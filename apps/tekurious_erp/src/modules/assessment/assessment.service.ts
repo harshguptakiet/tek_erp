@@ -1,0 +1,839 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { EventBusService } from '../../events/event-bus.service';
+import {
+  CreateQuestionDto,
+  CreateExamDto,
+  SubmitExamDto,
+  BulkGradeDto,
+  CreateBlueprintDto,
+  CreateRubricDto,
+} from './dto/assessment.dto';
+
+@Injectable()
+export class AssessmentService {
+  constructor(
+    private prisma: PrismaService,
+    private eventBus: EventBusService,
+  ) {}
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-QUEST-001–012: Question Bank
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async createQuestion(creatorId: string, dto: CreateQuestionDto) {
+    const question = await this.prisma.questionBank.create({
+      data: {
+        creatorId,
+        question: dto.question,
+        questionType: dto.questionType as any,
+        options: dto.options,
+        correctAnswer: dto.correctAnswer,
+        explanation: dto.explanation,
+        board: dto.board as any,
+        grade: dto.grade,
+        subjectId: dto.subjectId,
+        topicId: dto.topicId,
+        difficultyLevel: dto.difficultyLevel as any,
+        bloomsTaxonomy: dto.bloomsTaxonomy,
+        marks: dto.marks as any,
+        negativeMarks: dto.negativeMarks as any,
+        estimatedTime: dto.estimatedTime,
+        tags: dto.tags || [],
+        isPublic: dto.isPublic ?? false,
+        isActive: true,
+      },
+    });
+
+    this.eventBus.publish('assessment.question.created', {
+      questionId: question.id,
+      createdBy: creatorId,
+    });
+
+    return question;
+  }
+
+  async getQuestion(questionId: string) {
+    const q = await this.prisma.questionBank.findUnique({ where: { id: questionId } });
+    if (!q || !q.isActive) throw new NotFoundException('Question not found');
+    return q;
+  }
+
+  async searchQuestions(filters: {
+    q?: string;
+    grade?: number;
+    board?: string;
+    subjectId?: string;
+    topicId?: string;
+    difficultyLevel?: string;
+    questionType?: string;
+    isPublic?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      isActive: true,
+      ...(filters.q ? { question: { contains: filters.q, mode: 'insensitive' } } : {}),
+      ...(filters.grade ? { grade: filters.grade } : {}),
+      ...(filters.board ? { board: filters.board } : {}),
+      ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+      ...(filters.topicId ? { topicId: filters.topicId } : {}),
+      ...(filters.difficultyLevel ? { difficultyLevel: filters.difficultyLevel } : {}),
+      ...(filters.questionType ? { questionType: filters.questionType } : {}),
+      ...(filters.isPublic !== undefined ? { isPublic: filters.isPublic } : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.questionBank.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { usageCount: 'desc' },
+        select: {
+          id: true, question: true, questionType: true, marks: true,
+          difficultyLevel: true, grade: true, board: true, subjectId: true,
+          tags: true, usageCount: true, isPublic: true,
+        },
+      }),
+      this.prisma.questionBank.count({ where }),
+    ]);
+
+    return {
+      data: items,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async updateQuestion(questionId: string, dto: Partial<CreateQuestionDto>) {
+    const q = await this.prisma.questionBank.findUnique({ where: { id: questionId } });
+    if (!q || !q.isActive) throw new NotFoundException('Question not found');
+
+    return this.prisma.questionBank.update({
+      where: { id: questionId },
+      data: {
+        ...(dto.question ? { question: dto.question } : {}),
+        ...(dto.options !== undefined ? { options: dto.options } : {}),
+        ...(dto.correctAnswer !== undefined ? { correctAnswer: dto.correctAnswer } : {}),
+        ...(dto.explanation ? { explanation: dto.explanation } : {}),
+        ...(dto.difficultyLevel ? { difficultyLevel: dto.difficultyLevel as any } : {}),
+        ...(dto.marks ? { marks: dto.marks as any } : {}),
+        ...(dto.tags ? { tags: dto.tags } : {}),
+      },
+    });
+  }
+
+  async deleteQuestion(questionId: string) {
+    await this.prisma.questionBank.update({
+      where: { id: questionId },
+      data: { isActive: false },
+    });
+    return { success: true, message: 'Question deactivated' };
+  }
+
+  async bulkImportQuestions(creatorId: string, questions: CreateQuestionDto[]) {
+    const results = { created: 0, errors: [] as string[] };
+    for (const q of questions) {
+      try {
+        await this.createQuestion(creatorId, q);
+        results.created++;
+      } catch (e) {
+        results.errors.push(q.question.slice(0, 50));
+      }
+    }
+    return results;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-EXAM-001–010: Exam Management
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async createExam(createdBy: string, dto: CreateExamDto) {
+    const exam = await this.prisma.exam.create({
+      data: {
+        teacherId: dto.teacherId,
+        sectionId: dto.sectionId,
+        title: dto.title,
+        description: dto.description,
+        examType: dto.examType as any,
+        subjectId: dto.subjectId,
+        grade: dto.grade,
+        totalMarks: dto.totalMarks as any,
+        passingMarks: dto.passingMarks as any,
+        duration: dto.duration,
+        hasNegativeMarking: dto.hasNegativeMarking ?? false,
+        randomizeQuestions: dto.randomizeQuestions ?? false,
+        randomizeOptions: dto.randomizeOptions ?? false,
+        showResultsImmediately: dto.showResultsImmediately ?? true,
+        startTime: dto.startTime ? new Date(dto.startTime) : null,
+        endTime: dto.endTime ? new Date(dto.endTime) : null,
+      },
+    });
+
+    // Add questions if provided
+    if (dto.questions && dto.questions.length > 0) {
+      await this.addQuestionsToExam(createdBy, exam.id, dto.questions);
+    }
+
+    this.eventBus.publish('assessment.exam.created', {
+      examId: exam.id,
+      createdBy,
+    });
+
+    return this.getExam(exam.id);
+  }
+
+  async addQuestionsToExam(userId: string, examId: string, questions: any[]) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    const existingCount = await this.prisma.examQuestion.count({ where: { examId } });
+
+    const toCreate = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      let questionData: any;
+
+      if (q.questionBankId) {
+        // Pull from question bank
+        const bankedQ = await this.prisma.questionBank.findUnique({
+          where: { id: q.questionBankId },
+        });
+        if (!bankedQ) continue;
+        questionData = {
+          examId,
+          questionBankId: q.questionBankId,
+          questionOrder: existingCount + i + 1,
+          question: bankedQ.question,
+          questionType: bankedQ.questionType,
+          options: bankedQ.options,
+          correctAnswer: bankedQ.correctAnswer,
+          explanation: bankedQ.explanation,
+          marks: q.marks ?? bankedQ.marks,
+          negativeMarks: q.negativeMarks ?? bankedQ.negativeMarks,
+          sectionName: q.sectionName,
+        };
+        // Increment usage count
+        await this.prisma.questionBank.update({
+          where: { id: q.questionBankId },
+          data: { usageCount: { increment: 1 } },
+        });
+      } else {
+        // Custom question
+        questionData = {
+          examId,
+          questionOrder: existingCount + i + 1,
+          question: q.question,
+          questionType: q.questionType,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation,
+          marks: q.marks,
+          negativeMarks: q.negativeMarks,
+          sectionName: q.sectionName,
+        };
+      }
+      toCreate.push(questionData);
+    }
+
+    await this.prisma.examQuestion.createMany({ data: toCreate });
+    return { added: toCreate.length };
+  }
+
+  async getExam(examId: string, withAnswers = false) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId, deletedAt: null },
+      include: {
+        questions: {
+          orderBy: { questionOrder: 'asc' },
+          select: {
+            id: true,
+            questionOrder: true,
+            question: true,
+            questionType: true,
+            options: true,
+            marks: true,
+            negativeMarks: true,
+            sectionName: true,
+            // Only include correct answers if withAnswers=true
+            ...(withAnswers ? { correctAnswer: true, explanation: true } : {}),
+          },
+        },
+        _count: { select: { attempts: true, assignments: true } },
+      },
+    });
+    if (!exam) throw new NotFoundException('Exam not found');
+    return exam;
+  }
+
+  async listExams(filters: {
+    teacherId?: string;
+    sectionId?: string;
+    examType?: string;
+    isPublished?: boolean;
+    grade?: number;
+  }) {
+    return this.prisma.exam.findMany({
+      where: {
+        deletedAt: null,
+        ...(filters.teacherId ? { teacherId: filters.teacherId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters.examType ? { examType: filters.examType as any } : {}),
+        ...(filters.isPublished !== undefined ? { isPublished: filters.isPublished } : {}),
+        ...(filters.grade ? { grade: filters.grade } : {}),
+      } as any,
+      include: {
+        _count: { select: { questions: true, attempts: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async publishExam(userId: string, examId: string) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+    if (exam.isPublished) throw new ConflictException('Exam is already published');
+
+    const questionCount = await this.prisma.examQuestion.count({ where: { examId } });
+    if (questionCount === 0) throw new BadRequestException('Cannot publish exam with no questions');
+
+    const updated = await this.prisma.exam.update({
+      where: { id: examId },
+      data: { isPublished: true },
+    });
+
+    this.eventBus.publish('assessment.exam.published', { examId, publishedBy: userId });
+    return updated;
+  }
+
+  async deleteExam(userId: string, examId: string) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    await this.prisma.exam.update({
+      where: { id: examId },
+      data: { deletedAt: new Date() },
+    });
+
+    this.eventBus.publish('assessment.exam.deleted', { examId, deletedBy: userId });
+    return { success: true };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-ATTEMPT-001–010: Exam Attempts
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async startExam(studentId: string, examId: string) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId, deletedAt: null },
+      include: {
+        questions: {
+          orderBy: { questionOrder: 'asc' },
+          select: {
+            id: true, questionOrder: true, question: true,
+            questionType: true, options: true, marks: true,
+            negativeMarks: true, sectionName: true,
+            // Do NOT include correctAnswer
+          },
+        },
+      },
+    });
+    if (!exam) throw new NotFoundException('Exam not found');
+    if (!exam.isPublished) throw new BadRequestException('Exam is not published yet');
+
+    // Check for existing active attempt
+    const existingAttempt = await this.prisma.examAttempt.findFirst({
+      where: { examId, studentId, submittedAt: null },
+    });
+    if (existingAttempt) return { attempt: existingAttempt, exam, resumed: true };
+
+    // Check attempt count
+    const attemptCount = await this.prisma.examAttempt.count({ where: { examId, studentId } });
+
+    const attempt = await this.prisma.examAttempt.create({
+      data: {
+        examId,
+        studentId,
+        attemptNumber: attemptCount + 1,
+        startedAt: new Date(),
+      },
+    });
+
+    // Randomize questions if required
+    let questions = exam.questions;
+    if (exam.randomizeQuestions) {
+      questions = [...questions].sort(() => Math.random() - 0.5);
+    }
+
+    this.eventBus.publish('assessment.attempt.started', { attemptId: attempt.id, studentId, examId });
+
+    return {
+      attempt,
+      exam: {
+        id: exam.id,
+        title: exam.title,
+        duration: exam.duration,
+        totalMarks: exam.totalMarks,
+        hasNegativeMarking: exam.hasNegativeMarking,
+        startedAt: attempt.startedAt,
+        deadline: exam.endTime,
+        questions,
+      },
+      resumed: false,
+    };
+  }
+
+  async submitExam(studentId: string, attemptId: string, dto: SubmitExamDto) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: { exam: { include: { questions: true } } },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.studentId !== studentId) throw new BadRequestException('Invalid attempt');
+    if (attempt.submittedAt) throw new ConflictException('Exam already submitted');
+
+    // Evaluate auto-gradable questions (MCQ, TRUE_FALSE, FILL_BLANK, MULTI_SELECT)
+    let totalObtained = 0;
+    const AUTO_GRADE_TYPES = ['MCQ', 'TRUE_FALSE', 'FILL_BLANK', 'MULTI_SELECT'];
+
+    const answerRecords = [];
+    for (const submission of dto.answers) {
+      const question = attempt.exam.questions.find((q) => q.id === submission.questionId);
+      if (!question) continue;
+
+      let isCorrect: boolean | null = null;
+      let marksAwarded: number | null = null;
+
+      if (AUTO_GRADE_TYPES.includes(question.questionType)) {
+        const correctAnswer = question.correctAnswer as any;
+
+        if ((question.questionType as string) === 'MULTI_SELECT') {
+          const studentSet = new Set(Array.isArray(submission.answer) ? submission.answer : []);
+          const correctSet = new Set(Array.isArray(correctAnswer) ? correctAnswer : []);
+          isCorrect =
+            studentSet.size === correctSet.size &&
+            [...studentSet].every((v) => correctSet.has(v));
+        } else {
+          isCorrect =
+            String(submission.answer).trim().toLowerCase() ===
+            String(correctAnswer).trim().toLowerCase();
+        }
+
+        if (isCorrect) {
+          marksAwarded = Number(question.marks);
+        } else if (attempt.exam.hasNegativeMarking && question.negativeMarks) {
+          marksAwarded = -Number(question.negativeMarks);
+        } else {
+          marksAwarded = 0;
+        }
+        totalObtained += marksAwarded;
+      }
+
+      answerRecords.push({
+        attemptId,
+        questionId: submission.questionId,
+        answer: submission.answer,
+        isCorrect,
+        marksAwarded: marksAwarded as any,
+        timeTaken: submission.timeTaken,
+      });
+    }
+
+    // Save answers
+    await this.prisma.examAnswer.createMany({ data: answerRecords, skipDuplicates: true });
+
+    const totalMarks = Number(attempt.exam.totalMarks);
+    const percentage = totalMarks > 0 ? (totalObtained / totalMarks) * 100 : 0;
+    const isPassed = attempt.exam.passingMarks
+      ? totalObtained >= Number(attempt.exam.passingMarks)
+      : null;
+
+    const finalAttempt = await this.prisma.examAttempt.update({
+      where: { id: attemptId },
+      data: {
+        submittedAt: new Date(),
+        timeTaken: dto.totalTimeTaken,
+        obtainedMarks: totalObtained as any,
+        totalMarks: totalMarks as any,
+        percentage: percentage as any,
+        isPassed,
+        evaluatedAt: new Date(),
+      },
+    });
+
+    this.eventBus.publish('assessment.attempt.submitted', {
+      attemptId,
+      studentId,
+      examId: attempt.examId,
+      percentage,
+      isPassed,
+    });
+
+    return {
+      attempt: finalAttempt,
+      showResults: attempt.exam.showResultsImmediately,
+      ...(attempt.exam.showResultsImmediately
+        ? {
+            result: {
+              obtainedMarks: totalObtained,
+              totalMarks,
+              percentage: percentage.toFixed(2),
+              isPassed,
+            },
+          }
+        : {}),
+    };
+  }
+
+  async getAttemptResult(attemptId: string, studentId: string) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        exam: {
+          select: {
+            title: true, totalMarks: true, passingMarks: true,
+            showCorrectAnswers: true, allowReview: true,
+          },
+        },
+        answers: {
+          include: {
+            question: {
+              select: {
+                question: true, questionType: true, marks: true,
+                options: true, explanation: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.studentId !== studentId) throw new BadRequestException('Access denied');
+
+    return {
+      attempt: {
+        id: attempt.id,
+        submittedAt: attempt.submittedAt,
+        timeTaken: attempt.timeTaken,
+        obtainedMarks: attempt.obtainedMarks,
+        totalMarks: attempt.totalMarks,
+        percentage: attempt.percentage,
+        isPassed: attempt.isPassed,
+        rank: attempt.rank,
+      },
+      exam: attempt.exam,
+      answers: attempt.exam.allowReview ? attempt.answers : [],
+    };
+  }
+
+  async listStudentAttempts(studentId: string, examId?: string) {
+    return this.prisma.examAttempt.findMany({
+      where: {
+        studentId,
+        ...(examId ? { examId } : {}),
+        submittedAt: { not: null },
+      },
+      include: {
+        exam: { select: { title: true, examType: true, totalMarks: true } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-GRADE-001–008: Manual Grading
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async manualGradeAttempt(graderId: string, attemptId: string, dto: BulkGradeDto) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: { exam: true },
+    });
+    if (!attempt) throw new NotFoundException('Attempt not found');
+
+    let totalObtained = 0;
+
+    for (const grade of dto.grades) {
+      await this.prisma.examAnswer.update({
+        where: { id: grade.answerId },
+        data: {
+          marksAwarded: grade.marksAwarded as any,
+          feedback: grade.feedback,
+          isCorrect: grade.marksAwarded > 0,
+        },
+      });
+    }
+
+    // Recalculate total
+    const allAnswers = await this.prisma.examAnswer.findMany({ where: { attemptId } });
+    allAnswers.forEach((a) => {
+      if (a.marksAwarded) totalObtained += Number(a.marksAwarded);
+    });
+
+    const totalMarks = Number(attempt.exam.totalMarks);
+    const percentage = totalMarks > 0 ? (totalObtained / totalMarks) * 100 : 0;
+    const isPassed = attempt.exam.passingMarks
+      ? totalObtained >= Number(attempt.exam.passingMarks)
+      : null;
+
+    await this.prisma.examAttempt.update({
+      where: { id: attemptId },
+      data: {
+        obtainedMarks: totalObtained as any,
+        percentage: percentage as any,
+        isPassed,
+        evaluatedAt: new Date(),
+        evaluatedBy: graderId,
+      },
+    });
+
+    this.eventBus.publish('assessment.attempt.graded', { attemptId, gradedBy: graderId });
+
+    return { success: true, obtainedMarks: totalObtained, percentage, isPassed };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-RESULT-001–008: Results & Rankings
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getExamResults(examId: string) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: examId },
+      select: { id: true, title: true, totalMarks: true, passingMarks: true },
+    });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { examId, submittedAt: { not: null } },
+      include: {
+        student: {
+          include: { user: { select: { firstName: true, lastName: true } } },
+        },
+      },
+      orderBy: { obtainedMarks: 'desc' },
+    });
+
+    // Assign ranks
+    const ranked = attempts.map((a, i) => ({
+      rank: i + 1,
+      studentId: a.studentId,
+      studentName: `${a.student.user.firstName} ${a.student.user.lastName}`,
+      obtainedMarks: a.obtainedMarks,
+      percentage: a.percentage,
+      isPassed: a.isPassed,
+      timeTaken: a.timeTaken,
+    }));
+
+    // Update ranks in DB
+    for (const r of ranked) {
+      await this.prisma.examAttempt.updateMany({
+        where: { examId, studentId: r.studentId },
+        data: { rank: r.rank },
+      });
+    }
+
+    const passed = ranked.filter((r) => r.isPassed).length;
+    const avgPercentage =
+      ranked.reduce((s, r) => s + Number(r.percentage || 0), 0) / (ranked.length || 1);
+
+    return {
+      exam,
+      totalAttempts: ranked.length,
+      passCount: passed,
+      failCount: ranked.length - passed,
+      passRate: ranked.length > 0 ? ((passed / ranked.length) * 100).toFixed(1) : '0',
+      averageScore: avgPercentage.toFixed(1),
+      topScore: ranked[0]?.obtainedMarks || 0,
+      results: ranked,
+    };
+  }
+
+  async getStudentReport(studentId: string, filters: { examType?: string; subjectId?: string }) {
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: {
+        studentId,
+        submittedAt: { not: null },
+        exam: {
+          ...(filters.examType ? { examType: filters.examType as any } : {}),
+          ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+        },
+      },
+      include: {
+        exam: {
+          select: { title: true, examType: true, totalMarks: true, subjectId: true },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    const totalExams = attempts.length;
+    const passed = attempts.filter((a) => a.isPassed).length;
+    const avgScore =
+      attempts.reduce((s, a) => s + Number(a.percentage || 0), 0) / (totalExams || 1);
+
+    return {
+      studentId,
+      totalExams,
+      passed,
+      failed: totalExams - passed,
+      passRate: totalExams > 0 ? ((passed / totalExams) * 100).toFixed(1) : '0',
+      averageScore: avgScore.toFixed(1),
+      attempts: attempts.map((a) => ({
+        examTitle: a.exam.title,
+        examType: a.exam.examType,
+        subjectId: a.exam.subjectId,
+        obtainedMarks: a.obtainedMarks,
+        totalMarks: a.exam.totalMarks,
+        percentage: a.percentage,
+        isPassed: a.isPassed,
+        rank: a.rank,
+        submittedAt: a.submittedAt,
+      })),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-EXAM Blueprint & Rubric
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async createBlueprint(createdBy: string, dto: CreateBlueprintDto) {
+    const blueprint = await this.prisma.examBlueprint.create({
+      data: {
+        name: dto.name,
+        board: dto.board as any,
+        grade: dto.grade,
+        subjectId: dto.subjectId,
+        distribution: dto.distribution,
+        totalMarks: dto.totalMarks as any,
+        duration: dto.duration,
+        difficultyDistribution: dto.difficultyDistribution,
+        isTemplate: dto.isTemplate ?? false,
+        createdBy,
+      },
+    });
+
+    return blueprint;
+  }
+
+  async listBlueprints(grade?: number, subjectId?: string) {
+    return this.prisma.examBlueprint.findMany({
+      where: {
+        ...(grade ? { grade } : {}),
+        ...(subjectId ? { subjectId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createRubric(createdBy: string, dto: CreateRubricDto) {
+    return this.prisma.gradingRubric.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        criteria: dto.criteria,
+        totalPoints: dto.totalPoints as any,
+        isPublic: dto.isPublic ?? false,
+        createdBy,
+      },
+    });
+  }
+
+  async listRubrics(isPublic?: boolean) {
+    return this.prisma.gradingRubric.findMany({
+      where: isPublic !== undefined ? { isPublic } : {},
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-RESULT-004/SECURITY-001–003/REPORT-002–003: Extended Assessment Features
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async computeExamRankings(examId: string) {
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { examId, submittedAt: { not: null } },
+      orderBy: [{ obtainedMarks: 'desc' }, { timeTaken: 'asc' }],
+    });
+    for (let i = 0; i < attempts.length; i++) {
+      await this.prisma.examAttempt.update({ where: { id: attempts[i].id }, data: { rank: i + 1 } });
+    }
+    return {
+      examId, totalStudents: attempts.length,
+      rankings: attempts.map((a, i) => ({ rank: i + 1, studentId: a.studentId, obtainedMarks: a.obtainedMarks, percentage: a.percentage })),
+    };
+  }
+
+  async checkAttemptValidity(studentId: string, examId: string) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId, deletedAt: null }, select: { id: true, title: true, startTime: true, endTime: true, isPublished: true } });
+    if (!exam) return { valid: false, reason: 'Exam not found' };
+    if (!exam.isPublished) return { valid: false, reason: 'Exam not published' };
+    const now = new Date();
+    if (exam.startTime && now < exam.startTime) return { valid: false, reason: 'Exam has not started yet', startsAt: exam.startTime };
+    if (exam.endTime && now > exam.endTime) return { valid: false, reason: 'Exam has ended', endedAt: exam.endTime };
+    const submitted = await this.prisma.examAttempt.findFirst({ where: { examId, studentId, submittedAt: { not: null } } });
+    if (submitted) return { valid: false, reason: 'Already submitted', attemptId: submitted.id };
+    const active = await this.prisma.examAttempt.findFirst({ where: { examId, studentId, submittedAt: null } });
+    return { valid: true, hasActiveAttempt: !!active, activeAttemptId: active?.id };
+  }
+
+  async getSubjectWiseReport(filters: { teacherId?: string; sectionId?: string; subjectId?: string }) {
+    const exams = await this.prisma.exam.findMany({
+      where: {
+        deletedAt: null,
+        ...(filters.teacherId ? { teacherId: filters.teacherId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+      },
+      include: { attempts: { where: { submittedAt: { not: null } }, select: { obtainedMarks: true, percentage: true, isPassed: true } } },
+    });
+    return exams.map((e) => {
+      const total = e.attempts.length;
+      const passed = e.attempts.filter((a) => a.isPassed).length;
+      const avg = total > 0 ? e.attempts.reduce((s, a) => s + Number(a.percentage || 0), 0) / total : 0;
+      return { examId: e.id, examTitle: e.title, examType: e.examType, subjectId: e.subjectId, totalAttempts: total, passed, passRate: total > 0 ? ((passed / total) * 100).toFixed(1) : '0', averageScore: avg.toFixed(1) };
+    });
+  }
+
+  async exportExamResults(examId: string) {
+    const results = await this.getExamResults(examId);
+    const csv = ['Rank,StudentId,Marks,Total,Percentage,Passed,TimeTaken', ...results.results.map((r) => `${r.rank},${r.studentId},${r.obtainedMarks},${results.exam.totalMarks},${r.percentage},${r.isPassed},${r.timeTaken || ''}`)].join('\n');
+    return { examId, format: 'CSV', data: csv, rowCount: results.results.length };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Assign Exam to Students / Classes
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async assignExam(assignedBy: string, examId: string, targets: {
+    studentIds?: string[];
+    classId?: string;
+  }) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    const assignments = [];
+
+    if (targets.studentIds) {
+      for (const studentId of targets.studentIds) {
+        assignments.push({ examId, studentId, assignedBy });
+      }
+    }
+    if (targets.classId) {
+      assignments.push({ examId, classId: targets.classId, assignedBy });
+    }
+
+    await this.prisma.examAssignment.createMany({ data: assignments, skipDuplicates: true });
+
+    this.eventBus.publish('assessment.exam.assigned', { examId, targets, assignedBy });
+
+    return { success: true, assigned: assignments.length };
+  }
+}

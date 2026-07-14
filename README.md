@@ -1,101 +1,235 @@
-# Tekurious
+# Tekurious ERP - Educational Management Platform
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A comprehensive educational management system built with NestJS, Prisma, and PostgreSQL.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+## 🚀 Quick Start
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+### Prerequisites
 
-## Run tasks
+- Node.js v20+ 
+- Docker Desktop (for PostgreSQL and Redis)
+- npm or yarn
 
-To run the dev server for your app, use:
+### Installation
 
-```sh
-npx nx serve tekurious_erp
+1. **Clone and Install Dependencies**
+```bash
+cd tekurious
+npm install
 ```
 
-To create a production bundle:
-
-```sh
-npx nx build tekurious_erp
+2. **Start Docker Services**
+```bash
+# Make sure Docker Desktop is running first!
+docker-compose up -d
 ```
 
-To see all available targets to run for a project, run:
+This will start:
+- PostgreSQL on port 5432
+- Redis on port 6379
 
-```sh
-npx nx show project tekurious_erp
+3. **Set up Environment Variables**
+```bash
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/nest:app demo
+4. **Generate Prisma Client**
+```bash
+npx prisma generate
 ```
 
-To generate a new library, use:
-
-```sh
-npx nx g @nx/node:lib mylib
+5. **Run Database Migrations**
+```bash
+npx prisma migrate dev --name init
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
+6. **Start the Development Server**
+```bash
+npm run serve
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+The API will be available at: `http://localhost:3000/api/v1`
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## 📁 Project Structure
 
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+```
+tekurious/
+├── apps/
+│   └── tekurious_erp/
+│       └── src/
+│           ├── modules/          # Feature modules
+│           │   ├── auth/         # Authentication
+│           │   ├── users/        # User management
+│           │   ├── schools/      # School management
+│           │   ├── students/     # Student management
+│           │   └── teachers/     # Teacher management
+│           ├── common/           # Shared utilities
+│           │   ├── decorators/
+│           │   ├── guards/
+│           │   ├── interceptors/
+│           │   ├── filters/
+│           │   └── pipes/
+│           ├── database/         # Prisma service
+│           ├── events/           # Event bus
+│           ├── config/           # Configuration
+│           └── main.ts           # Bootstrap
+├── prisma/
+│   └── schema.prisma            # Database schema (268 models)
+├── docker-compose.yml           # Docker services
+└── .env                         # Environment variables
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## 🔧 Development
 
-## Install Nx Console
+### Available Scripts
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+```bash
+# Start development server
+npm run serve
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# Run tests
+npm test
 
-## Useful links
+# Run linter
+npm run lint
 
-Learn more:
+# Format code
+npm run format
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# Build for production
+npm run build
+```
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Database Commands
+
+```bash
+# Generate Prisma Client
+npx prisma generate
+
+# Create a migration
+npx prisma migrate dev --name your_migration_name
+
+# Run migrations
+npx prisma migrate deploy
+
+# Open Prisma Studio (Database GUI)
+npx prisma studio
+
+# Reset database (development only!)
+npx prisma migrate reset
+```
+
+## 📊 Database Schema
+
+The project uses a comprehensive schema with:
+- **268 models** covering all aspects of educational management
+- Multi-tenancy support
+- Complete RBAC (Role-Based Access Control)
+- Event-driven architecture
+- Soft deletes
+- Audit logging
+
+## 🏗️ Architecture
+
+### Phase 1: MVP (Months 1-3)
+- **Architecture**: Modular Monolith
+- **Services**: 1 (All modules in one app)
+- **Database**: 1 PostgreSQL instance
+- **Infrastructure**: Docker Compose on VPS
+
+### Future Phases
+See `architecture-docs/IMPLEMENTATION_GUIDE.md` for the complete roadmap.
+
+## 🔐 Environment Variables
+
+Key environment variables (see `.env.example`):
+
+```env
+DATABASE_URL=postgresql://postgres:password@localhost:5432/tekurious_db
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-secret-key
+AWS_S3_BUCKET=your-bucket
+RAZORPAY_KEY_ID=your-key
+SENDGRID_API_KEY=your-key
+TWILIO_ACCOUNT_SID=your-sid
+```
+
+## 📚 Documentation
+
+- **Implementation Guide**: `architecture-docs/IMPLEMENTATION_GUIDE.md`
+- **Requirements**: `requirements/` folder
+- **Database Schema**: `schema.prisma`
+- **Architecture Docs**: `architecture-docs/` folder
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm test
+
+# E2E tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+```
+
+## 🚢 Deployment
+
+### Docker Build
+
+```bash
+# Build Docker image
+docker build -t tekurious-erp .
+
+# Run container
+docker run -p 3000:3000 tekurious-erp
+```
+
+### Production Deployment
+
+See `architecture-docs/IMPLEMENTATION_GUIDE.md` for detailed deployment instructions.
+
+## 📝 License
+
+Proprietary - All Rights Reserved
+
+## 👥 Team
+
+Built with ❤️ by the Tekurious team
+
+---
+
+## 🆘 Troubleshooting
+
+### Docker not starting
+```bash
+# Check if Docker Desktop is running
+docker ps
+
+# Restart Docker Desktop if needed
+```
+
+### Database connection issues
+```bash
+# Check if PostgreSQL is running
+docker ps | grep postgres
+
+# Check logs
+docker logs tekurious_postgres
+```
+
+### Prisma Client issues
+```bash
+# Regenerate Prisma Client
+npx prisma generate
+
+# Clear node_modules and reinstall
+rm -rf node_modules
+npm install
+```
+
+## 📞 Support
+
+For issues and questions, contact the development team.

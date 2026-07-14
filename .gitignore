@@ -1,45 +1,62 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# compiled output
-dist
-tmp
-out-tsc
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+build/
+.nx/cache/
+.nx/workspace-data/
+tmp/
+out-tsc/
+.angular/
 
-# dependencies
-node_modules
+# ── Environment / Secrets (NEVER commit) ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
 
-# IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# Keep the example file
+!.env.example
 
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# ── Test / Debug artefacts ────────────────────────────────────────────────────
+build_log.txt
+build_out.txt
+build_err.txt
+build2.txt
+build3.txt
+diag*.ps1
+diag*.txt
+wf_*.ps1
+wf_*.txt
+q_result.json
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
+# ── Prisma ────────────────────────────────────────────────────────────────────
+# Keep schema and migrations, ignore generated client
+prisma/generated/
 
-# System Files
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-.nx/cache
-.nx/workspace-data
-.nx/migrate-runs
-.claude/worktrees
-.claude/settings.local.json
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
+*.log
+coverage/
+.nyc_output/
