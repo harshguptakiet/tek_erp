@@ -652,7 +652,7 @@
 | SMS logs | FR-SMS-001–004 | ✅ DONE |
 | Conversations (create/list) | FR-MSG-001–002 | ✅ DONE |
 | Send/get messages | FR-MSG-003–004 | ✅ DONE |
-| Push notifications | FR-PUSH-001–004 | ⏳ PENDING |
+| Push notifications | FR-PUSH-001–004 | ✅ DONE (device registration, send push, bulk push, user devices) |
 | WhatsApp integration | FR-WHATSAPP-001–004 | ⏳ PENDING |
 
 ---

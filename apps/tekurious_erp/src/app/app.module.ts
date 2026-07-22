@@ -24,6 +24,7 @@ import { SystemModule } from '../modules/system/system.module';
 import { SubscriptionsModule } from '../modules/subscriptions/subscriptions.module';
 import { ErpModule } from '../modules/erp/erp.module';
 import { MediaModule } from '../modules/media/media.module';
+import { SyncModule } from '../modules/sync/sync.module';
 import { JwtAuthGuard } from '../modules/auth/guards';
 
 @Module({
@@ -75,6 +76,7 @@ import { JwtAuthGuard } from '../modules/auth/guards';
     SubscriptionsModule,
     ErpModule,
     MediaModule,
+    SyncModule,
     // etc.
   ],
   controllers: [AppController],
