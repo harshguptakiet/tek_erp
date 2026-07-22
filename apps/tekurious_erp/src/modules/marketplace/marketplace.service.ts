@@ -427,4 +427,197 @@ export class MarketplaceService {
       totalRevenue: revenue._sum.revenueGenerated || 0,
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-MONET-006 to FR-MONET-008: SUBSCRIPTION PRODUCT MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async manageSubscription(buyerId: string, orderId: string, action: 'PAUSE' | 'RESUME' | 'CANCEL') {
+    const order = await this.prisma.marketplaceOrder.findFirst({
+      where: { id: orderId, buyerId },
+      include: { product: true },
+    });
+
+    if (!order) throw new NotFoundException('Subscription order not found');
+    if (order.product.productType !== 'SUBSCRIPTION') {
+      throw new BadRequestException('This order is not a subscription');
+    }
+
+    const statusMap = { PAUSE: 'PAUSED', RESUME: 'COMPLETED', CANCEL: 'CANCELLED' };
+    const updated = await this.prisma.marketplaceOrder.update({
+      where: { id: orderId },
+      data: { status: statusMap[action] },
+    });
+
+    await this.eventBus.publish('subscription.action', {
+      orderId, buyerId, action,
+      productId: order.productId,
+    });
+
+    return { message: `Subscription ${action.toLowerCase()}d successfully`, order: updated };
+  }
+
+  async getSubscriptionDetails(buyerId: string) {
+    const subscriptions = await this.prisma.marketplaceOrder.findMany({
+      where: {
+        buyerId,
+        product: { productType: 'SUBSCRIPTION' },
+      },
+      include: {
+        product: { select: { id: true, productName: true, price: true, productType: true } },
+      },
+      orderBy: { orderedAt: 'desc' },
+    });
+
+    return {
+      totalSubscriptions: subscriptions.length,
+      active: subscriptions.filter(s => s.status === 'COMPLETED').length,
+      paused: subscriptions.filter(s => s.status === 'PAUSED').length,
+      cancelled: subscriptions.filter(s => s.status === 'CANCELLED').length,
+      subscriptions,
+    };
+  }
+
+  async getProductSubscribers(productId: string) {
+    const subscribers = await this.prisma.marketplaceOrder.findMany({
+      where: {
+        productId,
+        product: { productType: 'SUBSCRIPTION' },
+        status: { in: ['COMPLETED', 'PAUSED'] },
+      },
+      orderBy: { orderedAt: 'desc' },
+    });
+
+    return {
+      productId,
+      totalSubscribers: subscribers.length,
+      active: subscribers.filter(s => s.status === 'COMPLETED').length,
+      paused: subscribers.filter(s => s.status === 'PAUSED').length,
+      subscribers: subscribers.map(s => ({
+        orderId: s.id,
+        buyerId: s.buyerId,
+        status: s.status,
+        subscribedAt: s.orderedAt,
+      })),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-OPS-003 to FR-OPS-004: MARKETPLACE REVIEW/RATING SYSTEM
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async submitProductReview(userId: string, dto: {
+    productId: string; rating: number; title?: string; review?: string;
+  }) {
+    if (dto.rating < 1 || dto.rating > 5) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    // Verify user purchased the product
+    const purchase = await this.prisma.marketplaceOrder.findFirst({
+      where: { buyerId: userId, productId: dto.productId, status: 'COMPLETED' },
+    });
+
+    if (!purchase) {
+      throw new BadRequestException('You must purchase the product before reviewing');
+    }
+
+    // Check if product has linked content for ContentReview
+    const product = await this.prisma.marketplaceProduct.findUnique({
+      where: { id: dto.productId },
+    });
+
+    if (!product) throw new NotFoundException('Product not found');
+
+    // If product has contentId, use ContentReview model
+    if (product.contentId) {
+      const existingReview = await this.prisma.contentReview.findUnique({
+        where: { contentId_userId: { contentId: product.contentId, userId } },
+      });
+
+      if (existingReview) {
+        // Update existing review
+        await this.prisma.contentReview.update({
+          where: { id: existingReview.id },
+          data: { rating: dto.rating, comment: dto.review || dto.title },
+        });
+      } else {
+        await this.prisma.contentReview.create({
+          data: {
+            contentId: product.contentId,
+            userId,
+            rating: dto.rating,
+            comment: dto.review || dto.title,
+          },
+        });
+      }
+    }
+
+    // Update product rating aggregate
+    const allReviews = product.contentId
+      ? await this.prisma.contentReview.findMany({
+          where: { contentId: product.contentId },
+        })
+      : [];
+
+    const avgRating = allReviews.length > 0
+      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+      : dto.rating;
+
+    await this.prisma.marketplaceProduct.update({
+      where: { id: dto.productId },
+      data: {
+        rating: avgRating,
+        reviewCount: allReviews.length || 1,
+      },
+    });
+
+    await this.eventBus.publish('product.reviewed', {
+      productId: dto.productId,
+      userId,
+      rating: dto.rating,
+    });
+
+    return {
+      message: 'Review submitted successfully',
+      productId: dto.productId,
+      rating: dto.rating,
+      averageRating: avgRating,
+    };
+  }
+
+  async getProductReviews(productId: string, page = 1, limit = 20) {
+    const product = await this.prisma.marketplaceProduct.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) throw new NotFoundException('Product not found');
+
+    if (!product.contentId) {
+      return { data: [], meta: { total: 0, page, limit, averageRating: 0 } };
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.contentReview.findMany({
+        where: { contentId: product.contentId },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.contentReview.count({
+        where: { contentId: product.contentId },
+      }),
+    ]);
+
+    return {
+      data: reviews,
+      meta: {
+        total,
+        page,
+        limit,
+        averageRating: product.rating,
+        reviewCount: product.reviewCount,
+      },
+    };
+  }
 }

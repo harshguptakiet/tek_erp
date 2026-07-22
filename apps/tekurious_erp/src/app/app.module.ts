@@ -23,6 +23,7 @@ import { SearchModule } from '../modules/search/search.module';
 import { SystemModule } from '../modules/system/system.module';
 import { SubscriptionsModule } from '../modules/subscriptions/subscriptions.module';
 import { ErpModule } from '../modules/erp/erp.module';
+import { MediaModule } from '../modules/media/media.module';
 import { JwtAuthGuard } from '../modules/auth/guards';
 
 @Module({
@@ -73,6 +74,7 @@ import { JwtAuthGuard } from '../modules/auth/guards';
     SystemModule,
     SubscriptionsModule,
     ErpModule,
+    MediaModule,
     // etc.
   ],
   controllers: [AppController],

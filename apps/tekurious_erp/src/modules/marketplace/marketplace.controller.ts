@@ -182,4 +182,42 @@ export class MarketplaceController {
   marketplaceStats(@Request() req) {
     return this.service.getMarketplaceStats(req.user.userId);
   }
+
+  // ── Subscription Management (FR-MONET-006 to FR-MONET-008) ────────────────
+
+  @Put('subscriptions/:orderId')
+  @ApiOperation({ summary: 'Manage subscription (pause/resume/cancel) (FR-MONET-006)' })
+  manageSubscription(@Request() req, @Param('orderId') orderId: string, @Body() dto: { action: 'PAUSE' | 'RESUME' | 'CANCEL' }) {
+    return this.service.manageSubscription(req.user.userId, orderId, dto.action);
+  }
+
+  @Get('subscriptions/my')
+  @ApiOperation({ summary: 'Get my subscriptions (FR-MONET-007)' })
+  mySubscriptions(@Request() req) {
+    return this.service.getSubscriptionDetails(req.user.userId);
+  }
+
+  @Get('subscriptions/product/:productId')
+  @ApiOperation({ summary: 'Get product subscribers (FR-MONET-008)' })
+  productSubscribers(@Param('productId') productId: string) {
+    return this.service.getProductSubscribers(productId);
+  }
+
+  // ── Reviews & Ratings (FR-OPS-003 to FR-OPS-004) ──────────────────────────
+
+  @Post('products/:productId/reviews')
+  @ApiOperation({ summary: 'Submit product review (FR-OPS-003)' })
+  submitReview(@Request() req, @Param('productId') productId: string, @Body() dto: any) {
+    return this.service.submitProductReview(req.user.userId, { ...dto, productId });
+  }
+
+  @Get('products/:productId/reviews')
+  @ApiOperation({ summary: 'Get product reviews (FR-OPS-004)' })
+  getReviews(
+    @Param('productId') productId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getProductReviews(productId, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  }
 }

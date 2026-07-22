@@ -152,4 +152,50 @@ export class SystemController {
   setFlag(@Param('name') name: string, @Body() body: { isEnabled: boolean; enabledFor?: string[] }) {
     return this.service.setFeatureFlag(name, body.isEnabled, body.enabledFor);
   }
+
+  // ── Cloud Sync & Offline (FR-SYNC-001/002) ──────────────────────────────
+
+  @Get('sync/status')
+  @ApiOperation({ summary: 'Get sync status (FR-SYNC-001)' })
+  getSyncStatus(@Query('organizationId') organizationId?: string) {
+    return this.service.getSyncStatus(organizationId);
+  }
+
+  @Post('sync/trigger')
+  @ApiOperation({ summary: 'Trigger cloud sync (FR-SYNC-001)' })
+  triggerSync(@Body() dto: any) {
+    return this.service.triggerSync(dto);
+  }
+
+  @Get('sync/offline-config/:organizationId')
+  @ApiOperation({ summary: 'Get offline configuration (FR-SYNC-002)' })
+  getOfflineConfig(@Param('organizationId') organizationId: string) {
+    return this.service.getOfflineConfig(organizationId);
+  }
+
+  // ── Backups & Data Retention (FR-DATA-001/002) ──────────────────────────
+
+  @Post('backups/trigger')
+  @ApiOperation({ summary: 'Trigger backup (FR-DATA-001)' })
+  triggerBackup(@Body() dto: any) {
+    return this.service.triggerBackup(dto);
+  }
+
+  @Get('backups/history')
+  @ApiOperation({ summary: 'Get backup history (FR-DATA-001)' })
+  getBackupHistory(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.service.getBackupHistory(page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  }
+
+  @Get('data/retention-policy')
+  @ApiOperation({ summary: 'Get data retention policy (FR-DATA-002)' })
+  getRetentionPolicy() {
+    return this.service.getRetentionPolicy();
+  }
+
+  @Post('data/cleanup')
+  @ApiOperation({ summary: 'Run data cleanup (FR-DATA-002)' })
+  runDataCleanup(@Body() dto: any) {
+    return this.service.runDataCleanup(dto);
+  }
 }

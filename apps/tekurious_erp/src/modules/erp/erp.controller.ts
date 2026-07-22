@@ -768,4 +768,150 @@ export class ErpController {
   getBehaviorLeaderboard(@Query('schoolId') schoolId: string, @Query('limit') limit: string) {
     return this.service.getBehaviorLeaderboard(schoolId, limit ? parseInt(limit) : 20);
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-009: GPS TRACKING AND TRIP MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('transport/gps/update')
+  @ApiOperation({ summary: 'Update vehicle GPS location (FR-TRANS-009)' })
+  updateVehicleGPS(@Body() dto: any) {
+    const { vehicleId, ...gpsData } = dto;
+    return this.service.updateVehicleGPS(vehicleId, gpsData);
+  }
+
+  @Get('transport/gps/:vehicleId/history')
+  @ApiOperation({ summary: 'Get vehicle GPS history (FR-TRANS-009)' })
+  getVehicleGPSHistory(
+    @Param('vehicleId') vehicleId: string,
+    @Query('startTime') startTime?: string,
+    @Query('endTime') endTime?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getVehicleGPSHistory(vehicleId, {
+      startTime,
+      endTime,
+      limit: limit ? parseInt(limit) : 100,
+    });
+  }
+
+  @Post('transport/trips')
+  @ApiOperation({ summary: 'Create transport trip (FR-TRANS-009)' })
+  createTrip(@Request() req, @Body() dto: any) {
+    return this.service.createTrip(req.user.userId, dto);
+  }
+
+  @Post('transport/trips/:tripId/start')
+  @ApiOperation({ summary: 'Start trip (FR-TRANS-009)' })
+  startTrip(@Request() req, @Param('tripId') tripId: string, @Body() dto: any) {
+    return this.service.startTrip(tripId, req.user.userId, dto);
+  }
+
+  @Post('transport/trips/:tripId/end')
+  @ApiOperation({ summary: 'End trip (FR-TRANS-009)' })
+  endTrip(@Request() req, @Param('tripId') tripId: string, @Body() dto: any) {
+    return this.service.endTrip(tripId, req.user.userId, dto);
+  }
+
+  @Get('transport/trips/:tripId')
+  @ApiOperation({ summary: 'Get trip details (FR-TRANS-009)' })
+  getTripDetails(@Param('tripId') tripId: string) {
+    return this.service.getTripDetails(tripId);
+  }
+
+  @Get('transport/trips')
+  @ApiOperation({ summary: 'List trips (FR-TRANS-009)' })
+  listTrips(@Query() filters: any) {
+    return this.service.listTrips({
+      routeId: filters.routeId,
+      vehicleId: filters.vehicleId,
+      date: filters.date,
+      status: filters.status,
+      page: filters.page ? parseInt(filters.page) : 1,
+      limit: filters.limit ? parseInt(filters.limit) : 20,
+    });
+  }
+
+  @Post('transport/attendance/mark')
+  @ApiOperation({ summary: 'Mark student transport attendance (FR-TRANS-009)' })
+  markStudentTransportAttendance(@Request() req, @Body() dto: any) {
+    return this.service.markStudentAttendance(req.user.userId, dto);
+  }
+
+  @Get('transport/attendance/report')
+  @ApiOperation({ summary: 'Get transport attendance report (FR-TRANS-009)' })
+  getTransportAttendanceReport(@Query() filters: any) {
+    return this.service.getTransportAttendanceReport({
+      routeId: filters.routeId,
+      studentId: filters.studentId,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-FEE-HOSTEL: HOSTEL FEE MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hostel/fees')
+  @ApiOperation({ summary: 'Create hostel fee structure (FR-FEE-HOSTEL)' })
+  createHostelFee(@Request() req, @Body() dto: any) {
+    return this.service.createHostelFee(req.user.userId, dto);
+  }
+
+  @Get('hostel/fees')
+  @ApiOperation({ summary: 'List hostel fees (FR-FEE-HOSTEL)' })
+  listHostelFees(@Query('blockId') blockId?: string) {
+    return this.service.listHostelFees(blockId);
+  }
+
+  @Put('hostel/fees/:feeId')
+  @ApiOperation({ summary: 'Update hostel fee (FR-FEE-HOSTEL)' })
+  updateHostelFee(@Request() req, @Param('feeId') feeId: string, @Body() dto: any) {
+    return this.service.updateHostelFee(feeId, req.user.userId, dto);
+  }
+
+  @Delete('hostel/fees/:feeId')
+  @ApiOperation({ summary: 'Delete hostel fee (FR-FEE-HOSTEL)' })
+  deleteHostelFee(@Request() req, @Param('feeId') feeId: string) {
+    return this.service.deleteHostelFee(feeId, req.user.userId);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-INV-SUPPLIERS: SUPPLIER MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('inventory/suppliers')
+  @ApiOperation({ summary: 'Create supplier (FR-INV-SUPPLIERS)' })
+  createSupplier(@Request() req, @Body() dto: any) {
+    return this.service.createSupplier(req.user.userId, dto);
+  }
+
+  @Get('inventory/suppliers')
+  @ApiOperation({ summary: 'List suppliers (FR-INV-SUPPLIERS)' })
+  listSuppliers(@Query() filters: any) {
+    return this.service.listSuppliers({
+      category: filters.category,
+      search: filters.search,
+      active: filters.active !== undefined ? filters.active === 'true' : undefined,
+    });
+  }
+
+  @Get('inventory/suppliers/:supplierId')
+  @ApiOperation({ summary: 'Get supplier details (FR-INV-SUPPLIERS)' })
+  getSupplier(@Param('supplierId') supplierId: string) {
+    return this.service.getSupplier(supplierId);
+  }
+
+  @Put('inventory/suppliers/:supplierId')
+  @ApiOperation({ summary: 'Update supplier (FR-INV-SUPPLIERS)' })
+  updateSupplier(@Request() req, @Param('supplierId') supplierId: string, @Body() dto: any) {
+    return this.service.updateSupplier(supplierId, req.user.userId, dto);
+  }
+
+  @Delete('inventory/suppliers/:supplierId')
+  @ApiOperation({ summary: 'Delete/deactivate supplier (FR-INV-SUPPLIERS)' })
+  deleteSupplier(@Request() req, @Param('supplierId') supplierId: string) {
+    return this.service.deleteSupplier(supplierId, req.user.userId);
+  }
 }

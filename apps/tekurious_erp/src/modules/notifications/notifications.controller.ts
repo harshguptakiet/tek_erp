@@ -103,6 +103,70 @@ export class NotificationsController {
   smsLogs(@Query('userId') userId?: string) {
     return this.service.getSMSLogs(userId);
   }
+
+  // ── Push Notifications (FR-PUSH-001 to FR-PUSH-004) ─────────────────────────
+
+  @Post('push/devices')
+  @ApiOperation({ summary: 'Register device for push notifications (FR-PUSH-001)' })
+  registerDevice(@Request() req, @Body() dto: any) {
+    return this.service.registerDevice(req.user.userId, dto);
+  }
+
+  @Delete('push/devices/:token')
+  @ApiOperation({ summary: 'Unregister device (FR-PUSH-001)' })
+  unregisterDevice(@Request() req, @Param('token') token: string) {
+    return this.service.unregisterDevice(req.user.userId, token);
+  }
+
+  @Get('push/devices')
+  @ApiOperation({ summary: 'Get user devices (FR-PUSH-001)' })
+  getUserDevices(@Request() req) {
+    return this.service.getUserDevices(req.user.userId);
+  }
+
+  @Post('push/send')
+  @ApiOperation({ summary: 'Send push notification (FR-PUSH-002)' })
+  sendPush(@Body() dto: any) {
+    return this.service.sendPushNotification(dto);
+  }
+
+  @Post('push/send-bulk')
+  @ApiOperation({ summary: 'Send bulk push notification (FR-PUSH-003)' })
+  sendBulkPush(@Body() dto: any) {
+    return this.service.sendBulkPush(dto);
+  }
+
+  @Get('push/stats')
+  @ApiOperation({ summary: 'Get push delivery stats (FR-PUSH-004)' })
+  getPushStats(@Query('notificationId') notificationId?: string, @Query('userId') userId?: string) {
+    return this.service.getPushDeliveryStats(notificationId, userId);
+  }
+
+  // ── WhatsApp Integration (FR-WHATSAPP-001 to FR-WHATSAPP-004) ───────────────
+
+  @Post('whatsapp/send')
+  @ApiOperation({ summary: 'Send WhatsApp message (FR-WHATSAPP-001)' })
+  sendWhatsApp(@Body() dto: any) {
+    return this.service.sendWhatsAppMessage(dto);
+  }
+
+  @Post('whatsapp/send-bulk')
+  @ApiOperation({ summary: 'Send bulk WhatsApp messages (FR-WHATSAPP-002)' })
+  sendBulkWhatsApp(@Body() dto: any) {
+    return this.service.sendBulkWhatsApp(dto);
+  }
+
+  @Get('whatsapp/logs')
+  @ApiOperation({ summary: 'Get WhatsApp delivery logs (FR-WHATSAPP-003)' })
+  getWhatsAppLogs(@Query() filters: any) {
+    return this.service.getWhatsAppDeliveryLogs(filters);
+  }
+
+  @Get('whatsapp/templates')
+  @ApiOperation({ summary: 'Get WhatsApp templates (FR-WHATSAPP-004)' })
+  getWhatsAppTemplates() {
+    return this.service.getWhatsAppTemplates();
+  }
 }
 
 // ── Messaging Controller (separate prefix) ───────────────────────────────────

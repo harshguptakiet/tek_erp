@@ -2840,4 +2840,486 @@ export class ErpService {
       leaderboard,
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-009: GPS Tracking and Trip Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async updateVehicleGPS(vehicleId: string, dto: {
+    latitude: number; longitude: number; speed?: number;
+    heading?: number; altitude?: number; accuracy?: number;
+    ignitionOn?: boolean; fuelLevel?: number;
+  }) {
+    const vehicle = await this.prisma.transportVehicle.findUnique({
+      where: { id: vehicleId },
+    });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+
+    // Log GPS data
+    const gpsLog = await this.prisma.vehicleGPSLog.create({
+      data: {
+        vehicleId,
+        latitude: dto.latitude as any,
+        longitude: dto.longitude as any,
+        speed: dto.speed as any,
+        heading: dto.heading as any,
+        altitude: dto.altitude as any,
+        accuracy: dto.accuracy as any,
+        ignitionOn: dto.ignitionOn,
+        fuelLevel: dto.fuelLevel as any,
+        timestamp: new Date(),
+      },
+    });
+
+    // Update vehicle's last known location
+    await this.prisma.transportVehicle.update({
+      where: { id: vehicleId },
+      data: {
+        lastKnownLat: dto.latitude as any,
+        lastKnownLng: dto.longitude as any,
+        lastTrackedAt: new Date(),
+        currentSpeed: dto.speed as any,
+        fuelLevel: dto.fuelLevel as any,
+      },
+    });
+
+    return gpsLog;
+  }
+
+  async getVehicleGPSHistory(vehicleId: string, filters: { startTime?: string; endTime?: string; limit?: number }) {
+    const vehicle = await this.prisma.transportVehicle.findUnique({
+      where: { id: vehicleId },
+      select: { vehicleNumber: true, lastKnownLat: true, lastKnownLng: true, lastTrackedAt: true },
+    });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+
+    const where: any = {
+      vehicleId,
+      ...(filters.startTime || filters.endTime ? {
+        timestamp: {
+          ...(filters.startTime ? { gte: new Date(filters.startTime) } : {}),
+          ...(filters.endTime ? { lte: new Date(filters.endTime) } : {}),
+        },
+      } : {}),
+    };
+
+    const logs = await this.prisma.vehicleGPSLog.findMany({
+      where,
+      orderBy: { timestamp: 'desc' },
+      take: filters.limit || 100,
+    });
+
+    return {
+      vehicleId,
+      vehicleNumber: vehicle.vehicleNumber,
+      currentLocation: {
+        latitude: vehicle.lastKnownLat,
+        longitude: vehicle.lastKnownLng,
+        lastUpdated: vehicle.lastTrackedAt,
+      },
+      historyCount: logs.length,
+      logs,
+    };
+  }
+
+  async createTrip(createdBy: string, dto: {
+    routeId: string; vehicleId: string; date: string;
+    tripType: string; driverId: string; attendantId?: string;
+    plannedStartTime: string; plannedEndTime: string;
+  }) {
+    const route = await this.prisma.transportRoute.findUnique({ where: { id: dto.routeId } });
+    if (!route) throw new NotFoundException('Route not found');
+
+    const vehicle = await this.prisma.transportVehicle.findUnique({ where: { id: dto.vehicleId } });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+
+    const trip = await this.prisma.transportTrip.create({
+      data: {
+        routeId: dto.routeId,
+        vehicleId: dto.vehicleId,
+        date: new Date(dto.date),
+        tripType: dto.tripType,
+        driverId: dto.driverId,
+        attendantId: dto.attendantId,
+        plannedStartTime: dto.plannedStartTime,
+        plannedEndTime: dto.plannedEndTime,
+        status: 'SCHEDULED',
+      },
+    });
+
+    await this.eventBus.publish('transport.trip.created', {
+      tripId: trip.id,
+      routeId: dto.routeId,
+      vehicleId: dto.vehicleId,
+      date: dto.date,
+      createdBy,
+    });
+
+    return trip;
+  }
+
+  async startTrip(tripId: string, startedBy: string, dto: { actualStartTime?: string; startOdometer?: number }) {
+    const trip = await this.prisma.transportTrip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new NotFoundException('Trip not found');
+    if (trip.status !== 'SCHEDULED') throw new BadRequestException('Trip cannot be started');
+
+    const updated = await this.prisma.transportTrip.update({
+      where: { id: tripId },
+      data: {
+        status: 'IN_PROGRESS',
+        actualStartTime: dto.actualStartTime ? new Date(dto.actualStartTime) : new Date(),
+        startOdometer: dto.startOdometer,
+      },
+    });
+
+    await this.eventBus.publish('transport.trip.started', {
+      tripId,
+      vehicleId: trip.vehicleId,
+      startedBy,
+    });
+
+    return updated;
+  }
+
+  async endTrip(tripId: string, endedBy: string, dto: {
+    actualEndTime?: string; endOdometer?: number; incidents?: any[];
+  }) {
+    const trip = await this.prisma.transportTrip.findUnique({ where: { id: tripId } });
+    if (!trip) throw new NotFoundException('Trip not found');
+    if (trip.status !== 'IN_PROGRESS') throw new BadRequestException('Trip is not in progress');
+
+    const distance = dto.endOdometer && trip.startOdometer
+      ? dto.endOdometer - trip.startOdometer
+      : null;
+
+    const updated = await this.prisma.transportTrip.update({
+      where: { id: tripId },
+      data: {
+        status: 'COMPLETED',
+        actualEndTime: dto.actualEndTime ? new Date(dto.actualEndTime) : new Date(),
+        endOdometer: dto.endOdometer,
+        distance: distance as any,
+        incidents: dto.incidents || {},
+      },
+    });
+
+    await this.eventBus.publish('transport.trip.ended', {
+      tripId,
+      vehicleId: trip.vehicleId,
+      distance,
+      endedBy,
+    });
+
+    return updated;
+  }
+
+  async getTripDetails(tripId: string) {
+    const trip = await this.prisma.transportTrip.findUnique({
+      where: { id: tripId },
+      include: {
+        route: { include: { stops: true } },
+        vehicle: true,
+        attendance: { include: { assignment: { include: { student: true } } } },
+      },
+    });
+
+    if (!trip) throw new NotFoundException('Trip not found');
+    return trip;
+  }
+
+  async listTrips(filters: {
+    routeId?: string; vehicleId?: string; date?: string;
+    status?: string; page?: number; limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+
+    const where: any = {
+      ...(filters.routeId ? { routeId: filters.routeId } : {}),
+      ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.date ? {
+        date: {
+          gte: new Date(filters.date),
+          lt: new Date(new Date(filters.date).setDate(new Date(filters.date).getDate() + 1)),
+        },
+      } : {}),
+    };
+
+    const [trips, total] = await Promise.all([
+      this.prisma.transportTrip.findMany({
+        where,
+        include: { route: true, vehicle: true },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { date: 'desc' },
+      }),
+      this.prisma.transportTrip.count({ where }),
+    ]);
+
+    return { data: trips, meta: { total, page, limit } };
+  }
+
+  async markStudentAttendance(markedBy: string, dto: {
+    assignmentId: string; tripId?: string; tripType: string;
+    status: string; boardedAt?: string; boardedLocation?: any;
+    alightedAt?: string; alightedLocation?: any; rfidScanIn?: string; rfidScanOut?: string;
+  }) {
+    const assignment = await this.prisma.transportStudentAssignment.findUnique({
+      where: { id: dto.assignmentId },
+    });
+    if (!assignment) throw new NotFoundException('Student assignment not found');
+
+    const attendance = await this.prisma.transportAttendance.create({
+      data: {
+        assignmentId: dto.assignmentId,
+        tripId: dto.tripId,
+        date: new Date(),
+        tripType: dto.tripType,
+        status: dto.status,
+        boardedAt: dto.boardedAt ? new Date(dto.boardedAt) : null,
+        boardedLocation: dto.boardedLocation || {},
+        alightedAt: dto.alightedAt ? new Date(dto.alightedAt) : null,
+        alightedLocation: dto.alightedLocation || {},
+        rfidScanIn: dto.rfidScanIn ? new Date(dto.rfidScanIn) : null,
+        rfidScanOut: dto.rfidScanOut ? new Date(dto.rfidScanOut) : null,
+        verifiedBy: markedBy,
+        parentNotified: false,
+      },
+    });
+
+    await this.eventBus.publish('transport.attendance.marked', {
+      attendanceId: attendance.id,
+      studentId: assignment.studentId,
+      status: dto.status,
+      tripType: dto.tripType,
+      markedBy,
+    });
+
+    return attendance;
+  }
+
+  async getTransportAttendanceReport(filters: {
+    routeId?: string; studentId?: string; startDate?: string; endDate?: string;
+  }) {
+    const where: any = {
+      ...(filters.studentId ? { assignment: { studentId: filters.studentId } } : {}),
+      ...(filters.routeId ? { assignment: { routeId: filters.routeId } } : {}),
+      ...(filters.startDate || filters.endDate ? {
+        date: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const records = await this.prisma.transportAttendance.findMany({
+      where,
+      include: {
+        assignment: {
+          include: { student: { select: { id: true, userId: true } }, route: true },
+        },
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    const summary = {
+      total: records.length,
+      present: records.filter(r => r.status === 'PRESENT').length,
+      absent: records.filter(r => r.status === 'ABSENT').length,
+      delayed: records.filter(r => r.status === 'DELAYED').length,
+      notBoarded: records.filter(r => r.status === 'NOT_BOARDED').length,
+    };
+
+    return { summary, records };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-FEE-HOSTEL: Hostel Fee Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async createHostelFee(createdBy: string, dto: {
+    blockId: string; feeType: string; amount: number;
+    effectiveFrom: string; effectiveTo?: string;
+  }) {
+    const block = await this.prisma.hostelBlock.findUnique({ where: { id: dto.blockId } });
+    if (!block) throw new NotFoundException('Hostel block not found');
+
+    const fee = await this.prisma.hostelFee.create({
+      data: {
+        blockId: dto.blockId,
+        feeType: dto.feeType,
+        amount: dto.amount as any,
+        effectiveFrom: new Date(dto.effectiveFrom),
+        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+      },
+    });
+
+    await this.eventBus.publish('hostel.fee.created', {
+      feeId: fee.id,
+      blockId: dto.blockId,
+      createdBy,
+    });
+
+    return fee;
+  }
+
+  async listHostelFees(blockId?: string) {
+    const fees = await this.prisma.hostelFee.findMany({
+      where: blockId ? { blockId } : {},
+      include: { block: { select: { blockName: true } } },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    return { total: fees.length, fees };
+  }
+
+  async updateHostelFee(feeId: string, updatedBy: string, dto: {
+    feeType?: string; amount?: number; effectiveFrom?: string; effectiveTo?: string;
+  }) {
+    const fee = await this.prisma.hostelFee.findUnique({ where: { id: feeId } });
+    if (!fee) throw new NotFoundException('Hostel fee not found');
+
+    const updated = await this.prisma.hostelFee.update({
+      where: { id: feeId },
+      data: {
+        ...(dto.feeType ? { feeType: dto.feeType } : {}),
+        ...(dto.amount ? { amount: dto.amount as any } : {}),
+        ...(dto.effectiveFrom ? { effectiveFrom: new Date(dto.effectiveFrom) } : {}),
+        ...(dto.effectiveTo !== undefined ? { effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null } : {}),
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteHostelFee(feeId: string, deletedBy: string) {
+    const fee = await this.prisma.hostelFee.findUnique({ where: { id: feeId } });
+    if (!fee) throw new NotFoundException('Hostel fee not found');
+
+    await this.prisma.hostelFee.delete({ where: { id: feeId } });
+
+    await this.eventBus.publish('hostel.fee.deleted', {
+      feeId,
+      deletedBy,
+    });
+
+    return { message: 'Hostel fee deleted successfully' };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-INV-SUPPLIERS: Supplier Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async createSupplier(createdBy: string, dto: {
+    supplierName: string; supplierCode?: string; contactPerson?: string;
+    email?: string; phone?: string; category?: string;
+    gstNumber?: string; panNumber?: string; bankDetails?: any; rating?: number;
+  }) {
+    if (dto.supplierCode) {
+      const existing = await this.prisma.supplier.findUnique({ where: { supplierCode: dto.supplierCode } });
+      if (existing) throw new ConflictException('Supplier code already exists');
+    }
+
+    const supplier = await this.prisma.supplier.create({
+      data: {
+        supplierName: dto.supplierName,
+        supplierCode: dto.supplierCode || `SUP-${Date.now()}`,
+        contactPerson: dto.contactPerson,
+        email: dto.email,
+        phone: dto.phone,
+        category: dto.category,
+        gstNumber: dto.gstNumber,
+        panNumber: dto.panNumber,
+        bankDetails: dto.bankDetails || {},
+        rating: dto.rating as any,
+        isActive: true,
+      },
+    });
+
+    await this.eventBus.publish('supplier.created', {
+      supplierId: supplier.id,
+      supplierName: supplier.supplierName,
+      createdBy,
+    });
+
+    return supplier;
+  }
+
+  async listSuppliers(filters: { category?: string; search?: string; active?: boolean }) {
+    const where: any = {
+      ...(filters.active !== undefined ? { isActive: filters.active } : {}),
+      ...(filters.category ? { category: filters.category } : {}),
+      ...(filters.search ? {
+        OR: [
+          { supplierName: { contains: filters.search, mode: 'insensitive' } },
+          { supplierCode: { contains: filters.search } },
+          { email: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      } : {}),
+    };
+
+    const suppliers = await this.prisma.supplier.findMany({
+      where,
+      orderBy: { supplierName: 'asc' },
+    });
+
+    return { total: suppliers.length, suppliers };
+  }
+
+  async getSupplier(supplierId: string) {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    if (!supplier) throw new NotFoundException('Supplier not found');
+    return supplier;
+  }
+
+  async updateSupplier(supplierId: string, updatedBy: string, dto: {
+    supplierName?: string; contactPerson?: string; email?: string;
+    phone?: string; category?: string; gstNumber?: string;
+    panNumber?: string; bankDetails?: any; rating?: number; isActive?: boolean;
+  }) {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    if (!supplier) throw new NotFoundException('Supplier not found');
+
+    const updated = await this.prisma.supplier.update({
+      where: { id: supplierId },
+      data: {
+        ...(dto.supplierName ? { supplierName: dto.supplierName } : {}),
+        ...(dto.contactPerson !== undefined ? { contactPerson: dto.contactPerson } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.gstNumber !== undefined ? { gstNumber: dto.gstNumber } : {}),
+        ...(dto.panNumber !== undefined ? { panNumber: dto.panNumber } : {}),
+        ...(dto.bankDetails !== undefined ? { bankDetails: dto.bankDetails } : {}),
+        ...(dto.rating !== undefined ? { rating: dto.rating as any } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    await this.eventBus.publish('supplier.updated', {
+      supplierId,
+      updatedBy,
+    });
+
+    return updated;
+  }
+
+  async deleteSupplier(supplierId: string, deletedBy: string) {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    if (!supplier) throw new NotFoundException('Supplier not found');
+
+    // Soft delete - just deactivate
+    await this.prisma.supplier.update({
+      where: { id: supplierId },
+      data: { isActive: false },
+    });
+
+    await this.eventBus.publish('supplier.deleted', {
+      supplierId,
+      deletedBy,
+    });
+
+    return { message: 'Supplier deactivated successfully' };
+  }
 }

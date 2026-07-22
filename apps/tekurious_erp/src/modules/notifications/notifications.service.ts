@@ -318,4 +318,295 @@ export class NotificationsService {
     });
     return participations.map((p) => p.conversation);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-PUSH-001 to FR-PUSH-004: PUSH NOTIFICATIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async registerDevice(userId: string, dto: {
+    token: string; deviceType: string; deviceId?: string; deviceName?: string;
+  }) {
+    // Upsert - update if token exists, create if new
+    const existing = await this.prisma.deviceToken.findUnique({
+      where: { token: dto.token },
+    });
+
+    if (existing) {
+      return this.prisma.deviceToken.update({
+        where: { token: dto.token },
+        data: {
+          userId,
+          deviceType: dto.deviceType,
+          deviceId: dto.deviceId,
+          deviceName: dto.deviceName,
+          isActive: true,
+          lastUsedAt: new Date(),
+        },
+      });
+    }
+
+    return this.prisma.deviceToken.create({
+      data: {
+        userId,
+        token: dto.token,
+        deviceType: dto.deviceType,
+        deviceId: dto.deviceId,
+        deviceName: dto.deviceName,
+      },
+    });
+  }
+
+  async unregisterDevice(userId: string, token: string) {
+    const device = await this.prisma.deviceToken.findFirst({
+      where: { userId, token },
+    });
+
+    if (!device) throw new NotFoundException('Device token not found');
+
+    await this.prisma.deviceToken.update({
+      where: { id: device.id },
+      data: { isActive: false },
+    });
+
+    return { message: 'Device unregistered successfully' };
+  }
+
+  async getUserDevices(userId: string) {
+    const devices = await this.prisma.deviceToken.findMany({
+      where: { userId, isActive: true },
+      orderBy: { lastUsedAt: 'desc' },
+    });
+
+    return {
+      userId,
+      totalDevices: devices.length,
+      devices: devices.map(d => ({
+        id: d.id,
+        deviceType: d.deviceType,
+        deviceId: d.deviceId,
+        deviceName: d.deviceName,
+        lastUsedAt: d.lastUsedAt,
+        createdAt: d.createdAt,
+      })),
+    };
+  }
+
+  async sendPushNotification(dto: {
+    userId: string; title: string; body: string;
+    data?: Record<string, any>; priority?: string;
+  }) {
+    // Get active device tokens
+    const devices = await this.prisma.deviceToken.findMany({
+      where: { userId: dto.userId, isActive: true },
+    });
+
+    if (devices.length === 0) {
+      return { message: 'No active devices found', sent: 0 };
+    }
+
+    // Create notification record
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: dto.userId,
+        title: dto.title,
+        message: dto.body,
+        type: 'PUSH',
+        channels: ['PUSH'],
+        priority: (dto.priority as any) || 'MEDIUM',
+      },
+    });
+
+    // Create delivery records for each device
+    const deliveries = await Promise.all(
+      devices.map(device =>
+        this.prisma.notificationDelivery.create({
+          data: {
+            notificationId: notification.id,
+            channel: 'PUSH',
+            recipient: device.token,
+            status: 'PENDING',
+          },
+        })
+      )
+    );
+
+    // Emit event for actual push service to process
+    await this.eventBus.publish('push.send', {
+      notificationId: notification.id,
+      devices: devices.map(d => ({ token: d.token, deviceType: d.deviceType })),
+      title: dto.title,
+      body: dto.body,
+      data: dto.data,
+    });
+
+    return {
+      notificationId: notification.id,
+      sent: deliveries.length,
+      devices: devices.map(d => d.deviceType),
+    };
+  }
+
+  async sendBulkPush(dto: {
+    userIds: string[]; title: string; body: string;
+    data?: Record<string, any>;
+  }) {
+    const results = await Promise.all(
+      dto.userIds.map(userId =>
+        this.sendPushNotification({
+          userId,
+          title: dto.title,
+          body: dto.body,
+          data: dto.data,
+        })
+      )
+    );
+
+    return {
+      totalUsers: dto.userIds.length,
+      totalDevices: results.reduce((sum, r) => sum + r.sent, 0),
+      results,
+    };
+  }
+
+  async getPushDeliveryStats(notificationId?: string, userId?: string) {
+    const where: any = {
+      channel: 'PUSH',
+      ...(notificationId ? { notificationId } : {}),
+      ...(userId ? { notification: { userId } } : {}),
+    };
+
+    const deliveries = await this.prisma.notificationDelivery.findMany({
+      where,
+      orderBy: { sentAt: 'desc' },
+      take: 100,
+    });
+
+    const stats = {
+      total: deliveries.length,
+      pending: deliveries.filter(d => d.status === 'PENDING').length,
+      sent: deliveries.filter(d => d.status === 'SENT').length,
+      delivered: deliveries.filter(d => d.status === 'DELIVERED').length,
+      failed: deliveries.filter(d => d.status === 'FAILED').length,
+      opened: deliveries.filter(d => d.status === 'OPENED').length,
+    };
+
+    return { stats, deliveries };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-WHATSAPP-001 to FR-WHATSAPP-004: WHATSAPP INTEGRATION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async sendWhatsAppMessage(dto: {
+    userId: string; phoneNumber: string; templateName: string;
+    templateParams?: Record<string, string>; message?: string;
+  }) {
+    // Create notification record
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: dto.userId,
+        title: `WhatsApp: ${dto.templateName}`,
+        message: dto.message || `Template: ${dto.templateName}`,
+        type: 'WHATSAPP',
+        channels: ['WHATSAPP'],
+        priority: 'MEDIUM',
+      },
+    });
+
+    // Create delivery record
+    const delivery = await this.prisma.notificationDelivery.create({
+      data: {
+        notificationId: notification.id,
+        channel: 'WHATSAPP',
+        recipient: dto.phoneNumber,
+        status: 'PENDING',
+      },
+    });
+
+    // Emit event for WhatsApp gateway to process
+    await this.eventBus.publish('whatsapp.send', {
+      notificationId: notification.id,
+      deliveryId: delivery.id,
+      phoneNumber: dto.phoneNumber,
+      templateName: dto.templateName,
+      templateParams: dto.templateParams,
+      message: dto.message,
+    });
+
+    return {
+      notificationId: notification.id,
+      deliveryId: delivery.id,
+      status: 'PENDING',
+      phoneNumber: dto.phoneNumber,
+    };
+  }
+
+  async sendBulkWhatsApp(dto: {
+    recipients: { userId: string; phoneNumber: string }[];
+    templateName: string; templateParams?: Record<string, string>;
+  }) {
+    const results = await Promise.all(
+      dto.recipients.map(r =>
+        this.sendWhatsAppMessage({
+          userId: r.userId,
+          phoneNumber: r.phoneNumber,
+          templateName: dto.templateName,
+          templateParams: dto.templateParams,
+        })
+      )
+    );
+
+    return {
+      totalSent: results.length,
+      results,
+    };
+  }
+
+  async getWhatsAppDeliveryLogs(filters: {
+    userId?: string; phoneNumber?: string; status?: string;
+    startDate?: string; endDate?: string;
+  }) {
+    const where: any = {
+      channel: 'WHATSAPP',
+      ...(filters.phoneNumber ? { recipient: filters.phoneNumber } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.userId ? { notification: { userId: filters.userId } } : {}),
+      ...(filters.startDate || filters.endDate ? {
+        sentAt: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const logs = await this.prisma.notificationDelivery.findMany({
+      where,
+      include: {
+        notification: { select: { title: true, message: true, userId: true } },
+      },
+      orderBy: { sentAt: 'desc' },
+      take: 100,
+    });
+
+    const stats = {
+      total: logs.length,
+      delivered: logs.filter(l => l.status === 'DELIVERED').length,
+      failed: logs.filter(l => l.status === 'FAILED').length,
+      pending: logs.filter(l => l.status === 'PENDING').length,
+    };
+
+    return { stats, logs };
+  }
+
+  async getWhatsAppTemplates() {
+    const templates = await this.prisma.notificationTemplate.findMany({
+      where: { templateType: 'WHATSAPP' },
+      orderBy: { name: 'asc' },
+    });
+
+    return {
+      totalTemplates: templates.length,
+      templates,
+    };
+  }
 }
