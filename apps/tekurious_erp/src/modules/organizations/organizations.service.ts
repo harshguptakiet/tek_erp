@@ -1190,5 +1190,196 @@ export class OrganizationsService {
 
     return { success: true, message: 'Invitation cancelled' };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-ORG-010–013: White-Label Configuration
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-ORG-010: Upload / set organization logo URL
+  async setOrganizationLogo(adminId: string, organizationId: string, logoUrl: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    await this.prisma.organizationSetting.upsert({
+      where: { organizationId_settingKey: { organizationId, settingKey: 'LOGO_URL' } },
+      create: { organizationId, settingKey: 'LOGO_URL', settingValue: logoUrl, valueType: 'STRING', category: 'BRANDING', updatedBy: adminId },
+      update: { settingValue: logoUrl, updatedBy: adminId },
+    });
+
+    this.eventBus.publish('organization.branding.updated', { organizationId, key: 'LOGO_URL', updatedBy: adminId });
+    return { success: true, organizationId, logoUrl };
+  }
+
+  // FR-ORG-011: Customize color scheme
+  async setColorScheme(adminId: string, organizationId: string, dto: {
+    primaryColor?: string; secondaryColor?: string; accentColor?: string;
+    backgroundColor?: string; textColor?: string;
+  }) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const colorKeys = ['primaryColor', 'secondaryColor', 'accentColor', 'backgroundColor', 'textColor'] as const;
+    const updated: Record<string, string> = {};
+
+    for (const key of colorKeys) {
+      if (dto[key]) {
+        const settingKey = key.replace(/([A-Z])/g, '_$1').toUpperCase(); // camelCase → UPPER_SNAKE
+        await this.prisma.organizationSetting.upsert({
+          where: { organizationId_settingKey: { organizationId, settingKey } },
+          create: { organizationId, settingKey, settingValue: dto[key]!, valueType: 'COLOR', category: 'BRANDING', updatedBy: adminId },
+          update: { settingValue: dto[key]!, updatedBy: adminId },
+        });
+        updated[key] = dto[key]!;
+      }
+    }
+
+    this.eventBus.publish('organization.branding.updated', { organizationId, keys: Object.keys(updated), updatedBy: adminId });
+    return { success: true, organizationId, updatedColors: updated };
+  }
+
+  // FR-ORG-012: Custom domain configuration
+  async setCustomDomain(adminId: string, organizationId: string, dto: {
+    domain: string; subdomain?: string; sslEnabled?: boolean;
+  }) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    // Basic domain format validation
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(dto.domain)) {
+      throw new BadRequestException('Invalid domain format');
+    }
+
+    const settings = [
+      { key: 'CUSTOM_DOMAIN', value: dto.domain },
+      { key: 'CUSTOM_SUBDOMAIN', value: dto.subdomain || '' },
+      { key: 'SSL_ENABLED', value: String(dto.sslEnabled ?? true) },
+      { key: 'DOMAIN_VERIFIED', value: 'false' }, // requires DNS verification
+    ];
+
+    for (const s of settings) {
+      await this.prisma.organizationSetting.upsert({
+        where: { organizationId_settingKey: { organizationId, settingKey: s.key } },
+        create: { organizationId, settingKey: s.key, settingValue: s.value, valueType: 'STRING', category: 'DOMAIN', updatedBy: adminId },
+        update: { settingValue: s.value, updatedBy: adminId },
+      });
+    }
+
+    this.eventBus.publish('organization.domain.configured', { organizationId, domain: dto.domain, updatedBy: adminId });
+    return {
+      success: true, organizationId,
+      domain: dto.domain, subdomain: dto.subdomain,
+      sslEnabled: dto.sslEnabled ?? true,
+      verificationStatus: 'PENDING',
+      message: 'Domain saved. Add a CNAME record pointing to platform.tekurious.com to verify.',
+    };
+  }
+
+  // FR-ORG-013: Email template customization
+  async setEmailTemplates(adminId: string, organizationId: string, dto: {
+    emailFromName?: string; emailFromAddress?: string;
+    emailFooterText?: string; emailLogoUrl?: string;
+    welcomeSubject?: string; welcomeBodyHtml?: string;
+  }) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const templateKeys: Record<string, string> = {
+      emailFromName: 'EMAIL_FROM_NAME',
+      emailFromAddress: 'EMAIL_FROM_ADDRESS',
+      emailFooterText: 'EMAIL_FOOTER_TEXT',
+      emailLogoUrl: 'EMAIL_LOGO_URL',
+      welcomeSubject: 'EMAIL_WELCOME_SUBJECT',
+      welcomeBodyHtml: 'EMAIL_WELCOME_BODY_HTML',
+    };
+
+    const updated: Record<string, string> = {};
+    for (const [field, settingKey] of Object.entries(templateKeys)) {
+      const value = dto[field as keyof typeof dto];
+      if (value !== undefined) {
+        await this.prisma.organizationSetting.upsert({
+          where: { organizationId_settingKey: { organizationId, settingKey } },
+          create: { organizationId, settingKey, settingValue: value, valueType: 'STRING', category: 'EMAIL_TEMPLATE', updatedBy: adminId },
+          update: { settingValue: value, updatedBy: adminId },
+        });
+        updated[field] = value;
+      }
+    }
+
+    this.eventBus.publish('organization.email_template.updated', { organizationId, updatedBy: adminId });
+    return { success: true, organizationId, updatedFields: Object.keys(updated) };
+  }
+
+  // Get all white-label settings for an organization
+  async getWhiteLabelConfig(organizationId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const settings = await this.prisma.organizationSetting.findMany({
+      where: { organizationId, category: { in: ['BRANDING', 'DOMAIN', 'EMAIL_TEMPLATE'] } },
+      orderBy: [{ category: 'asc' }, { settingKey: 'asc' }],
+    });
+
+    // Group by category
+    const grouped = settings.reduce((acc, s) => {
+      if (!acc[s.category!]) acc[s.category!] = {};
+      acc[s.category!][s.settingKey] = s.settingValue;
+      return acc;
+    }, {} as Record<string, Record<string, string>>);
+
+    return {
+      organizationId,
+      orgName: org.name,
+      branding: grouped['BRANDING'] || {},
+      domain: grouped['DOMAIN'] || {},
+      emailTemplate: grouped['EMAIL_TEMPLATE'] || {},
+    };
+  }
+
+  // FR-ORG-023: Data Retention Policy
+  async setDataRetentionPolicy(adminId: string, organizationId: string, dto: {
+    auditLogRetentionDays: number; userDataRetentionDays: number;
+    mediaRetentionDays: number; reportRetentionDays: number;
+  }) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const policyKeys = [
+      { key: 'RETENTION_AUDIT_LOG_DAYS', value: String(dto.auditLogRetentionDays) },
+      { key: 'RETENTION_USER_DATA_DAYS', value: String(dto.userDataRetentionDays) },
+      { key: 'RETENTION_MEDIA_DAYS', value: String(dto.mediaRetentionDays) },
+      { key: 'RETENTION_REPORT_DAYS', value: String(dto.reportRetentionDays) },
+    ];
+
+    for (const p of policyKeys) {
+      await this.prisma.organizationSetting.upsert({
+        where: { organizationId_settingKey: { organizationId, settingKey: p.key } },
+        create: { organizationId, settingKey: p.key, settingValue: p.value, valueType: 'INTEGER', category: 'DATA_RETENTION', updatedBy: adminId },
+        update: { settingValue: p.value, updatedBy: adminId },
+      });
+    }
+
+    this.eventBus.publish('organization.retention_policy.updated', { organizationId, updatedBy: adminId });
+    return { success: true, organizationId, policy: dto };
+  }
+
+  async getDataRetentionPolicy(organizationId: string) {
+    const settings = await this.prisma.organizationSetting.findMany({
+      where: { organizationId, category: 'DATA_RETENTION' },
+    });
+    const policy = settings.reduce((acc, s) => {
+      acc[s.settingKey] = parseInt(s.settingValue) || 0;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Default values if not configured
+    return {
+      organizationId,
+      RETENTION_AUDIT_LOG_DAYS: policy['RETENTION_AUDIT_LOG_DAYS'] ?? 1825, // 5 years
+      RETENTION_USER_DATA_DAYS: policy['RETENTION_USER_DATA_DAYS'] ?? 2555, // 7 years
+      RETENTION_MEDIA_DAYS: policy['RETENTION_MEDIA_DAYS'] ?? 365,
+      RETENTION_REPORT_DAYS: policy['RETENTION_REPORT_DAYS'] ?? 730,
+    };
+  }
 }
 

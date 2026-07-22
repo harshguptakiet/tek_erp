@@ -303,4 +303,76 @@ export class OrganizationsController {
   ) {
     return this.orgsService.cancelInvitation(req.user.userId, id, invitationId);
   }
+
+  // ── White-Label Configuration (FR-ORG-010–013) ───────────────────────────
+
+  @Get(':id/white-label')
+  @ApiOperation({ summary: 'Get all white-label config (FR-ORG-010–013)' })
+  async getWhiteLabel(@Param('id') id: string) {
+    return this.orgsService.getWhiteLabelConfig(id);
+  }
+
+  @Put(':id/white-label/logo')
+  @ApiOperation({ summary: 'Set organization logo URL (FR-ORG-010)' })
+  async setLogo(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('logoUrl') logoUrl: string,
+  ) {
+    return this.orgsService.setOrganizationLogo(req.user.userId, id, logoUrl);
+  }
+
+  @Put(':id/white-label/colors')
+  @ApiOperation({ summary: 'Customize color scheme (FR-ORG-011)' })
+  async setColors(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: {
+      primaryColor?: string; secondaryColor?: string; accentColor?: string;
+      backgroundColor?: string; textColor?: string;
+    },
+  ) {
+    return this.orgsService.setColorScheme(req.user.userId, id, dto);
+  }
+
+  @Put(':id/white-label/domain')
+  @ApiOperation({ summary: 'Configure custom domain (FR-ORG-012)' })
+  async setDomain(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: { domain: string; subdomain?: string; sslEnabled?: boolean },
+  ) {
+    return this.orgsService.setCustomDomain(req.user.userId, id, dto);
+  }
+
+  @Put(':id/white-label/email-templates')
+  @ApiOperation({ summary: 'Customize email templates (FR-ORG-013)' })
+  async setEmailTemplates(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: any,
+  ) {
+    return this.orgsService.setEmailTemplates(req.user.userId, id, dto);
+  }
+
+  // ── Data Retention Policy (FR-ORG-023) ──────────────────────────────────
+
+  @Get(':id/retention-policy')
+  @ApiOperation({ summary: 'Get data retention policy (FR-ORG-023)' })
+  async getRetentionPolicy(@Param('id') id: string) {
+    return this.orgsService.getDataRetentionPolicy(id);
+  }
+
+  @Put(':id/retention-policy')
+  @ApiOperation({ summary: 'Set data retention policy (FR-ORG-023)' })
+  async setRetentionPolicy(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: {
+      auditLogRetentionDays: number; userDataRetentionDays: number;
+      mediaRetentionDays: number; reportRetentionDays: number;
+    },
+  ) {
+    return this.orgsService.setDataRetentionPolicy(req.user.userId, id, dto);
+  }
 }

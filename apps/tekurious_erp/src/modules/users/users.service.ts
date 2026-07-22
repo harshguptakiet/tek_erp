@@ -1081,4 +1081,408 @@ export class UsersService {
       notice: 'This is your complete data held by the platform as per GDPR Article 15.',
     };
   }
+
+  // ============================================================================
+  // FR-USER-017: Student Achievements and Certificates
+  // ============================================================================
+
+  async issueStudentCertificate(issuedBy: string, dto: {
+    studentId: string;
+    templateId: string;
+    title: string;
+    description?: string;
+    issuedFor?: string;
+    data?: any;
+    expiresAt?: Date;
+  }) {
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { id: dto.studentId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const template = await this.prisma.certificateTemplate.findUnique({
+      where: { id: dto.templateId },
+    });
+
+    if (!template || !template.isActive) {
+      throw new NotFoundException('Certificate template not found or inactive');
+    }
+
+    const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const verificationCode = `VERIFY-${Math.random().toString(36).substr(2, 12).toUpperCase()}`;
+
+    const certificate = await this.prisma.certificate.create({
+      data: {
+        templateId: dto.templateId,
+        recipientId: dto.studentId,
+        recipientType: 'STUDENT',
+        certificateNumber,
+        title: dto.title,
+        description: dto.description,
+        issuedFor: dto.issuedFor,
+        data: dto.data || {},
+        issuedBy,
+        verificationCode,
+        expiresAt: dto.expiresAt,
+      },
+    });
+
+    await this.eventBus.publish('user.certificate_issued', {
+      certificateId: certificate.id,
+      studentId: dto.studentId,
+      timestamp: new Date(),
+    });
+
+    return certificate;
+  }
+
+  async getStudentCertificates(studentId: string) {
+    const certificates = await this.prisma.certificate.findMany({
+      where: {
+        recipientId: studentId,
+        recipientType: 'STUDENT',
+        isRevoked: false,
+      },
+      include: { template: { select: { name: true, certificateType: true } } },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    return {
+      studentId,
+      total: certificates.length,
+      certificates: certificates.map(c => ({
+        id: c.id,
+        certificateNumber: c.certificateNumber,
+        title: c.title,
+        description: c.description,
+        issuedFor: c.issuedFor,
+        templateName: c.template.name,
+        certificateType: c.template.certificateType,
+        issuedAt: c.issuedAt,
+        expiresAt: c.expiresAt,
+        verificationCode: c.verificationCode,
+      })),
+    };
+  }
+
+  async verifyCertificate(verificationCode: string) {
+    const certificate = await this.prisma.certificate.findUnique({
+      where: { verificationCode },
+      include: {
+        template: { select: { name: true, certificateType: true } },
+      },
+    });
+
+    if (!certificate) {
+      return { valid: false, message: 'Certificate not found' };
+    }
+
+    if (certificate.isRevoked) {
+      return {
+        valid: false,
+        message: 'Certificate has been revoked',
+        revokedAt: certificate.revokedAt,
+        revokedReason: certificate.revokedReason,
+      };
+    }
+
+    if (certificate.expiresAt && new Date() > certificate.expiresAt) {
+      return {
+        valid: false,
+        message: 'Certificate has expired',
+        expiresAt: certificate.expiresAt,
+      };
+    }
+
+    return {
+      valid: true,
+      certificate: {
+        certificateNumber: certificate.certificateNumber,
+        title: certificate.title,
+        issuedFor: certificate.issuedFor,
+        recipientType: certificate.recipientType,
+        templateName: certificate.template.name,
+        certificateType: certificate.template.certificateType,
+        issuedAt: certificate.issuedAt,
+      },
+    };
+  }
+
+  async revokeCertificate(certificateId: string, revokedReason: string) {
+    const certificate = await this.prisma.certificate.findUnique({
+      where: { id: certificateId },
+    });
+
+    if (!certificate) {
+      throw new NotFoundException('Certificate not found');
+    }
+
+    if (certificate.isRevoked) {
+      throw new BadRequestException('Certificate already revoked');
+    }
+
+    const updated = await this.prisma.certificate.update({
+      where: { id: certificateId },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date(),
+        revokedReason,
+      },
+    });
+
+    await this.eventBus.publish('user.certificate_revoked', {
+      certificateId,
+      recipientId: certificate.recipientId,
+      timestamp: new Date(),
+    });
+
+    return { success: true, message: 'Certificate revoked', certificate: updated };
+  }
+
+  // Certificate Templates Management
+  async createCertificateTemplate(createdBy: string, dto: {
+    name: string;
+    certificateType: string;
+    templateHtml: string;
+    templateCss?: string;
+    variables?: string[];
+    signaturePositions?: any;
+  }) {
+    const template = await this.prisma.certificateTemplate.create({
+      data: {
+        name: dto.name,
+        certificateType: dto.certificateType,
+        templateHtml: dto.templateHtml,
+        templateCss: dto.templateCss,
+        variables: dto.variables || [],
+        signaturePositions: dto.signaturePositions,
+        createdBy,
+      },
+    });
+
+    return template;
+  }
+
+  async listCertificateTemplates(certificateType?: string) {
+    const where: any = { isActive: true };
+    if (certificateType) {
+      where.certificateType = certificateType;
+    }
+
+    return this.prisma.certificateTemplate.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateCertificateTemplate(templateId: string, dto: {
+    name?: string;
+    templateHtml?: string;
+    templateCss?: string;
+    variables?: string[];
+    isActive?: boolean;
+  }) {
+    return this.prisma.certificateTemplate.update({
+      where: { id: templateId },
+      data: dto,
+    });
+  }
+
+  // FR-USER-018: Student Behavior and Discipline Records
+  async createDisciplinaryRecord(recordedBy: string, dto: {
+    studentId: string;
+    incidentDate: string;
+    incidentType: string;
+    description: string;
+    actionTaken?: string;
+  }) {
+    const student = await this.prisma.studentProfile.findUnique({ where: { id: dto.studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const record = await this.prisma.disciplinaryRecord.create({
+      data: {
+        studentId: dto.studentId,
+        incidentDate: new Date(dto.incidentDate),
+        incidentType: dto.incidentType,
+        description: dto.description,
+        actionTaken: dto.actionTaken,
+        recordedBy,
+      },
+    });
+
+    // Notify parent if serious incident
+    if (['SUSPENSION', 'EXPULSION'].includes(dto.incidentType)) {
+      await this.eventBus.publish('student.disciplinary_action', {
+        studentId: dto.studentId,
+        incidentType: dto.incidentType,
+        recordId: record.id,
+        timestamp: new Date(),
+      });
+    }
+
+    return { success: true, record };
+  }
+
+  async getStudentDisciplinaryRecords(studentId: string, filters?: {
+    incidentType?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const student = await this.prisma.studentProfile.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const where: any = { studentId };
+
+    if (filters?.incidentType) {
+      where.incidentType = filters.incidentType;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.incidentDate = {};
+      if (filters.startDate) where.incidentDate.gte = new Date(filters.startDate);
+      if (filters.endDate) where.incidentDate.lte = new Date(filters.endDate);
+    }
+
+    const records = await this.prisma.disciplinaryRecord.findMany({
+      where,
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    // Calculate statistics
+    const stats = {
+      total: records.length,
+      warnings: records.filter(r => r.incidentType === 'WARNING').length,
+      suspensions: records.filter(r => r.incidentType === 'SUSPENSION').length,
+      expulsions: records.filter(r => r.incidentType === 'EXPULSION').length,
+    };
+
+    return {
+      studentId,
+      stats,
+      records: records.map(r => ({
+        id: r.id,
+        incidentDate: r.incidentDate,
+        incidentType: r.incidentType,
+        description: r.description,
+        actionTaken: r.actionTaken,
+        recordedBy: r.recordedBy,
+        createdAt: r.createdAt,
+      })),
+    };
+  }
+
+  async updateDisciplinaryRecord(recordId: string, updatedBy: string, dto: {
+    incidentType?: string;
+    description?: string;
+    actionTaken?: string;
+  }) {
+    const record = await this.prisma.disciplinaryRecord.findUnique({ where: { id: recordId } });
+    if (!record) throw new NotFoundException('Disciplinary record not found');
+
+    const updated = await this.prisma.disciplinaryRecord.update({
+      where: { id: recordId },
+      data: dto,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: updatedBy,
+        action: 'UPDATE_DISCIPLINARY_RECORD',
+        tableName: 'DisciplinaryRecord',
+        recordId,
+        changes: dto as any,
+        ipAddress: '127.0.0.1',
+        userAgent: 'System',
+      },
+    });
+
+    return { success: true, record: updated };
+  }
+
+  async deleteDisciplinaryRecord(recordId: string, deletedBy: string, reason: string) {
+    const record = await this.prisma.disciplinaryRecord.findUnique({ where: { id: recordId } });
+    if (!record) throw new NotFoundException('Disciplinary record not found');
+
+    await this.prisma.disciplinaryRecord.delete({ where: { id: recordId } });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: deletedBy,
+        action: 'DELETE_DISCIPLINARY_RECORD',
+        tableName: 'DisciplinaryRecord',
+        recordId,
+        changes: { reason, deletedAt: new Date().toISOString() } as any,
+        ipAddress: '127.0.0.1',
+        userAgent: 'System',
+      },
+    });
+
+    return { success: true, message: 'Disciplinary record deleted' };
+  }
+
+  async getStudentBehaviorReport(studentId: string, academicYearId?: string) {
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { id: studentId },
+      include: { user: { select: { firstName: true, lastName: true } } },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+
+    // Get disciplinary records
+    const disciplinaryRecords = await this.prisma.disciplinaryRecord.findMany({
+      where: { studentId },
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    // Calculate behavior metrics
+    const positiveIncidents = 0; // If you have positive behavior tracking
+    const negativeIncidents = disciplinaryRecords.length;
+    const warningsCount = disciplinaryRecords.filter(r => r.incidentType === 'WARNING').length;
+    const suspensionsCount = disciplinaryRecords.filter(r => r.incidentType === 'SUSPENSION').length;
+
+    // Calculate behavior score (example: 100 - penalties)
+    const behaviorScore = Math.max(0, 100 - (warningsCount * 5) - (suspensionsCount * 20));
+
+    return {
+      studentId,
+      studentName: `${student.user.firstName} ${student.user.lastName}`,
+      admissionNumber: student.admissionNumber,
+      behaviorMetrics: {
+        behaviorScore,
+        positiveIncidents,
+        negativeIncidents,
+        warningsCount,
+        suspensionsCount,
+        totalRecords: disciplinaryRecords.length,
+      },
+      recentIncidents: disciplinaryRecords.slice(0, 10),
+      recommendations: this.generateBehaviorRecommendations(behaviorScore, warningsCount, suspensionsCount),
+    };
+  }
+
+  private generateBehaviorRecommendations(score: number, warnings: number, suspensions: number): string[] {
+    const recommendations: string[] = [];
+
+    if (score >= 90) {
+      recommendations.push('Excellent behavior - consider for student leadership roles');
+    } else if (score >= 70) {
+      recommendations.push('Good behavior - maintain current standards');
+    } else if (score >= 50) {
+      recommendations.push('Needs improvement - consider counseling sessions');
+    } else {
+      recommendations.push('Requires immediate intervention and parent meeting');
+    }
+
+    if (warnings > 3) {
+      recommendations.push('High number of warnings - schedule parent-teacher meeting');
+    }
+
+    if (suspensions > 0) {
+      recommendations.push('Previous suspensions recorded - monitor closely and provide support');
+    }
+
+    return recommendations;
+  }
 }

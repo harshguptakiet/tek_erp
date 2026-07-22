@@ -622,4 +622,123 @@ export class UsersController {
   async getParentProfile(@Param('parentId') parentId: string) {
     return this.parentProfileService.getParentProfile(parentId);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-USER-017: Student Achievements and Certificates
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Post('certificates/issue')
+  @ApiOperation({ summary: 'Issue certificate to student (FR-USER-017)' })
+  issueStudentCertificate(@Request() req, @Body() dto: any) {
+    return this.usersService.issueStudentCertificate(req.user.userId, dto);
+  }
+
+  @Get('students/:studentId/certificates')
+  @ApiOperation({ summary: 'Get student certificates (FR-USER-017)' })
+  getStudentCertificates(@Param('studentId') studentId: string) {
+    return this.usersService.getStudentCertificates(studentId);
+  }
+
+  @Get('certificates/verify/:verificationCode')
+  @ApiOperation({ summary: 'Verify certificate by code (FR-USER-017)' })
+  verifyCertificate(@Param('verificationCode') verificationCode: string) {
+    return this.usersService.verifyCertificate(verificationCode);
+  }
+
+  @Post('certificates/:certificateId/revoke')
+  @ApiOperation({ summary: 'Revoke certificate (FR-USER-017)' })
+  revokeCertificate(
+    @Param('certificateId') certificateId: string,
+    @Body() body: { reason: string },
+  ) {
+    return this.usersService.revokeCertificate(certificateId, body.reason);
+  }
+
+  @Post('certificates/templates')
+  @ApiOperation({ summary: 'Create certificate template' })
+  createCertificateTemplate(@Request() req, @Body() dto: any) {
+    return this.usersService.createCertificateTemplate(req.user.userId, dto);
+  }
+
+  @Get('certificates/templates')
+  @ApiOperation({ summary: 'List certificate templates' })
+  listCertificateTemplates(@Query('certificateType') certificateType?: string) {
+    return this.usersService.listCertificateTemplates(certificateType);
+  }
+
+  @Put('certificates/templates/:templateId')
+  @ApiOperation({ summary: 'Update certificate template' })
+  updateCertificateTemplate(@Param('templateId') templateId: string, @Body() dto: any) {
+    return this.usersService.updateCertificateTemplate(templateId, dto);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-USER-018: Student Behavior and Discipline Records
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Post('students/:studentId/discipline')
+  @ApiOperation({ summary: 'Create disciplinary record for student (FR-USER-018)' })
+  createDisciplinaryRecord(
+    @Request() req,
+    @Param('studentId') studentId: string,
+    @Body() dto: {
+      incidentDate: string;
+      incidentType: string;
+      description: string;
+      actionTaken?: string;
+    },
+  ) {
+    return this.usersService.createDisciplinaryRecord(req.user.userId, {
+      studentId,
+      ...dto,
+    });
+  }
+
+  @Get('students/:studentId/discipline')
+  @ApiOperation({ summary: 'Get student disciplinary records (FR-USER-018)' })
+  getStudentDisciplinaryRecords(
+    @Param('studentId') studentId: string,
+    @Query('incidentType') incidentType?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.usersService.getStudentDisciplinaryRecords(studentId, {
+      incidentType,
+      startDate,
+      endDate,
+    });
+  }
+
+  @Put('discipline/:recordId')
+  @ApiOperation({ summary: 'Update disciplinary record (FR-USER-018)' })
+  updateDisciplinaryRecord(
+    @Request() req,
+    @Param('recordId') recordId: string,
+    @Body() dto: {
+      incidentType?: string;
+      description?: string;
+      actionTaken?: string;
+    },
+  ) {
+    return this.usersService.updateDisciplinaryRecord(recordId, req.user.userId, dto);
+  }
+
+  @Delete('discipline/:recordId')
+  @ApiOperation({ summary: 'Delete disciplinary record (FR-USER-018)' })
+  deleteDisciplinaryRecord(
+    @Request() req,
+    @Param('recordId') recordId: string,
+    @Body() body: { reason: string },
+  ) {
+    return this.usersService.deleteDisciplinaryRecord(recordId, req.user.userId, body.reason);
+  }
+
+  @Get('students/:studentId/behavior-report')
+  @ApiOperation({ summary: 'Get student behavior report with metrics (FR-USER-018)' })
+  getStudentBehaviorReport(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.usersService.getStudentBehaviorReport(studentId, academicYearId);
+  }
 }

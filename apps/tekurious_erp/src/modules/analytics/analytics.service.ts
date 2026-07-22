@@ -640,4 +640,333 @@ export class AnalyticsService {
       update: { metrics: dto.metrics },
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-PRINCIPAL-007–012: Real-Time Monitoring Dashboards
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-PRINCIPAL-007: Live attendance status for today
+  async getLiveAttendanceStatus(schoolId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [totalStudents, todayRecords] = await Promise.all([
+      this.prisma.studentProfile.count({ where: { schoolId } }),
+      this.prisma.attendance.findMany({
+        where: {
+          schoolId,
+          date: { gte: today, lt: tomorrow },
+        },
+        select: { status: true, sectionId: true },
+      }),
+    ]);
+
+    const byStatus = todayRecords.reduce((acc, r) => {
+      acc[r.status] = (acc[r.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const present = byStatus['PRESENT'] || 0;
+    const absent = byStatus['ABSENT'] || 0;
+    const late = byStatus['LATE'] || 0;
+    const unmarked = totalStudents - todayRecords.length;
+
+    return {
+      schoolId,
+      asOf: new Date(),
+      date: today.toISOString().slice(0, 10),
+      totalStudents,
+      marked: todayRecords.length,
+      unmarked,
+      present, absent, late,
+      attendancePercent: totalStudents > 0
+        ? ((present / totalStudents) * 100).toFixed(1) : '0',
+    };
+  }
+
+  // FR-PRINCIPAL-008: Section-level attendance breakdown
+  async getSectionAttendanceBreakdown(schoolId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const sections = await this.prisma.section.findMany({
+      where: { class: { schoolId } },
+      include: {
+        class: { select: { grade: true, gradeName: true } },
+        _count: { select: { enrollments: true } },
+      },
+    });
+
+    const todayAttendance = await this.prisma.attendance.groupBy({
+      by: ['sectionId', 'status'],
+      where: { schoolId, date: { gte: today, lt: tomorrow } },
+      _count: { id: true },
+    });
+
+    const attMap: Record<string, Record<string, number>> = {};
+    for (const row of todayAttendance) {
+      if (!attMap[row.sectionId]) attMap[row.sectionId] = {};
+      attMap[row.sectionId][row.status] = row._count.id;
+    }
+
+    return {
+      schoolId,
+      date: today.toISOString().slice(0, 10),
+      sections: sections.map((s) => {
+        const att = attMap[s.id] || {};
+        const total = s._count.enrollments;
+        const present = att['PRESENT'] || 0;
+        return {
+          sectionId: s.id,
+          sectionName: s.sectionName,
+          grade: s.class.grade,
+          gradeName: s.class.gradeName,
+          totalStudents: total,
+          present,
+          absent: att['ABSENT'] || 0,
+          late: att['LATE'] || 0,
+          unmarked: total - (att['PRESENT'] || 0) - (att['ABSENT'] || 0) - (att['LATE'] || 0),
+          attendancePercent: total > 0 ? ((present / total) * 100).toFixed(1) : '0',
+        };
+      }),
+    };
+  }
+
+  // FR-PRINCIPAL-009: Real-time exam activity
+  async getLiveExamActivity(schoolId: string) {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    const [activeAttempts, recentSubmissions, upcomingExams] = await Promise.all([
+      // Currently active (started but not submitted)
+      this.prisma.examAttempt.count({
+        where: {
+          submittedAt: null,
+          startedAt: { gte: oneHourAgo },
+          exam: { section: { class: { schoolId } } },
+        },
+      }),
+      // Submitted in the last hour
+      this.prisma.examAttempt.count({
+        where: {
+          submittedAt: { gte: oneHourAgo },
+          exam: { section: { class: { schoolId } } },
+        },
+      }),
+      // Published exams that haven't ended yet
+      this.prisma.exam.findMany({
+        where: {
+          isPublished: true,
+          deletedAt: null,
+          section: { class: { schoolId } },
+          OR: [{ endTime: null }, { endTime: { gte: now } }],
+        },
+        select: { id: true, title: true, startTime: true, endTime: true,
+          _count: { select: { attempts: true } } },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      schoolId,
+      asOf: now,
+      activeStudentsInExam: activeAttempts,
+      recentSubmissions,
+      upcomingAndActiveExams: upcomingExams,
+    };
+  }
+
+  // FR-PRINCIPAL-010: Fee collection live status
+  async getLiveFeeStatus(schoolId: string) {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const [todayCollection, monthCollection, outstanding, overdueCount] = await Promise.all([
+      this.prisma.feePayment.aggregate({
+        where: { feeRecord: { feeStructure: { schoolId } }, paymentDate: { gte: startOfDay } },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.feePayment.aggregate({
+        where: { feeRecord: { feeStructure: { schoolId } }, paymentDate: { gte: startOfMonth } },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.feeRecord.aggregate({
+        where: { feeStructure: { schoolId }, status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] } },
+        _sum: { balanceAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.feeRecord.count({
+        where: { feeStructure: { schoolId }, status: 'OVERDUE' },
+      }),
+    ]);
+
+    return {
+      schoolId,
+      asOf: new Date(),
+      today: {
+        collected: todayCollection._sum.amount || 0,
+        transactions: todayCollection._count.id,
+      },
+      thisMonth: {
+        collected: monthCollection._sum.amount || 0,
+        transactions: monthCollection._count.id,
+      },
+      outstanding: {
+        amount: outstanding._sum.balanceAmount || 0,
+        records: outstanding._count.id,
+        overdueCount,
+      },
+    };
+  }
+
+  // FR-PRINCIPAL-011: Staff activity monitoring
+  async getStaffActivityStatus(schoolId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [totalTeachers, todayTeacherAttendance, liveClasses] = await Promise.all([
+      this.prisma.teacherProfile.count({ where: { schoolId } }),
+      this.prisma.teacherAttendance.findMany({
+        where: { schoolId, date: { gte: today, lt: tomorrow } },
+        select: { status: true },
+      }),
+      this.prisma.liveClass.count({
+        where: { status: 'LIVE', teacher: { schoolId } },
+      }),
+    ]);
+
+    const present = todayTeacherAttendance.filter((a) => a.status === 'PRESENT').length;
+
+    return {
+      schoolId,
+      asOf: new Date(),
+      totalTeachers,
+      present,
+      absent: todayTeacherAttendance.filter((a) => a.status === 'ABSENT').length,
+      unmarked: totalTeachers - todayTeacherAttendance.length,
+      attendancePercent: totalTeachers > 0
+        ? ((present / totalTeachers) * 100).toFixed(1) : '0',
+      activeLiveClasses: liveClasses,
+    };
+  }
+
+  // FR-PRINCIPAL-012: Consolidated principal live dashboard
+  async getPrincipalLiveDashboard(schoolId: string) {
+    const [attendance, feeStatus, staffStatus, examActivity] = await Promise.all([
+      this.getLiveAttendanceStatus(schoolId),
+      this.getLiveFeeStatus(schoolId),
+      this.getStaffActivityStatus(schoolId),
+      this.getLiveExamActivity(schoolId),
+    ]);
+
+    return {
+      schoolId,
+      asOf: new Date(),
+      studentAttendance: {
+        present: attendance.present,
+        absent: attendance.absent,
+        unmarked: attendance.unmarked,
+        percent: attendance.attendancePercent,
+      },
+      staffAttendance: {
+        present: staffStatus.present,
+        absent: staffStatus.absent,
+        percent: staffStatus.attendancePercent,
+        activeLiveClasses: staffStatus.activeLiveClasses,
+      },
+      fees: {
+        todayCollection: feeStatus.today.collected,
+        outstanding: feeStatus.outstanding.amount,
+        overdueCount: feeStatus.outstanding.overdueCount,
+      },
+      examActivity: {
+        activeStudents: examActivity.activeStudentsInExam,
+        recentSubmissions: examActivity.recentSubmissions,
+      },
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-TEACH-ANALYTICS-007–012: Benchmark & Comparative Reports
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-TEACH-ANALYTICS-007: Teacher comparative performance
+  async getTeacherBenchmarkReport(schoolId: string) {
+    const teachers = await this.prisma.teacherProfile.findMany({
+      where: { schoolId },
+      select: { id: true, user: { select: { firstName: true, lastName: true } } },
+    });
+
+    const results = await Promise.all(
+      teachers.map(async (t) => {
+        const [examsCreated, avgStudentScore, liveClassesHeld] = await Promise.all([
+          this.prisma.exam.count({ where: { teacherId: t.id, deletedAt: null } }),
+          this.prisma.examAttempt.aggregate({
+            where: { exam: { teacherId: t.id }, submittedAt: { not: null } },
+            _avg: { percentage: true },
+          }),
+          this.prisma.liveClass.count({ where: { teacherId: t.id, status: 'COMPLETED' } }),
+        ]);
+        return {
+          teacherId: t.id,
+          teacherName: `${t.user.firstName} ${t.user.lastName}`,
+          examsCreated,
+          avgStudentScore: avgStudentScore._avg.percentage?.toFixed(1) || 'N/A',
+          liveClassesHeld,
+        };
+      }),
+    );
+
+    const schoolAvg = results.reduce((s, r) => s + Number(r.avgStudentScore || 0), 0) / (results.length || 1);
+
+    return {
+      schoolId,
+      schoolAverageStudentScore: schoolAvg.toFixed(1),
+      teacherBenchmarks: results.sort((a, b) => Number(b.avgStudentScore) - Number(a.avgStudentScore)),
+    };
+  }
+
+  // FR-TEACH-ANALYTICS-008: Section benchmark comparison
+  async getSectionBenchmarks(schoolId: string, academicYearId: string) {
+    const sections = await this.prisma.section.findMany({
+      where: { class: { schoolId, academicYearId } },
+      include: {
+        class: { select: { grade: true, gradeName: true } },
+        sectionTeachers: { select: { teacherId: true, isPrimary: true } },
+      },
+    });
+
+    const results = await Promise.all(
+      sections.map(async (s) => {
+        const enrollments = await this.prisma.studentEnrollment.count({
+          where: { sectionId: s.id, status: 'ACTIVE' },
+        });
+        const examStats = await this.prisma.examAttempt.aggregate({
+          where: { exam: { sectionId: s.id }, submittedAt: { not: null } },
+          _avg: { percentage: true },
+          _count: { id: true },
+        });
+        return {
+          sectionId: s.id,
+          sectionName: s.sectionName,
+          grade: s.class.grade,
+          totalStudents: enrollments,
+          avgExamScore: examStats._avg.percentage?.toFixed(1) || 'N/A',
+          totalAttempts: examStats._count.id,
+          teacherIds: s.sectionTeachers.map((st) => st.teacherId),
+        };
+      }),
+    );
+
+    return { schoolId, academicYearId, sections: results };
+  }
 }

@@ -154,4 +154,57 @@ export class AnalyticsController {
   createSnapshot(@Body() dto: any) {
     return this.service.createSnapshot(dto);
   }
+
+  // ── Real-Time Monitoring (FR-PRINCIPAL-007–012) ──────────────────────────
+  @Get('schools/:schoolId/live')
+  @ApiOperation({ summary: 'Principal live dashboard (FR-PRINCIPAL-012)' })
+  principalLiveDashboard(@Param('schoolId') schoolId: string) {
+    return this.service.getPrincipalLiveDashboard(schoolId);
+  }
+
+  @Get('schools/:schoolId/live/attendance')
+  @ApiOperation({ summary: 'Live student attendance status (FR-PRINCIPAL-007)' })
+  liveAttendance(@Param('schoolId') schoolId: string) {
+    return this.service.getLiveAttendanceStatus(schoolId);
+  }
+
+  @Get('schools/:schoolId/live/sections')
+  @ApiOperation({ summary: 'Section-level attendance breakdown (FR-PRINCIPAL-008)' })
+  sectionBreakdown(@Param('schoolId') schoolId: string) {
+    return this.service.getSectionAttendanceBreakdown(schoolId);
+  }
+
+  @Get('schools/:schoolId/live/exams')
+  @ApiOperation({ summary: 'Live exam activity monitoring (FR-PRINCIPAL-009)' })
+  liveExams(@Param('schoolId') schoolId: string) {
+    return this.service.getLiveExamActivity(schoolId);
+  }
+
+  @Get('schools/:schoolId/live/fees')
+  @ApiOperation({ summary: 'Live fee collection status (FR-PRINCIPAL-010)' })
+  liveFees(@Param('schoolId') schoolId: string) {
+    return this.service.getLiveFeeStatus(schoolId);
+  }
+
+  @Get('schools/:schoolId/live/staff')
+  @ApiOperation({ summary: 'Staff activity and attendance status (FR-PRINCIPAL-011)' })
+  liveStaff(@Param('schoolId') schoolId: string) {
+    return this.service.getStaffActivityStatus(schoolId);
+  }
+
+  // ── Benchmark Reports (FR-TEACH-ANALYTICS-007–012) ──────────────────────
+  @Get('schools/:schoolId/benchmarks/teachers')
+  @ApiOperation({ summary: 'Teacher comparative benchmark report (FR-TEACH-ANALYTICS-007)' })
+  teacherBenchmarks(@Param('schoolId') schoolId: string) {
+    return this.service.getTeacherBenchmarkReport(schoolId);
+  }
+
+  @Get('schools/:schoolId/benchmarks/sections')
+  @ApiOperation({ summary: 'Section benchmark comparison (FR-TEACH-ANALYTICS-008)' })
+  sectionBenchmarks(
+    @Param('schoolId') schoolId: string,
+    @Query('academicYearId') academicYearId: string,
+  ) {
+    return this.service.getSectionBenchmarks(schoolId, academicYearId);
+  }
 }
