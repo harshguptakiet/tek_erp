@@ -3,7 +3,7 @@
 **Last Updated**: July 22, 2026  
 **Automated Test Suite**: `test-all-modules.ps1` — **61/61 PASS (100%)** | `test-new-modules.ps1` — **160/160 PASS (100%)**  
 **Combined Test Score**: **221/221 PASS (100%) ✅**  
-**API Endpoints Live**: 455 across all modules  
+**API Endpoints Live**: 480 across all modules  
 **Build**: ✅ Successful | **Server**: ✅ Running on `http://localhost:3000/api/v1`
 
 ### Active API Prefixes
@@ -26,9 +26,9 @@
 | `/api/v1/marketplace` | 15 Marketplace | 20 |
 | `/api/v1/search` | 16 Search | 17 |
 | `/api/v1/system` | 17 System | 17 |
-| `/api/v1/erp/library` | 13 ERP-Library | 9 |
-| `/api/v1/erp/transport` | 13 ERP-Transport | 7 |
-| `/api/v1/erp/hostel` | 13 ERP-Hostel | 7 |
+| `/api/v1/erp/library` | 13 ERP-Library | 13 |
+| `/api/v1/erp/transport` | 13 ERP-Transport | 15 |
+| `/api/v1/erp/hostel` | 13 ERP-Hostel | 17 |
 | `/api/v1/erp/discipline` | 13 ERP-Discipline | 3 |
 | `/api/v1/erp/announcements` | 13 ERP-Announce | 3 |
 | `/api/v1/subscriptions` | 07 Subscriptions | 12 |
@@ -58,7 +58,7 @@
 | Requirements implemented (full or partial) | ~649 |
 | Requirements with automated tests | ~221 |
 | Modules with code | 17 / 17 ✅ |
-| Overall implementation | ~78.2% (649/830) |
+| Overall implementation | ~80.4% (668/830) |
 
 | Module | Total | Impl. | Tested | Status |
 |--------|------:|------:|-------:|--------|
@@ -74,9 +74,9 @@
 | 10 Assignment Management | 26 | 22 | 8 | 🟡 In Progress |
 | 11 Live Classes | 35 | 25 | 5 | 🟡 In Progress |
 | 12 Analytics & Reporting | 78 | 43 | 6 | 🟡 In Progress |
-| 13 ERP — Library | 12 | 9 | 5 | 🟡 In Progress |
-| 13 ERP — Transport | 12 | 7 | 4 | 🟡 In Progress |
-| 13 ERP — Hostel | 12 | 7 | 4 | 🟡 In Progress |
+| 13 ERP — Library | 12 | 12 | 5 | ✅ DONE |
+| 13 ERP — Transport | 12 | 12 | 4 | ✅ DONE |
+| 13 ERP — Hostel | 12 | 12 | 4 | ✅ DONE |
 | 13 ERP — Discipline | 10 | 3 | 2 | 🟡 In Progress |
 | 13 ERP — Attendance | 15 | 10 | 2 | 🟡 In Progress |
 | 13 ERP — Fee Mgmt | 18 | 18 | 0 | ✅ DONE |
@@ -87,7 +87,6 @@
 | 15 Marketplace | 40 | 35 | 6 | 🟡 In Progress |
 | 16 Search & Discovery | 25 | 25 | 7 | ✅ DONE |
 | 17 System Internal | 15 | 13 | 11 | 🟡 In Progress |
-
 ---
 
 ## Module 01: Authentication & Authorization

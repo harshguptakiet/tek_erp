@@ -427,4 +427,194 @@ export class ErpController {
   reviewScholarship(@Request() req, @Param('id') id: string, @Body() dto: any) {
     return this.service.reviewScholarshipApplication(req.user.userId, id, dto);
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-LIB-010: Library Access Control
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('library/access')
+  @ApiOperation({ summary: 'Record library check-in/out (FR-LIB-010)' })
+  recordLibraryAccess(@Body() dto: any) {
+    return this.service.recordLibraryAccess(dto);
+  }
+
+  @Get('library/access-logs')
+  @ApiOperation({ summary: 'Get library access logs (FR-LIB-010)' })
+  getLibraryAccessLogs(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.getLibraryAccessLogs(schoolId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-LIB-011: Book Recommendations
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Get('library/recommendations/:userId')
+  @ApiOperation({ summary: 'Get personalized book recommendations (FR-LIB-011)' })
+  getBookRecommendations(
+    @Param('userId') userId: string,
+    @Query('userType') userType: string,
+    @Query() options: any
+  ) {
+    return this.service.getBookRecommendations(userId, userType, options);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-LIB-007: E-Library Digital Resources
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('library/digital-resources')
+  @ApiOperation({ summary: 'Add digital resource (FR-LIB-007)' })
+  addDigitalResource(@Request() req, @Body() dto: any) {
+    return this.service.addDigitalResource(req.user.userId, dto);
+  }
+
+  @Get('library/digital-resources')
+  @ApiOperation({ summary: 'List digital resources (FR-LIB-007)' })
+  listDigitalResources(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.listDigitalResources(schoolId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-008: Vehicle Maintenance Tracking
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('transport/maintenance/schedule')
+  @ApiOperation({ summary: 'Schedule vehicle maintenance (FR-TRANS-008)' })
+  scheduleVehicleMaintenance(@Request() req, @Body() dto: any) {
+    return this.service.scheduleVehicleMaintenance(req.user.userId, dto);
+  }
+
+  @Put('transport/maintenance/:vehicleId/:maintenanceId/complete')
+  @ApiOperation({ summary: 'Log maintenance completion (FR-TRANS-008)' })
+  logMaintenanceCompletion(
+    @Request() req,
+    @Param('vehicleId') vehicleId: string,
+    @Param('maintenanceId') maintenanceId: string,
+    @Body() dto: any
+  ) {
+    return this.service.logVehicleMaintenanceCompletion(req.user.userId, vehicleId, maintenanceId, dto);
+  }
+
+  @Get('transport/maintenance/:vehicleId/history')
+  @ApiOperation({ summary: 'Get vehicle maintenance history (FR-TRANS-008)' })
+  getMaintenanceHistory(@Param('vehicleId') vehicleId: string) {
+    return this.service.getVehicleMaintenanceHistory(vehicleId);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-010: Transport Safety and Compliance
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('transport/safety/inspection')
+  @ApiOperation({ summary: 'Record safety inspection (FR-TRANS-010)' })
+  recordSafetyInspection(@Request() req, @Body() dto: any) {
+    const { vehicleId, ...inspectionData } = dto;
+    return this.service.recordSafetyInspection(req.user.userId, vehicleId, inspectionData);
+  }
+
+  @Get('transport/safety/compliance')
+  @ApiOperation({ summary: 'Get safety compliance report (FR-TRANS-010)' })
+  getSafetyCompliance(@Query('schoolId') schoolId: string) {
+    return this.service.getSafetyComplianceReport(schoolId);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-011: Transport Reports and Analytics
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Get('transport/analytics')
+  @ApiOperation({ summary: 'Get transport analytics (FR-TRANS-011)' })
+  getTransportAnalytics(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.getTransportAnalytics(schoolId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TRANS-012: Emergency Response System
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('transport/emergency')
+  @ApiOperation({ summary: 'Log emergency incident (FR-TRANS-012)' })
+  logEmergency(@Request() req, @Body() dto: any) {
+    return this.service.logEmergencyIncident(req.user.userId, dto);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HOSTEL-008: Leave and Outing Management
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hostel/leave/apply')
+  @ApiOperation({ summary: 'Apply for hostel leave (FR-HOSTEL-008)' })
+  applyHostelLeave(@Request() req, @Body() dto: any) {
+    return this.service.applyHostelLeave(req.user.userId, dto);
+  }
+
+  @Put('hostel/leave/:leaveId/approve')
+  @ApiOperation({ summary: 'Approve/reject hostel leave (FR-HOSTEL-008)' })
+  approveHostelLeave(@Request() req, @Param('leaveId') leaveId: string, @Body() dto: any) {
+    return this.service.approveHostelLeave(req.user.userId, leaveId, dto.approved, dto.remarks);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HOSTEL-009: Hostel Inventory Management
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hostel/inventory')
+  @ApiOperation({ summary: 'Add hostel inventory item (FR-HOSTEL-009)' })
+  addHostelInventory(@Request() req, @Body() dto: any) {
+    return this.service.addHostelInventoryItem(req.user.userId, dto);
+  }
+
+  @Get('hostel/inventory/report')
+  @ApiOperation({ summary: 'Get hostel inventory report (FR-HOSTEL-009)' })
+  getHostelInventoryReport(@Query('blockId') blockId?: string) {
+    return this.service.getHostelInventoryReport(blockId);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HOSTEL-010: Discipline and Complaints
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hostel/discipline')
+  @ApiOperation({ summary: 'Record hostel disciplinary action (FR-HOSTEL-010)' })
+  recordHostelDiscipline(@Request() req, @Body() dto: any) {
+    return this.service.recordHostelDisciplinaryAction(req.user.userId, dto);
+  }
+
+  @Post('hostel/complaints')
+  @ApiOperation({ summary: 'Register hostel complaint (FR-HOSTEL-010)' })
+  registerHostelComplaint(@Request() req, @Body() dto: any) {
+    return this.service.registerHostelComplaint(req.user.userId, dto);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HOSTEL-011: Hostel Maintenance
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hostel/maintenance')
+  @ApiOperation({ summary: 'Create hostel maintenance request (FR-HOSTEL-011)' })
+  createHostelMaintenance(@Request() req, @Body() dto: any) {
+    return this.service.createHostelMaintenanceRequest(req.user.userId, dto);
+  }
+
+  @Put('hostel/maintenance/:requestId')
+  @ApiOperation({ summary: 'Update hostel maintenance status (FR-HOSTEL-011)' })
+  updateHostelMaintenance(@Request() req, @Param('requestId') requestId: string, @Body() dto: any) {
+    return this.service.updateHostelMaintenanceStatus(req.user.userId, requestId, dto);
+  }
+
+  @Get('hostel/maintenance/report')
+  @ApiOperation({ summary: 'Get hostel maintenance report (FR-HOSTEL-011)' })
+  getHostelMaintenanceReport(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.getHostelMaintenanceReport(schoolId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HOSTEL-012: Hostel Reports and Analytics
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Get('hostel/analytics')
+  @ApiOperation({ summary: 'Get hostel analytics (FR-HOSTEL-012)' })
+  getHostelAnalytics(@Query('schoolId') schoolId: string) {
+    return this.service.getHostelAnalytics(schoolId);
+  }
 }
