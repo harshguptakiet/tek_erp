@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ErpService } from './erp.service';
@@ -311,6 +311,56 @@ export class ErpController {
   @ApiOperation({ summary: 'Inventory statistics (FR-INV-008)' })
   inventoryStats(@Query('schoolId') schoolId?: string, @Query('organizationId') organizationId?: string) {
     return this.service.getInventoryStats({ schoolId, organizationId });
+  }
+
+  @Get('inventory/reports')
+  @ApiOperation({ summary: 'Generate inventory reports (FR-INV-009)' })
+  inventoryReports(
+    @Query('schoolId') schoolId?: string,
+    @Query('organizationId') organizationId?: string,
+    @Query('reportType') reportType?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    if (!reportType) throw new BadRequestException('reportType is required');
+    return this.service.getInventoryReports({
+      schoolId,
+      organizationId,
+      reportType,
+      startDate,
+      endDate,
+      categoryId,
+    });
+  }
+
+  @Post('inventory/lab/reserve')
+  @ApiOperation({ summary: 'Reserve lab equipment (FR-INV-010)' })
+  reserveLabEquipment(@Request() req, @Body() dto: any) {
+    return this.service.reserveLabEquipment(req.user.userId, dto);
+  }
+
+  @Post('inventory/lab/usage')
+  @ApiOperation({ summary: 'Record lab equipment usage (FR-INV-010)' })
+  recordLabUsage(@Request() req, @Body() dto: any) {
+    return this.service.recordLabEquipmentUsage(req.user.userId, dto);
+  }
+
+  @Post('inventory/lab/calibration')
+  @ApiOperation({ summary: 'Schedule equipment calibration (FR-INV-010)' })
+  scheduleCalibration(@Request() req, @Body() dto: any) {
+    return this.service.scheduleEquipmentCalibration(req.user.userId, dto);
+  }
+
+  @Get('inventory/lab/report')
+  @ApiOperation({ summary: 'Lab equipment report (FR-INV-010)' })
+  labEquipmentReport(
+    @Query('schoolId') schoolId?: string,
+    @Query('labName') labName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.service.getLabEquipmentReport({ schoolId, labName, startDate, endDate });
   }
 
   // ── Certificates ──────────────────────────────────────────────────────────

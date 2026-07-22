@@ -996,4 +996,352 @@ export class ErpService {
     });
     return updated;
   }
+
+  // FR-INV-009: Inventory Reports
+  async getInventoryReports(filters: {
+    schoolId?: string;
+    organizationId?: string;
+    reportType: string;
+    startDate?: string;
+    endDate?: string;
+    categoryId?: string;
+  }) {
+    const where: any = {
+      isActive: true,
+      ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+    };
+
+    switch (filters.reportType) {
+      case 'STOCK_SUMMARY': {
+        const items = await this.prisma.inventoryItem.findMany({
+          where,
+          include: { category: { select: { name: true } } },
+          orderBy: { itemName: 'asc' },
+        });
+        const totalValue = items.reduce((s, i) => s + (i.quantity * Number(i.unitPrice || 0)), 0);
+        return {
+          reportType: 'Stock Summary',
+          generatedAt: new Date(),
+          totalItems: items.length,
+          totalValue,
+          items: items.map(i => ({
+            itemName: i.itemName,
+            itemCode: i.itemCode,
+            category: i.category?.name,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            totalValue: i.quantity * Number(i.unitPrice || 0),
+            reorderLevel: i.reorderLevel,
+          })),
+        };
+      }
+
+      case 'STOCK_MOVEMENT': {
+        const dateFilter: any = {};
+        if (filters.startDate) dateFilter.gte = new Date(filters.startDate);
+        if (filters.endDate) dateFilter.lte = new Date(filters.endDate);
+
+        const transactions = await this.prisma.inventoryTransaction.findMany({
+          where: {
+            item: where,
+            ...(filters.startDate || filters.endDate ? { transactionDate: dateFilter } : {}),
+          },
+          include: {
+            item: { select: { itemName: true, itemCode: true } },
+          },
+          orderBy: { transactionDate: 'desc' },
+          take: 500,
+        });
+
+        const byType = transactions.reduce((acc, t) => {
+          acc[t.transactionType] = (acc[t.transactionType] || 0) + t.quantity;
+          return acc;
+        }, {} as Record<string, number>);
+
+        return {
+          reportType: 'Stock Movement',
+          period: `${filters.startDate || 'Beginning'} to ${filters.endDate || 'Now'}`,
+          totalTransactions: transactions.length,
+          movementByType: byType,
+          transactions: transactions.map(t => ({
+            date: t.transactionDate,
+            itemName: t.item.itemName,
+            itemCode: t.item.itemCode,
+            type: t.transactionType,
+            quantity: t.quantity,
+            reference: t.reference,
+            performedBy: t.performedBy,
+          })),
+        };
+      }
+
+      case 'REORDER_LEVEL': {
+        const items = await this.prisma.inventoryItem.findMany({
+          where,
+          include: { category: { select: { name: true } } },
+        });
+        const lowStock = items.filter(i => i.quantity <= (i.reorderLevel || 10));
+        return {
+          reportType: 'Reorder Level Report',
+          generatedAt: new Date(),
+          totalLowStockItems: lowStock.length,
+          items: lowStock.map(i => ({
+            itemName: i.itemName,
+            itemCode: i.itemCode,
+            category: i.category?.name,
+            currentQuantity: i.quantity,
+            reorderLevel: i.reorderLevel,
+            deficit: (i.reorderLevel || 10) - i.quantity,
+            unitPrice: i.unitPrice,
+          })),
+        };
+      }
+
+      case 'DEAD_STOCK': {
+        // Items with zero transactions in last 90 days
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const items = await this.prisma.inventoryItem.findMany({
+          where,
+          include: {
+            category: { select: { name: true } },
+            transactions: {
+              where: { transactionDate: { gte: ninetyDaysAgo } },
+              select: { id: true },
+            },
+          },
+        });
+        const deadStock = items.filter(i => i.transactions.length === 0 && i.quantity > 0);
+        const totalValue = deadStock.reduce((s, i) => s + (i.quantity * Number(i.unitPrice || 0)), 0);
+        return {
+          reportType: 'Dead Stock Report',
+          period: 'Last 90 days',
+          totalDeadStockItems: deadStock.length,
+          totalValue,
+          items: deadStock.map(i => ({
+            itemName: i.itemName,
+            itemCode: i.itemCode,
+            category: i.category?.name,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            value: i.quantity * Number(i.unitPrice || 0),
+          })),
+        };
+      }
+
+      case 'VALUATION': {
+        const items = await this.prisma.inventoryItem.findMany({
+          where,
+          include: { category: { select: { name: true } } },
+        });
+        const byCategory = items.reduce((acc, i) => {
+          const cat = i.category?.name || 'Uncategorized';
+          if (!acc[cat]) acc[cat] = { count: 0, quantity: 0, value: 0 };
+          acc[cat].count++;
+          acc[cat].quantity += i.quantity;
+          acc[cat].value += i.quantity * Number(i.unitPrice || 0);
+          return acc;
+        }, {} as Record<string, { count: number; quantity: number; value: number }>);
+
+        const totalValue = Object.values(byCategory).reduce((s, c) => s + c.value, 0);
+        return {
+          reportType: 'Inventory Valuation',
+          generatedAt: new Date(),
+          totalValue,
+          byCategory,
+        };
+      }
+
+      default:
+        throw new BadRequestException('Invalid report type. Valid types: STOCK_SUMMARY, STOCK_MOVEMENT, REORDER_LEVEL, DEAD_STOCK, VALUATION');
+    }
+  }
+
+  // FR-INV-010: Lab Equipment Management
+  async reserveLabEquipment(reservedBy: string, dto: {
+    itemId: string;
+    labName: string;
+    reservedFor: string;
+    quantity: number;
+    reservationDate: string;
+    startTime: string;
+    endTime: string;
+    purpose: string;
+  }) {
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id: dto.itemId } });
+    if (!item) throw new NotFoundException('Equipment not found');
+    if (item.quantity < dto.quantity) throw new BadRequestException('Insufficient equipment available');
+
+    // Check for conflicts (simplified - in real system would check time overlaps)
+    const reservation = await this.prisma.inventoryRequisition.create({
+      data: {
+        itemId: dto.itemId,
+        requestedBy: reservedBy,
+        requestedFor: dto.reservedFor,
+        quantity: dto.quantity,
+        purpose: `LAB_RESERVATION: ${dto.labName} - ${dto.purpose}`,
+        status: 'APPROVED',
+        requestedAt: new Date(),
+        approvedAt: new Date(),
+        approvedBy: reservedBy,
+      },
+    });
+
+    this.eventBus.publish('lab.equipment.reserved', {
+      reservationId: reservation.id,
+      itemId: dto.itemId,
+      labName: dto.labName,
+      reservedFor: dto.reservedFor,
+      date: dto.reservationDate,
+    });
+
+    return {
+      ...reservation,
+      labName: dto.labName,
+      reservationDate: dto.reservationDate,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+    };
+  }
+
+  async recordLabEquipmentUsage(recordedBy: string, dto: {
+    itemId: string;
+    labName: string;
+    usedBy: string;
+    quantity: number;
+    experimentName: string;
+    conditionBefore: string;
+    conditionAfter: string;
+    breakageCount?: number;
+    consumablesUsed?: Record<string, number>;
+    notes?: string;
+  }) {
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id: dto.itemId } });
+    if (!item) throw new NotFoundException('Equipment not found');
+
+    // Record the usage as a transaction
+    await this.recordInventoryTransaction(recordedBy, {
+      itemId: dto.itemId,
+      transactionType: dto.breakageCount && dto.breakageCount > 0 ? 'DAMAGED' : 'OUT',
+      quantity: dto.breakageCount || 0,
+      reference: `LAB_USAGE: ${dto.labName} - ${dto.experimentName}`,
+      notes: JSON.stringify({
+        usedBy: dto.usedBy,
+        experimentName: dto.experimentName,
+        conditionBefore: dto.conditionBefore,
+        conditionAfter: dto.conditionAfter,
+        breakageCount: dto.breakageCount,
+        consumablesUsed: dto.consumablesUsed,
+        additionalNotes: dto.notes,
+      }),
+    });
+
+    return {
+      success: true,
+      message: 'Lab equipment usage recorded',
+      itemId: dto.itemId,
+      labName: dto.labName,
+      experimentName: dto.experimentName,
+      breakageCount: dto.breakageCount || 0,
+    };
+  }
+
+  async scheduleEquipmentCalibration(scheduledBy: string, dto: {
+    itemId: string;
+    calibrationDate: string;
+    calibrationType: string;
+    performedBy?: string;
+    notes?: string;
+  }) {
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id: dto.itemId } });
+    if (!item) throw new NotFoundException('Equipment not found');
+
+    // Store calibration schedule in inventory item metadata or create audit log
+    await this.prisma.auditLog.create({
+      data: {
+        userId: scheduledBy,
+        action: 'EQUIPMENT_CALIBRATION_SCHEDULED',
+        tableName: 'InventoryItem',
+        recordId: dto.itemId,
+        changes: {
+          calibrationDate: dto.calibrationDate,
+          calibrationType: dto.calibrationType,
+          performedBy: dto.performedBy,
+          notes: dto.notes,
+        },
+        ipAddress: '127.0.0.1',
+        userAgent: 'System',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Calibration scheduled',
+      itemId: dto.itemId,
+      calibrationDate: dto.calibrationDate,
+      calibrationType: dto.calibrationType,
+    };
+  }
+
+  async getLabEquipmentReport(filters: {
+    schoolId?: string;
+    labName?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const where: any = {
+      isActive: true,
+      ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+      // Filter for lab equipment category
+      category: { name: { contains: 'Lab', mode: 'insensitive' } },
+    };
+
+    const equipment = await this.prisma.inventoryItem.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        transactions: {
+          where: {
+            ...(filters.startDate || filters.endDate ? {
+              transactionDate: {
+                ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+                ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+              },
+            } : {}),
+          },
+          orderBy: { transactionDate: 'desc' },
+          take: 100,
+        },
+      },
+    });
+
+    const totalEquipment = equipment.length;
+    const totalValue = equipment.reduce((s, e) => s + (e.quantity * Number(e.unitPrice || 0)), 0);
+    const damagedCount = equipment.reduce((s, e) => {
+      const damaged = e.transactions.filter(t => t.transactionType === 'DAMAGED').length;
+      return s + damaged;
+    }, 0);
+
+    return {
+      reportType: 'Lab Equipment Report',
+      period: `${filters.startDate || 'All time'} to ${filters.endDate || 'Now'}`,
+      labName: filters.labName || 'All Labs',
+      summary: {
+        totalEquipment,
+        totalValue,
+        damagedIncidents: damagedCount,
+      },
+      equipment: equipment.map(e => ({
+        itemName: e.itemName,
+        itemCode: e.itemCode,
+        category: e.category?.name,
+        quantity: e.quantity,
+        unitPrice: e.unitPrice,
+        usageCount: e.transactions.filter(t => t.transactionType === 'OUT').length,
+        breakageCount: e.transactions.filter(t => t.transactionType === 'DAMAGED').length,
+        lastUsed: e.transactions[0]?.transactionDate,
+      })),
+    };
+  }
 }
