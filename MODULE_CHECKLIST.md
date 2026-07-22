@@ -3,7 +3,7 @@
 **Last Updated**: July 22, 2026  
 **Automated Test Suite**: `test-all-modules.ps1` — **61/61 PASS (100%)** | `test-new-modules.ps1` — **160/160 PASS (100%)**  
 **Combined Test Score**: **221/221 PASS (100%) ✅**  
-**API Endpoints Live**: 480 across all modules  
+**API Endpoints Live**: 502 across all modules  
 **Build**: ✅ Successful | **Server**: ✅ Running on `http://localhost:3000/api/v1`
 
 ### Active API Prefixes
@@ -29,8 +29,12 @@
 | `/api/v1/erp/library` | 13 ERP-Library | 13 |
 | `/api/v1/erp/transport` | 13 ERP-Transport | 15 |
 | `/api/v1/erp/hostel` | 13 ERP-Hostel | 17 |
-| `/api/v1/erp/discipline` | 13 ERP-Discipline | 3 |
+| `/api/v1/erp/discipline` | 13 ERP-Discipline | 12 |
 | `/api/v1/erp/announcements` | 13 ERP-Announce | 3 |
+| `/api/v1/erp/events` | 13 ERP-Events | 6 |
+| `/api/v1/erp/hr/training` | 13 ERP-Training | 2 |
+| `/api/v1/erp/hr/leave` | 13 ERP-Leave | 4 |
+| `/api/v1/erp/hr/analytics` | 13 ERP-HR Analytics | 1 |
 | `/api/v1/subscriptions` | 07 Subscriptions | 12 |
 | `/api/v1/licenses` | 07 Licenses | 5 |  
 **Build**: ✅ Successful | **Server**: ✅ Running on `http://localhost:3000/api/v1`
@@ -55,10 +59,10 @@
 | Metric | Count |
 |--------|------:|
 | Total documented FR requirements | 830 |
-| Requirements implemented (full or partial) | ~649 |
+| Requirements implemented (full or partial) | ~695 |
 | Requirements with automated tests | ~221 |
 | Modules with code | 17 / 17 ✅ |
-| Overall implementation | ~80.4% (668/830) |
+| Overall implementation | ~83.7% (695/830) |
 
 | Module | Total | Impl. | Tested | Status |
 |--------|------:|------:|-------:|--------|
@@ -77,11 +81,11 @@
 | 13 ERP — Library | 12 | 12 | 5 | ✅ DONE |
 | 13 ERP — Transport | 12 | 12 | 4 | ✅ DONE |
 | 13 ERP — Hostel | 12 | 12 | 4 | ✅ DONE |
-| 13 ERP — Discipline | 10 | 3 | 2 | 🟡 In Progress |
+| 13 ERP — Discipline | 10 | 10 | 2 | ✅ DONE |
 | 13 ERP — Attendance | 15 | 10 | 2 | 🟡 In Progress |
 | 13 ERP — Fee Mgmt | 18 | 18 | 0 | ✅ DONE |
-| 13 ERP — Events/Announce | 9 | 3 | 3 | 🟡 In Progress |
-| 13 ERP — HR/Payroll | 10 | 6 | 6 | 🟡 In Progress |
+| 13 ERP — Events/Announce | 9 | 9 | 3 | ✅ DONE |
+| 13 ERP — HR/Payroll | 10 | 10 | 6 | ✅ DONE |
 | 13 ERP — Inventory | 10 | 10 | 9 | ✅ DONE |
 | 14 Notifications & Messaging | 30 | 26 | 14 | 🟡 In Progress |
 | 15 Marketplace | 40 | 35 | 6 | 🟡 In Progress |

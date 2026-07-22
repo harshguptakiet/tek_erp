@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ErpService } from './erp.service';
@@ -616,5 +616,156 @@ export class ErpController {
   @ApiOperation({ summary: 'Get hostel analytics (FR-HOSTEL-012)' })
   getHostelAnalytics(@Query('schoolId') schoolId: string) {
     return this.service.getHostelAnalytics(schoolId);
+  }
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-EVENT-001 to FR-EVENT-009: EVENT MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('events')
+  @ApiOperation({ summary: 'Create event (FR-EVENT-001)' })
+  createEvent(@Request() req, @Body() dto: any) {
+    return this.service.createEvent(req.user.userId, dto);
+  }
+
+  @Get('events')
+  @ApiOperation({ summary: 'List events (FR-EVENT-001)' })
+  listEvents(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.listEvents(schoolId, filters);
+  }
+
+  @Get('events/calendar')
+  @ApiOperation({ summary: 'Get event calendar (FR-EVENT-002)' })
+  getEventCalendar(@Query('schoolId') schoolId: string, @Query('month') month: string, @Query('year') year: string) {
+    return this.service.getEventCalendar(schoolId, { month: month ? parseInt(month) : undefined, year: year ? parseInt(year) : undefined });
+  }
+
+  @Get('events/:id')
+  @ApiOperation({ summary: 'Get event by ID (FR-EVENT-001)' })
+  getEvent(@Param('id') id: string) {
+    return this.service.getEvent(id);
+  }
+
+  @Put('events/:id')
+  @ApiOperation({ summary: 'Update event (FR-EVENT-001)' })
+  updateEvent(@Request() req, @Param('id') id: string, @Body() dto: any) {
+    return this.service.updateEvent(id, req.user.userId, dto);
+  }
+
+  @Delete('events/:id')
+  @ApiOperation({ summary: 'Delete event (FR-EVENT-001)' })
+  deleteEvent(@Request() req, @Param('id') id: string) {
+    return this.service.deleteEvent(id, req.user.userId);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HR-007: TRAINING AND DEVELOPMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hr/training')
+  @ApiOperation({ summary: 'Schedule training event (FR-HR-007)' })
+  scheduleTraining(@Request() req, @Body() dto: any) {
+    return this.service.scheduleTraining(req.user.userId, dto);
+  }
+
+  @Get('hr/training/calendar')
+  @ApiOperation({ summary: 'Get training calendar (FR-HR-007)' })
+  getTrainingCalendar(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.getTrainingCalendar(schoolId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HR-002: LEAVE MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('hr/leave/apply')
+  @ApiOperation({ summary: 'Apply for leave (FR-HR-002)' })
+  applyLeave(@Request() req, @Body() dto: any) {
+    return this.service.applyLeave(req.user.userId, dto);
+  }
+
+  @Put('hr/leave/:leaveId/approve')
+  @ApiOperation({ summary: 'Approve or reject leave (FR-HR-002)' })
+  approveLeave(@Request() req, @Param('leaveId') leaveId: string, @Body() dto: any) {
+    return this.service.approveLeave(leaveId, req.user.userId, dto.approved, dto.remarks);
+  }
+
+  @Get('hr/leave/balance/:employeeId')
+  @ApiOperation({ summary: 'Get leave balance (FR-HR-002)' })
+  getLeaveBalance(@Param('employeeId') employeeId: string) {
+    return this.service.getLeaveBalance(employeeId);
+  }
+
+  @Get('hr/leave/history/:employeeId')
+  @ApiOperation({ summary: 'Get leave history (FR-HR-002)' })
+  getLeaveHistory(@Param('employeeId') employeeId: string, @Query() filters: any) {
+    return this.service.getLeaveHistory(employeeId, filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-HR-010: HR REPORTS AND ANALYTICS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Get('hr/analytics')
+  @ApiOperation({ summary: 'Get HR analytics (FR-HR-010)' })
+  getHRAnalytics(@Query() filters: any) {
+    return this.service.getHRAnalytics(filters);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-003 to FR-DISC-010: EXPANDED DISCIPLINE MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('discipline/behavior')
+  @ApiOperation({ summary: 'Log student behavior (FR-DISC-003)' })
+  logStudentBehavior(@Request() req, @Body() dto: any) {
+    return this.service.logStudentBehavior(req.user.userId, dto);
+  }
+
+  @Get('discipline/behavior/:studentId')
+  @ApiOperation({ summary: 'Get student behavior history (FR-DISC-003)' })
+  getStudentBehaviorHistory(@Param('studentId') studentId: string, @Query() filters: any) {
+    return this.service.getStudentBehaviorHistory(studentId, filters);
+  }
+
+  @Post('discipline/counseling')
+  @ApiOperation({ summary: 'Schedule counseling session (FR-DISC-004)' })
+  scheduleCounseling(@Request() req, @Body() dto: any) {
+    return this.service.scheduleCounseling(req.user.userId, dto);
+  }
+
+  @Get('discipline/counseling/:studentId')
+  @ApiOperation({ summary: 'Get counseling history (FR-DISC-004)' })
+  getCounselingHistory(@Param('studentId') studentId: string) {
+    return this.service.getCounselingHistory(studentId);
+  }
+
+  @Post('discipline/parent-notification')
+  @ApiOperation({ summary: 'Send parent discipline notification (FR-DISC-005)' })
+  sendParentDisciplineNotification(@Request() req, @Body() dto: any) {
+    return this.service.sendParentDisciplineNotification(req.user.userId, dto);
+  }
+
+  @Get('discipline/analytics')
+  @ApiOperation({ summary: 'Get discipline analytics and reports (FR-DISC-009)' })
+  getDisciplineAnalytics(@Query('schoolId') schoolId: string, @Query() filters: any) {
+    return this.service.getDisciplineAnalytics(schoolId, filters);
+  }
+
+  @Post('discipline/positive')
+  @ApiOperation({ summary: 'Log positive behavior (FR-DISC-010)' })
+  logPositiveBehavior(@Request() req, @Body() dto: any) {
+    return this.service.logPositiveBehavior(req.user.userId, dto);
+  }
+
+  @Get('discipline/positive/:studentId')
+  @ApiOperation({ summary: 'Get positive behavior records (FR-DISC-010)' })
+  getPositiveBehaviorRecords(@Param('studentId') studentId: string) {
+    return this.service.getPositiveBehaviorRecords(studentId);
+  }
+
+  @Get('discipline/leaderboard')
+  @ApiOperation({ summary: 'Get positive behavior leaderboard (FR-DISC-010)' })
+  getBehaviorLeaderboard(@Query('schoolId') schoolId: string, @Query('limit') limit: string) {
+    return this.service.getBehaviorLeaderboard(schoolId, limit ? parseInt(limit) : 20);
   }
 }

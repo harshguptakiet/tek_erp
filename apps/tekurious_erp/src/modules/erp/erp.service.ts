@@ -2093,4 +2093,751 @@ export class ErpService {
       blockWiseData,
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-EVENT-001 to FR-EVENT-009: EVENT MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async createEvent(createdBy: string, dto: {
+    schoolId: string; title: string; description?: string;
+    eventType: string; startDate: string; endDate?: string;
+    location?: string; isAllDay?: boolean; notifyUsers?: boolean;
+  }) {
+    const event = await this.prisma.event.create({
+      data: {
+        schoolId: dto.schoolId,
+        title: dto.title,
+        description: dto.description,
+        eventType: dto.eventType,
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : null,
+        location: dto.location,
+        isAllDay: dto.isAllDay ?? false,
+        notifyUsers: dto.notifyUsers ?? false,
+        createdBy,
+      },
+    });
+
+    if (dto.notifyUsers) {
+      await this.eventBus.publish('event.created', {
+        eventId: event.id,
+        title: event.title,
+        startDate: event.startDate,
+        eventType: event.eventType,
+      });
+    }
+
+    return event;
+  }
+
+  async listEvents(schoolId: string, filters: { 
+    eventType?: string; startDate?: string; endDate?: string; 
+    page?: number; limit?: number; 
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    
+    const where: any = {
+      schoolId,
+      ...(filters.eventType ? { eventType: filters.eventType } : {}),
+      ...(filters.startDate || filters.endDate ? {
+        startDate: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [events, total] = await Promise.all([
+      this.prisma.event.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { startDate: 'asc' },
+      }),
+      this.prisma.event.count({ where }),
+    ]);
+
+    return {
+      data: events,
+      meta: { total, page, limit },
+    };
+  }
+
+  async getEvent(eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) throw new NotFoundException('Event not found');
+    return event;
+  }
+
+  async updateEvent(eventId: string, updatedBy: string, dto: {
+    title?: string; description?: string; eventType?: string;
+    startDate?: string; endDate?: string; location?: string;
+    isAllDay?: boolean; notifyUsers?: boolean;
+  }) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) throw new NotFoundException('Event not found');
+
+    const updated = await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        ...(dto.title ? { title: dto.title } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.eventType ? { eventType: dto.eventType } : {}),
+        ...(dto.startDate ? { startDate: new Date(dto.startDate) } : {}),
+        ...(dto.endDate !== undefined ? { endDate: dto.endDate ? new Date(dto.endDate) : null } : {}),
+        ...(dto.location !== undefined ? { location: dto.location } : {}),
+        ...(dto.isAllDay !== undefined ? { isAllDay: dto.isAllDay } : {}),
+        ...(dto.notifyUsers !== undefined ? { notifyUsers: dto.notifyUsers } : {}),
+      },
+    });
+
+    if (dto.notifyUsers) {
+      await this.eventBus.publish('event.updated', {
+        eventId: updated.id,
+        updatedBy,
+        changes: Object.keys(dto),
+      });
+    }
+
+    return updated;
+  }
+
+  async deleteEvent(eventId: string, deletedBy: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) throw new NotFoundException('Event not found');
+
+    await this.prisma.event.delete({
+      where: { id: eventId },
+    });
+
+    await this.eventBus.publish('event.deleted', {
+      eventId,
+      deletedBy,
+      eventTitle: event.title,
+    });
+
+    return { message: 'Event deleted successfully' };
+  }
+
+  async getEventCalendar(schoolId: string, filters: { month?: number; year?: number }) {
+    const year = filters.year || new Date().getFullYear();
+    const month = filters.month || new Date().getMonth() + 1;
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const events = await this.prisma.event.findMany({
+      where: {
+        schoolId,
+        startDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+
+    // Group by event type
+    const eventsByType = events.reduce((acc: any, event) => {
+      const type = event.eventType || 'OTHER';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(event);
+      return acc;
+    }, {});
+
+    return {
+      month,
+      year,
+      totalEvents: events.length,
+      eventsByType,
+      events,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-HR-007: TRAINING AND DEVELOPMENT (Using Event model for training events)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async scheduleTraining(scheduledBy: string, dto: {
+    schoolId: string; title: string; description?: string;
+    startDate: string; endDate?: string; location?: string;
+    targetEmployeeIds?: string[]; maxParticipants?: number;
+  }) {
+    // Create training as an event
+    const training = await this.prisma.event.create({
+      data: {
+        schoolId: dto.schoolId,
+        title: dto.title,
+        description: dto.description,
+        eventType: 'TRAINING',
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : null,
+        location: dto.location,
+        notifyUsers: true,
+        createdBy: scheduledBy,
+      },
+    });
+
+    await this.eventBus.publish('training.scheduled', {
+      trainingId: training.id,
+      title: training.title,
+      targetEmployees: dto.targetEmployeeIds,
+      scheduledBy,
+    });
+
+    return training;
+  }
+
+  async getTrainingCalendar(schoolId: string, filters: { startDate?: string; endDate?: string }) {
+    const where: any = {
+      schoolId,
+      eventType: 'TRAINING',
+      ...(filters.startDate || filters.endDate ? {
+        startDate: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const trainings = await this.prisma.event.findMany({
+      where,
+      orderBy: { startDate: 'asc' },
+    });
+
+    return {
+      totalTrainings: trainings.length,
+      upcoming: trainings.filter(t => new Date(t.startDate) > new Date()),
+      completed: trainings.filter(t => new Date(t.startDate) <= new Date()),
+      trainings,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-HR-004: LEAVE MANAGEMENT (Using TeacherLeave and LeaveBalance models)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async applyLeave(employeeId: string, dto: {
+    leaveType: string; startDate: string; endDate: string;
+    reason: string; emergencyContact?: string;
+  }) {
+    // Check leave balance
+    const balance = await this.prisma.leaveBalance.findFirst({
+      where: { employeeId, leaveType: dto.leaveType },
+    });
+
+    if (!balance) {
+      throw new BadRequestException(`No leave balance found for leave type: ${dto.leaveType}`);
+    }
+
+    // Calculate days
+    const start = new Date(dto.startDate);
+    const end = new Date(dto.endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (balance.balanceLeaves < days) {
+      throw new BadRequestException(`Insufficient leave balance. Available: ${balance.balanceLeaves}, Requested: ${days}`);
+    }
+
+    const leave = await this.prisma.teacherLeave.create({
+      data: {
+        teacherId: employeeId,
+        leaveType: dto.leaveType,
+        startDate: start,
+        endDate: end,
+        totalDays: days,
+        reason: dto.reason,
+        status: 'PENDING',
+      },
+    });
+
+    await this.eventBus.publish('leave.applied', {
+      leaveId: leave.id,
+      employeeId,
+      leaveType: dto.leaveType,
+      days,
+    });
+
+    return leave;
+  }
+
+  async approveLeave(leaveId: string, approvedBy: string, approved: boolean, remarks?: string) {
+    const leave = await this.prisma.teacherLeave.findUnique({
+      where: { id: leaveId },
+    });
+
+    if (!leave) throw new NotFoundException('Leave request not found');
+
+    if (leave.status !== 'PENDING') {
+      throw new BadRequestException(`Leave is already ${leave.status.toLowerCase()}`);
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Update leave status
+      const updatedLeave = await tx.teacherLeave.update({
+        where: { id: leaveId },
+        data: {
+          status: approved ? 'APPROVED' : 'REJECTED',
+          approvedBy: approvedBy,
+          approvedAt: new Date(),
+        },
+      });
+
+      // Deduct from balance if approved
+      if (approved) {
+        const balance = await tx.leaveBalance.findFirst({
+          where: {
+            employeeId: leave.teacherId,
+            leaveType: leave.leaveType,
+          },
+        });
+
+        if (balance) {
+          await tx.leaveBalance.update({
+            where: { id: balance.id },
+            data: {
+              balanceLeaves: balance.balanceLeaves - leave.totalDays,
+              usedLeaves: balance.usedLeaves + leave.totalDays,
+            },
+          });
+        }
+      }
+
+      return updatedLeave;
+    });
+
+    await this.eventBus.publish('leave.processed', {
+      leaveId: updated.id,
+      employeeId: leave.teacherId,
+      approved,
+      approvedBy,
+    });
+
+    return updated;
+  }
+
+  async getLeaveBalance(employeeId: string) {
+    const balances = await this.prisma.leaveBalance.findMany({
+      where: { employeeId },
+    });
+
+    return {
+      employeeId,
+      balances: balances.map(b => ({
+        leaveType: b.leaveType,
+        allocated: b.totalLeaves,
+        used: b.usedLeaves,
+        balance: b.balanceLeaves,
+        year: b.year,
+      })),
+    };
+  }
+
+  async getLeaveHistory(employeeId: string, filters: { status?: string; year?: number }) {
+    const where: any = {
+      teacherId: employeeId,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.year ? {
+        startDate: {
+          gte: new Date(`${filters.year}-01-01`),
+          lte: new Date(`${filters.year}-12-31`),
+        },
+      } : {}),
+    };
+
+    const leaves = await this.prisma.teacherLeave.findMany({
+      where,
+      orderBy: { startDate: 'desc' },
+    });
+
+    return {
+      employeeId,
+      totalLeaves: leaves.length,
+      leaves,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-HR-010: HR REPORTS AND ANALYTICS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getHRAnalytics(filters: { schoolId?: string; organizationId?: string; year?: number }) {
+    const year = filters.year || new Date().getFullYear();
+    const startDate = new Date(`${year}-01-01`);
+    const endDate = new Date(`${year}-12-31`);
+
+    // Get leave statistics
+    const leaves = await this.prisma.teacherLeave.findMany({
+      where: {
+        startDate: { gte: startDate, lte: endDate },
+      },
+    });
+
+    // Get payroll statistics
+    const salaries = await this.prisma.employeeSalary.findMany({
+      where: {
+        ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+        ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+        monthYear: { contains: year.toString() },
+      },
+    });
+
+    const totalPayrollCost = salaries.reduce((s, sal) => s + Number(sal.netSalary || 0), 0);
+    const averageSalary = salaries.length > 0 ? totalPayrollCost / salaries.length : 0;
+
+    // Get training statistics
+    const trainings = await this.prisma.event.findMany({
+      where: {
+        ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+        eventType: 'TRAINING',
+        startDate: { gte: startDate, lte: endDate },
+      },
+    });
+
+    return {
+      year,
+      leaveStatistics: {
+        totalLeaves: leaves.length,
+        approved: leaves.filter(l => l.status === 'APPROVED').length,
+        rejected: leaves.filter(l => l.status === 'REJECTED').length,
+        pending: leaves.filter(l => l.status === 'PENDING').length,
+        byType: leaves.reduce((acc: any, l) => {
+          acc[l.leaveType] = (acc[l.leaveType] || 0) + 1;
+          return acc;
+        }, {}),
+      },
+      payrollStatistics: {
+        totalEmployees: salaries.length,
+        totalPayrollCost,
+        averageSalary: averageSalary.toFixed(2),
+        highestSalary: salaries.length > 0 ? Math.max(...salaries.map(s => Number(s.netSalary))) : 0,
+        lowestSalary: salaries.length > 0 ? Math.min(...salaries.map(s => Number(s.netSalary))) : 0,
+      },
+      trainingStatistics: {
+        totalTrainings: trainings.length,
+        upcoming: trainings.filter(t => new Date(t.startDate) > new Date()).length,
+        completed: trainings.filter(t => new Date(t.startDate) <= new Date()).length,
+      },
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-003: STUDENT BEHAVIOR TRACKING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async logStudentBehavior(recordedBy: string, dto: {
+    studentId: string; behaviorType: string; description: string;
+    severity?: string; incidentDate?: string; witnesses?: string[];
+  }) {
+    const record = await this.prisma.disciplinaryRecord.create({
+      data: {
+        studentId: dto.studentId,
+        incidentDate: dto.incidentDate ? new Date(dto.incidentDate) : new Date(),
+        incidentType: dto.behaviorType,
+        description: dto.description,
+        actionTaken: dto.severity || 'OBSERVATION',
+        recordedBy,
+      },
+    });
+
+    await this.eventBus.publish('discipline.behavior.logged', {
+      recordId: record.id,
+      studentId: dto.studentId,
+      behaviorType: dto.behaviorType,
+      severity: dto.severity,
+      recordedBy,
+    });
+
+    return record;
+  }
+
+  async getStudentBehaviorHistory(studentId: string, filters: {
+    behaviorType?: string; startDate?: string; endDate?: string;
+  }) {
+    const where: any = {
+      studentId,
+      ...(filters.behaviorType ? { incidentType: filters.behaviorType } : {}),
+      ...(filters.startDate || filters.endDate ? {
+        incidentDate: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const records = await this.prisma.disciplinaryRecord.findMany({
+      where,
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    // Calculate behavior summary
+    const summary = records.reduce((acc: any, r) => {
+      acc[r.incidentType] = (acc[r.incidentType] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      studentId,
+      totalRecords: records.length,
+      summary,
+      records,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-004: COUNSELING MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async scheduleCounseling(scheduledBy: string, dto: {
+    studentId: string; sessionType: string; scheduledDate: string;
+    counselorId?: string; notes?: string; relatedIncidentId?: string;
+  }) {
+    // Log counseling as a disciplinary record with COUNSELING type
+    const session = await this.prisma.disciplinaryRecord.create({
+      data: {
+        studentId: dto.studentId,
+        incidentDate: new Date(dto.scheduledDate),
+        incidentType: 'COUNSELING',
+        description: dto.notes || `${dto.sessionType} counseling session scheduled`,
+        actionTaken: `COUNSELING_${dto.sessionType.toUpperCase()}`,
+        recordedBy: scheduledBy,
+      },
+    });
+
+    await this.eventBus.publish('discipline.counseling.scheduled', {
+      sessionId: session.id,
+      studentId: dto.studentId,
+      sessionType: dto.sessionType,
+      scheduledDate: dto.scheduledDate,
+      counselorId: dto.counselorId,
+      scheduledBy,
+    });
+
+    return session;
+  }
+
+  async getCounselingHistory(studentId: string) {
+    const sessions = await this.prisma.disciplinaryRecord.findMany({
+      where: {
+        studentId,
+        incidentType: 'COUNSELING',
+      },
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    return {
+      studentId,
+      totalSessions: sessions.length,
+      sessions,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-005: PARENT COMMUNICATION
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async sendParentDisciplineNotification(sentBy: string, dto: {
+    studentId: string; incidentId?: string; subject: string;
+    message: string; meetingDate?: string; requireAcknowledgment?: boolean;
+  }) {
+    // Emit event for notification system to handle
+    await this.eventBus.publish('discipline.parent.notification', {
+      studentId: dto.studentId,
+      incidentId: dto.incidentId,
+      subject: dto.subject,
+      message: dto.message,
+      meetingDate: dto.meetingDate,
+      requireAcknowledgment: dto.requireAcknowledgment,
+      sentBy,
+    });
+
+    return {
+      message: 'Parent notification sent successfully',
+      studentId: dto.studentId,
+      subject: dto.subject,
+      meetingDate: dto.meetingDate,
+      sentAt: new Date(),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-009: DISCIPLINARY REPORTS AND ANALYTICS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getDisciplineAnalytics(schoolId: string, filters: {
+    startDate?: string; endDate?: string; incidentType?: string;
+  }) {
+    const where: any = {
+      student: { schoolId },
+      ...(filters.incidentType ? { incidentType: filters.incidentType } : {}),
+      ...(filters.startDate || filters.endDate ? {
+        incidentDate: {
+          ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+          ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const records = await this.prisma.disciplinaryRecord.findMany({
+      where,
+      include: { student: { select: { id: true, userId: true } } },
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    // Incident type distribution
+    const byType = records.reduce((acc: any, r) => {
+      acc[r.incidentType] = (acc[r.incidentType] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Monthly trend
+    const monthlyTrend = records.reduce((acc: any, r) => {
+      const month = `${r.incidentDate.getFullYear()}-${String(r.incidentDate.getMonth() + 1).padStart(2, '0')}`;
+      acc[month] = (acc[month] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Repeat offenders (students with 3+ records)
+    const studentCounts = records.reduce((acc: any, r) => {
+      acc[r.studentId] = (acc[r.studentId] || 0) + 1;
+      return acc;
+    }, {});
+    const repeatOffenders = Object.entries(studentCounts)
+      .filter(([, count]) => (count as number) >= 3)
+      .map(([studentId, count]) => ({ studentId, incidentCount: count }))
+      .sort((a, b) => (b.incidentCount as number) - (a.incidentCount as number));
+
+    // Action distribution
+    const byAction = records.reduce((acc: any, r) => {
+      const action = r.actionTaken || 'NONE';
+      acc[action] = (acc[action] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      schoolId,
+      totalIncidents: records.length,
+      byType,
+      byAction,
+      monthlyTrend,
+      repeatOffenders,
+      counselingSessions: records.filter(r => r.incidentType === 'COUNSELING').length,
+      positiveRecords: records.filter(r => r.incidentType === 'POSITIVE').length,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-DISC-010: POSITIVE BEHAVIOR REINFORCEMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async logPositiveBehavior(recordedBy: string, dto: {
+    studentId: string; category: string; description: string;
+    points?: number;
+  }) {
+    const record = await this.prisma.disciplinaryRecord.create({
+      data: {
+        studentId: dto.studentId,
+        incidentDate: new Date(),
+        incidentType: 'POSITIVE',
+        description: dto.description,
+        actionTaken: `POINTS:${dto.points || 10}|CATEGORY:${dto.category}`,
+        recordedBy,
+      },
+    });
+
+    await this.eventBus.publish('discipline.positive.logged', {
+      recordId: record.id,
+      studentId: dto.studentId,
+      category: dto.category,
+      points: dto.points || 10,
+      recordedBy,
+    });
+
+    return {
+      ...record,
+      points: dto.points || 10,
+      category: dto.category,
+    };
+  }
+
+  async getPositiveBehaviorRecords(studentId: string) {
+    const records = await this.prisma.disciplinaryRecord.findMany({
+      where: {
+        studentId,
+        incidentType: 'POSITIVE',
+      },
+      orderBy: { incidentDate: 'desc' },
+    });
+
+    // Calculate total points
+    const totalPoints = records.reduce((sum, r) => {
+      const match = r.actionTaken?.match(/POINTS:(\d+)/);
+      return sum + (match ? parseInt(match[1]) : 10);
+    }, 0);
+
+    // Category breakdown
+    const byCategory = records.reduce((acc: any, r) => {
+      const catMatch = r.actionTaken?.match(/CATEGORY:(\w+)/);
+      const category = catMatch ? catMatch[1] : 'OTHER';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      studentId,
+      totalPoints,
+      totalRecords: records.length,
+      byCategory,
+      records,
+    };
+  }
+
+  async getBehaviorLeaderboard(schoolId: string, limit: number = 20) {
+    // Get all positive records for the school
+    const positiveRecords = await this.prisma.disciplinaryRecord.findMany({
+      where: {
+        incidentType: 'POSITIVE',
+        student: { schoolId },
+      },
+      select: {
+        studentId: true,
+        actionTaken: true,
+        student: {
+          select: { id: true, userId: true },
+        },
+      },
+    });
+
+    // Aggregate points per student
+    const studentPoints = positiveRecords.reduce((acc: any, r) => {
+      const match = r.actionTaken?.match(/POINTS:(\d+)/);
+      const points = match ? parseInt(match[1]) : 10;
+      if (!acc[r.studentId]) {
+        acc[r.studentId] = { studentId: r.studentId, totalPoints: 0, recordCount: 0 };
+      }
+      acc[r.studentId].totalPoints += points;
+      acc[r.studentId].recordCount += 1;
+      return acc;
+    }, {});
+
+    const leaderboard = Object.values(studentPoints)
+      .sort((a: any, b: any) => b.totalPoints - a.totalPoints)
+      .slice(0, limit);
+
+    return {
+      schoolId,
+      totalParticipants: Object.keys(studentPoints).length,
+      leaderboard,
+    };
+  }
 }
