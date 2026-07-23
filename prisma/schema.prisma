@@ -7929,3 +7929,706 @@ model IDCard {
   @@index([status])
   @@map("id_cards")
 }
+
+// ============================================================================
+// EXAM PROCTORING & SECURITY (Module 09 - FR-SECURITY-001-008)
+// ============================================================================
+
+model ExamProctoring {
+  id        String @id @default(uuid())
+  attemptId String
+
+  // Proctoring settings
+  enableWebcam       Boolean @default(false)
+  enableScreenShare  Boolean @default(false)
+  enableAudioMonitor Boolean @default(false)
+  preventTabSwitch   Boolean @default(true)
+  preventCopyPaste   Boolean @default(true)
+  allowCalculator    Boolean @default(false)
+
+  // Security events
+  tabSwitchCount   Int @default(0)
+  suspiciousEvents Json? // Array of flagged events
+
+  // AI Proctoring
+  aiAnalysisResult Json? // Face detection, gaze tracking, etc.
+  riskScore        Decimal? @db.Decimal(5, 2)
+
+  // Session monitoring
+  monitoringStartedAt DateTime?
+  monitoringEndedAt   DateTime?
+
+  // Recordings
+  webcamRecordingUrl      String?
+  screenRecordingUrl      String?
+  audioRecordingUrl       String?
+  fullSessionRecordingUrl String?
+
+  // Violations
+  violationCount Int     @default(0)
+  violations     Json? // Array of violation details
+  autoSubmitted  Boolean @default(false)
+
+  // Review status
+  reviewStatus String @default("PENDING") // PENDING, REVIEWED, FLAGGED, CLEARED
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  reviewNotes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attemptId])
+  @@index([reviewStatus])
+  @@map("exam_proctoring")
+}
+
+model ProctoringEvent {
+  id        String @id @default(uuid())
+  attemptId String
+
+  eventType String // TAB_SWITCH, FACE_NOT_DETECTED, MULTIPLE_FACES, SUSPICIOUS_MOVEMENT, etc.
+  severity  String // LOW, MEDIUM, HIGH, CRITICAL
+
+  description String?
+  metadata    Json? // Additional event data
+
+  detectedAt DateTime @default(now())
+
+  @@index([attemptId])
+  @@index([eventType])
+  @@index([severity])
+  @@map("proctoring_events")
+}
+
+model ExamSecurityLog {
+  id     String @id @default(uuid())
+  examId String
+
+  eventType String // ACCESS_ATTEMPT, PAPER_LEAK, UNAUTHORIZED_ACCESS, etc.
+  severity  String // INFO, WARNING, CRITICAL
+
+  userId    String?
+  ipAddress String?
+  userAgent String?
+  location  Json?
+
+  details   String?
+  metadata  Json?
+  action    String? // Action taken
+
+  timestamp DateTime @default(now())
+
+  @@index([examId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([timestamp])
+  @@map("exam_security_logs")
+}
+
+model ExamAccessControl {
+  id     String @id @default(uuid())
+  examId String
+
+  // IP Restrictions
+  allowedIpRanges String[] // CIDR notation
+  blockedIpRanges String[]
+
+  // Time Restrictions
+  accessWindowStart DateTime?
+  accessWindowEnd   DateTime?
+
+  // Device Restrictions
+  allowedDeviceTypes String[] // DESKTOP, MOBILE, TABLET
+  blockedDevices     String[] // Specific device IDs
+
+  // Location Restrictions
+  allowedCountries String[]
+  allowedStates    String[]
+  requireGPS       Boolean @default(false)
+
+  // Browser Restrictions
+  allowedBrowsers String[]
+  minBrowserVersion Json?
+
+  // Password Protection
+  accessPassword String?
+
+  // One-time Codes
+  requireOTP Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([examId])
+  @@map("exam_access_controls")
+}
+
+model ExamAnalyticsReport {
+  id     String @id @default(uuid())
+  examId String
+
+  // Overall Statistics
+  totalStudents    Int
+  attemptedBy      Int
+  completedBy      Int
+  averageScore     Decimal? @db.Decimal(5, 2)
+  averageTime      Int? // minutes
+  passPercentage   Decimal? @db.Decimal(5, 2)
+
+  // Difficulty Analysis
+  questionDifficulty Json? // Per question
+
+  // Performance Distribution
+  scoreDistribution Json? // Grade ranges
+  timeDistribution  Json? // Time ranges
+
+  // Top/Bottom Performers
+  topPerformers    Json? // Top 10
+  bottomPerformers Json? // Bottom 10
+
+  // Question Analysis
+  mostMissedQuestions Json?
+  easiestQuestions    Json?
+  hardestQuestions    Json?
+
+  // Cheating Detection
+  suspiciousPatterns Json?
+  flaggedAttempts    String[] // Attempt IDs
+
+  // Comparative Analysis
+  classComparison   Json? // By class/section
+  subjectComparison Json? // By topic
+
+  generatedAt DateTime @default(now())
+
+  @@unique([examId])
+  @@index([examId])
+  @@map("exam_analytics_reports")
+}
+
+// ============================================================================
+// USER CONNECTIONS & SOCIAL (FR-USER-041 - Find Classmates)
+// ============================================================================
+
+model UserConnection {
+  id         String @id @default(uuid())
+  userId     String
+  connectedUserId String
+
+  connectionType String // CLASSMATE, COLLEAGUE, FRIEND, MENTOR, MENTEE
+
+  status String @default("PENDING") // PENDING, ACCEPTED, REJECTED, BLOCKED
+
+  // Context
+  schoolId  String?
+  classId   String?
+  sectionId String?
+  organizationId String?
+
+  // Timestamps
+  requestedAt DateTime  @default(now())
+  acceptedAt  DateTime?
+  rejectedAt  DateTime?
+
+  // Notes
+  message String?
+
+  @@unique([userId, connectedUserId])
+  @@index([userId])
+  @@index([connectedUserId])
+  @@index([status])
+  @@map("user_connections")
+}
+
+model ClassmateRecommendation {
+  id        String @id @default(uuid())
+  userId    String
+  recommendedUserId String
+
+  score  Decimal @db.Decimal(5, 2)
+  reason String? // Same class, same interests, etc.
+
+  metadata Json? // Common interests, mutual connections, etc.
+
+  viewed   Boolean @default(false)
+  accepted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, recommendedUserId])
+  @@index([userId])
+  @@map("classmate_recommendations")
+}
+
+// ============================================================================
+// ORGANIZATION EXTENDED OPERATIONS (FR-ORG-068, FR-ORG-070)
+// ============================================================================
+
+model OrganizationSuspension {
+  id             String @id @default(uuid())
+  organizationId String
+
+  reason        String
+  suspendedBy   String
+  duration      Int? // Days, null = indefinite
+  suspendedAt   DateTime @default(now())
+  suspendedUntil DateTime?
+
+  // Impact tracking
+  affectedUsers    Int @default(0)
+  affectedSchools  Int @default(0)
+  dataAccessLocked Boolean @default(true)
+
+  // Reactivation
+  reactivatedAt DateTime?
+  reactivatedBy String?
+  reactivationNotes String?
+
+  status String @default("ACTIVE") // ACTIVE, REACTIVATED
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("organization_suspensions")
+}
+
+model OrganizationTransfer {
+  id             String @id @default(uuid())
+  organizationId String
+
+  fromOwnerId String
+  toOwnerId   String
+
+  reason String?
+
+  // Asset transfer details
+  transferredUsers   Int @default(0)
+  transferredSchools Int @default(0)
+  transferredData    Json?
+
+  // Approval workflow
+  status String @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+
+  requestedBy String
+  requestedAt DateTime @default(now())
+
+  approvedBy String?
+  approvedAt DateTime?
+
+  completedAt DateTime?
+
+  rejectionReason String?
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("organization_transfers")
+}
+
+model OrganizationMerger {
+  id String @id @default(uuid())
+
+  sourceOrganizationIds String[] // Organizations being merged
+  targetOrganizationId  String // Resulting organization
+
+  mergerType String // ACQUISITION, CONSOLIDATION, PARTNERSHIP
+
+  reason      String?
+  initiatedBy String
+  initiatedAt DateTime @default(now())
+
+  // Data migration plan
+  migrationPlan Json?
+
+  // Status tracking
+  status String @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, FAILED
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Results
+  migratedUsers   Int @default(0)
+  migratedSchools Int @default(0)
+  migratedData    Json?
+
+  errors Json? // Any errors during migration
+
+  @@index([targetOrganizationId])
+  @@index([status])
+  @@map("organization_mergers")
+}
+
+model ComplianceReport {
+  id             String @id @default(uuid())
+  organizationId String
+
+  reportType String // GDPR, DATA_PROTECTION, FINANCIAL, ACADEMIC, SAFETY
+
+  period      String // MONTHLY, QUARTERLY, ANNUAL
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Report data
+  complianceScore Decimal? @db.Decimal(5, 2)
+  findings        Json? // Issues found
+  recommendations Json?
+
+  // Metrics
+  metrics Json?
+
+  // Submission
+  status String @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED
+
+  submittedBy String?
+  submittedAt DateTime?
+
+  approvedBy String?
+  approvedAt DateTime?
+
+  rejectionReason String?
+
+  // File attachments
+  documentUrls String[]
+
+  generatedAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([reportType])
+  @@index([status])
+  @@map("compliance_reports")
+}
+
+// ============================================================================
+// WHATSAPP INTEGRATION (FR-WHATSAPP-001-004)
+// ============================================================================
+
+model WhatsAppTemplate {
+  id       String @id @default(uuid())
+  name     String
+  language String @default("en")
+
+  category String // MARKETING, UTILITY, AUTHENTICATION
+
+  templateText String
+  variables    String[] // Placeholders
+
+  // Media
+  headerType String? // TEXT, IMAGE, VIDEO, DOCUMENT
+  headerUrl  String?
+
+  // Buttons
+  buttons Json?
+
+  // Status
+  approvalStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
+  isActive       Boolean @default(false)
+
+  // Provider details
+  whatsappBusinessId String?
+  templateId         String? // Provider's template ID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages WhatsAppMessage[]
+
+  @@index([name])
+  @@index([approvalStatus])
+  @@map("whatsapp_templates")
+}
+
+model WhatsAppMessage {
+  id String @id @default(uuid())
+
+  userId     String?
+  phone      String
+  templateId String?
+
+  messageType String // TEMPLATE, TEXT, IMAGE, VIDEO, DOCUMENT, LOCATION
+
+  // Content
+  text       String?
+  mediaUrl   String?
+  documentUrl String?
+  caption    String?
+
+  // Template variables
+  variables Json?
+
+  // Status
+  status String // QUEUED, SENT, DELIVERED, READ, FAILED
+
+  // Provider details
+  providerId      String? // WhatsApp Business API message ID
+  providerStatus  String?
+  errorCode       String?
+  errorMessage    String?
+
+  // Delivery tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  // Reply tracking
+  isReplied Boolean @default(false)
+  replyText String?
+  repliedAt DateTime?
+
+  // Cost
+  cost Decimal? @db.Decimal(6, 4)
+
+  createdAt DateTime @default(now())
+
+  template WhatsAppTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([userId])
+  @@index([phone])
+  @@index([status])
+  @@index([sentAt])
+  @@map("whatsapp_messages")
+}
+
+model WhatsAppConversation {
+  id String @id @default(uuid())
+
+  userId String
+  phone  String
+
+  lastMessageAt DateTime @default(now())
+  
+  unreadCount Int @default(0)
+
+  // Context
+  organizationId String?
+  schoolId       String?
+
+  // Status
+  status String @default("ACTIVE") // ACTIVE, ARCHIVED, BLOCKED
+
+  // Session tracking
+  sessionStartAt DateTime?
+  sessionEndAt   DateTime?
+  sessionType    String? // CUSTOMER_INITIATED, BUSINESS_INITIATED
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, phone])
+  @@index([userId])
+  @@index([phone])
+  @@index([status])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsAppOptOut {
+  id    String @id @default(uuid())
+  phone String @unique
+
+  reason     String?
+  optedOutAt DateTime @default(now())
+
+  // Can be opted back in
+  optedBackInAt DateTime?
+
+  @@index([phone])
+  @@map("whatsapp_opt_outs")
+}
+
+// ============================================================================
+// ENHANCED AUTHENTICATION (FR-AUTH extensions)
+// ============================================================================
+
+model SecurityQuestion {
+  id       String @id @default(uuid())
+  userId   String
+  question String
+  answer   String // Hashed
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("security_questions")
+}
+
+model AccountRecoveryRequest {
+  id     String @id @default(uuid())
+  userId String
+
+  recoveryMethod String // SECURITY_QUESTIONS, ADMIN_APPROVAL, EMAIL_LINK
+
+  status String // PENDING, APPROVED, REJECTED, COMPLETED
+
+  verificationData Json? // Answers, proof, etc.
+
+  requestedAt DateTime @default(now())
+  expiresAt   DateTime
+
+  processedBy String?
+  processedAt DateTime?
+
+  rejectionReason String?
+
+  @@index([userId])
+  @@index([status])
+  @@map("account_recovery_requests")
+}
+
+model DeviceFingerprint {
+  id     String @id @default(uuid())
+  userId String
+
+  fingerprint String @unique // Browser/device fingerprint hash
+
+  deviceInfo Json // Browser, OS, screen resolution, etc.
+
+  isTrusted Boolean @default(false)
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  timesUsed Int @default(1)
+
+  @@index([userId])
+  @@index([fingerprint])
+  @@map("device_fingerprints")
+}
+
+model SuspiciousActivity {
+  id     String @id @default(uuid())
+  userId String?
+
+  activityType String // UNUSUAL_LOGIN, MULTIPLE_FAILED_ATTEMPTS, SUSPICIOUS_LOCATION, etc.
+  riskLevel    String // LOW, MEDIUM, HIGH, CRITICAL
+
+  details  String?
+  metadata Json?
+
+  ipAddress String?
+  location  Json?
+  userAgent String?
+
+  // Actions taken
+  actionTaken String? // BLOCKED, ALERTED, LOGGED
+  isResolved  Boolean @default(false)
+
+  detectedAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([riskLevel])
+  @@index([detectedAt])
+  @@map("suspicious_activities")
+}
+
+// ============================================================================
+// OAUTH & SSO EXTENDED
+// ============================================================================
+
+// Note: OAuthToken model already exists above, extending with SSO config only
+
+model SSOConfig {
+  id             String @id @default(uuid())
+  organizationId String
+
+  provider String // SAML, LDAP, OAUTH, OIDC
+
+  // SAML Config
+  ssoUrl         String?
+  issuer         String?
+  certificate    String?
+  signatureAlgorithm String?
+
+  // LDAP Config
+  ldapUrl        String?
+  baseDN         String?
+  bindDN         String?
+  bindPassword   String? // Encrypted
+
+  // OAuth/OIDC Config
+  clientId       String?
+  clientSecret   String? // Encrypted
+  authorizationUrl String?
+  tokenUrl       String?
+  userInfoUrl    String?
+  scopes         String[]
+
+  // Attribute Mapping
+  attributeMapping Json?
+
+  // Settings
+  isActive      Boolean @default(false)
+  autoProvision Boolean @default(true)
+  defaultRole   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId])
+  @@map("sso_configs")
+}
+
+// ============================================================================
+// DATA SYNC & OFFLINE MODE (FR-SYNC extended)
+// ============================================================================
+
+// Note: SyncLog model already exists above, extending with offline queue only
+
+model OfflineQueue {
+  id       String @id @default(uuid())
+  userId   String
+  deviceId String
+
+  operation String // CREATE, UPDATE, DELETE
+  resource  String // Table/model name
+  resourceId String?
+
+  payload Json // The actual data
+
+  status String @default("PENDING") // PENDING, SYNCED, FAILED, CONFLICT
+
+  attempt Int @default(0)
+  lastAttemptAt DateTime?
+
+  error String?
+
+  createdAt DateTime @default(now())
+  syncedAt  DateTime?
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([status])
+  @@map("offline_queue")
+}
+
+model DataConflict {
+  id String @id @default(uuid())
+
+  resource   String
+  resourceId String
+
+  userId         String
+  organizationId String?
+
+  localVersion  Json
+  serverVersion Json
+
+  resolutionStrategy String? // KEEP_LOCAL, KEEP_SERVER, MERGE, MANUAL
+  resolvedVersion    Json?
+
+  status String @default("UNRESOLVED") // UNRESOLVED, RESOLVED, IGNORED
+
+  detectedAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?
+
+  @@index([userId])
+  @@index([resource])
+  @@index([status])
+  @@map("data_conflicts")
+}
