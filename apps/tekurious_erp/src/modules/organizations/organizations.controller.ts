@@ -375,4 +375,41 @@ export class OrganizationsController {
   ) {
     return this.orgsService.setDataRetentionPolicy(req.user.userId, id, dto);
   }
+
+  // ── Organization Analytics & Reporting (FR-ORG-051 to FR-ORG-053) ─────
+
+  @Get(':id/usage-report')
+  @ApiOperation({ summary: 'Get organization usage report (FR-ORG-051)' })
+  async getUsageReport(
+    @Param('id') id: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.orgsService.getOrganizationUsageReport(
+      id,
+      dateFrom ? new Date(dateFrom) : undefined,
+      dateTo ? new Date(dateTo) : undefined,
+    );
+  }
+
+  @Get(':id/monitoring')
+  @ApiOperation({ summary: 'Real-time organization monitoring (FR-ORG-052)' })
+  async getMonitoring(@Param('id') id: string) {
+    return this.orgsService.getOrganizationMonitoring(id);
+  }
+
+  @Post('compare')
+  @ApiOperation({ summary: 'Compare multiple organizations (FR-ORG-053)' })
+  async compareOrganizations(@Body() dto: { organizationIds: string[] }) {
+    return this.orgsService.getOrganizationComparison(dto.organizationIds);
+  }
+
+  @Post(':id/export')
+  @ApiOperation({ summary: 'Export organization data (FR-ORG-067)' })
+  async exportData(
+    @Param('id') id: string,
+    @Body() dto: { format?: 'JSON' | 'CSV' },
+  ) {
+    return this.orgsService.exportOrganizationData(id, dto.format);
+  }
 }
