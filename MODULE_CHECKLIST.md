@@ -161,7 +161,7 @@
 
 ### Account Recovery (2)
 
-- [ ] **FR-AUTH-031**: Account Recovery via Security Questions — ⏳ PENDING
+- [x] **FR-AUTH-031**: Account Recovery via Security Questions — ✅ DONE (5 service methods, 5 endpoints)
 - [ ] **FR-AUTH-032**: Account Recovery via Admin — ⏭️ BLOCKED
 
 ### Session Security (3)
