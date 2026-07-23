@@ -1644,4 +1644,97 @@ export class AcademicService {
     return { id: grievanceId, status: dto.status, resolution: dto.resolution };
   }
 
+  // ───────────────────────────────────────────────────────────────────────
+  // FR-ACAD-050: Academic Audit Reports
+  // ───────────────────────────────────────────────────────────────────────
+
+  async getAcademicAuditReport(schoolId: string, filters: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    actionType?: string;
+    userId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const from = filters.dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const to = filters.dateTo || new Date();
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+    const skip = (page - 1) * limit;
+
+    // Define academic-related actions
+    const academicActions = [
+      'CREATE_ACADEMIC_YEAR',
+      'CREATE_CLASS',
+      'CREATE_SECTION',
+      'STUDENT_ENROLLMENT',
+      'TEACHER_ASSIGNMENT',
+      'STUDENT_TRANSFER',
+      'BULK_PROMOTION',
+      'MANUAL_PROMOTION',
+      'PTM_ATTENDANCE',
+      'ASSIGN_SUBSTITUTE',
+      'ALUMNI_REGISTRATION',
+      'READMISSION_REQUEST',
+      'STUDENT_GRIEVANCE',
+      'SPECIAL_PROGRAM_CREATED',
+    ];
+
+    const where: any = {
+      recordId: schoolId,
+      timestamp: { gte: from, lte: to },
+      action: filters.actionType ? filters.actionType : { in: academicActions },
+    };
+
+    if (filters.userId) {
+      where.userId = filters.userId;
+    }
+
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    // Group logs by action type
+    const actionSummary = logs.reduce((acc, log) => {
+      acc[log.action] = (acc[log.action] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Group logs by date
+    const dailyActivity = logs.reduce((acc, log) => {
+      const dateKey = log.timestamp.toISOString().split('T')[0];
+      acc[dateKey] = (acc[dateKey] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      schoolId,
+      reportPeriod: { from, to },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      summary: {
+        totalActions: total,
+        uniqueActions: Object.keys(actionSummary).length,
+        actionBreakdown: actionSummary,
+        dailyActivity,
+        averagePerDay: Math.round(total / Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)))),
+      },
+      logs: logs.map((log) => ({
+        id: log.id,
+        action: log.action,
+        userId: log.userId,
+        timestamp: log.timestamp,
+        tableName: log.tableName,
+        recordId: log.recordId,
+        changes: log.changes,
+        ipAddress: log.ipAddress,
+      })),
+      generatedAt: new Date(),
+    };
+  }
 }

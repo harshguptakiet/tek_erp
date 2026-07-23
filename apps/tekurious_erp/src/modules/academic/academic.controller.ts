@@ -467,4 +467,26 @@ export class AcademicController {
   updateGrievance(@Request() req, @Param('id') id: string, @Body() dto: any) {
     return this.academicService.updateGrievanceStatus(req.user.userId, id, dto);
   }
+
+  // FR-ACAD-050: Academic Audit Reports
+  @Get('schools/:schoolId/audit-report')
+  @ApiOperation({ summary: 'Get academic audit report (FR-ACAD-050)' })
+  getAuditReport(
+    @Param('schoolId') schoolId: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('actionType') actionType?: string,
+    @Query('userId') userId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.academicService.getAcademicAuditReport(schoolId, {
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      actionType,
+      userId,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
+    });
+  }
 }
