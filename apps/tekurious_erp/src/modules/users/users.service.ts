@@ -1485,4 +1485,335 @@ export class UsersService {
 
     return recommendations;
   }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // FR-USER-031: Parent Meeting History
+  // ───────────────────────────────────────────────────────────────────────
+
+  async getParentMeetingHistory(parentId: string, options?: {
+    studentId?: string; dateFrom?: Date; dateTo?: Date; page?: number; limit?: number;
+  }) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Get PTM attendance records from audit logs
+    const where: any = {
+      action: 'PTM_ATTENDANCE',
+      changes: { path: ['parentId'], equals: parentId },
+    };
+
+    if (options?.dateFrom || options?.dateTo) {
+      where.timestamp = {
+        ...(options.dateFrom ? { gte: options.dateFrom } : {}),
+        ...(options.dateTo ? { lte: options.dateTo } : {}),
+      };
+    }
+
+    const [meetings, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    const meetingHistory = meetings.map((log) => {
+      const changes = log.changes as any;
+      return {
+        id: log.id,
+        meetingDate: log.timestamp,
+        ptmId: log.recordId,
+        studentId: changes.studentId,
+        status: changes.status,
+        notes: changes.notes,
+        recordedBy: log.userId,
+      };
+    });
+
+    // Filter by studentId if provided
+    const filteredMeetings = options?.studentId
+      ? meetingHistory.filter((m) => m.studentId === options.studentId)
+      : meetingHistory;
+
+    return {
+      parentId,
+      pagination: { page, limit, total: filteredMeetings.length, pages: Math.ceil(filteredMeetings.length / limit) },
+      meetings: filteredMeetings,
+      summary: {
+        totalMeetings: filteredMeetings.length,
+        attended: filteredMeetings.filter((m) => m.status === 'ATTENDED').length,
+        missed: filteredMeetings.filter((m) => m.status === 'ABSENT').length,
+      },
+    };
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // FR-USER-032: Parent Feedback and Concerns
+  // ───────────────────────────────────────────────────────────────────────
+
+  async submitParentFeedback(parentId: string, dto: {
+    studentId?: string; feedbackType: string; subject: string;
+    description: string; priority?: string; attachments?: string[];
+  }) {
+    // Verify parent profile exists
+    const parent = await this.prisma.parentProfile.findUnique({
+      where: { id: parentId },
+    });
+    if (!parent) throw new NotFoundException('Parent profile not found');
+
+    // Store feedback in audit log
+    const feedback = await this.prisma.auditLog.create({
+      data: {
+        userId: parentId,
+        action: 'PARENT_FEEDBACK',
+        tableName: 'ParentProfile',
+        recordId: parentId,
+        changes: {
+          studentId: dto.studentId,
+          feedbackType: dto.feedbackType,
+          subject: dto.subject,
+          description: dto.description,
+          priority: dto.priority || 'MEDIUM',
+          attachments: dto.attachments || [],
+          status: 'OPEN',
+          submittedAt: new Date().toISOString(),
+        },
+        ipAddress: '127.0.0.1',
+        userAgent: 'System',
+      },
+    });
+
+    // Emit event for notification
+    await this.eventBus.publish('parent.feedback.submitted', {
+      feedbackId: feedback.id,
+      parentId,
+      studentId: dto.studentId,
+      feedbackType: dto.feedbackType,
+      priority: dto.priority || 'MEDIUM',
+    });
+
+    return {
+      success: true,
+      feedbackId: feedback.id,
+      message: 'Feedback submitted successfully. Our team will review it shortly.',
+      ticketNumber: `FB-${feedback.id.substring(0, 8).toUpperCase()}`,
+    };
+  }
+
+  async getParentFeedbackList(parentId: string, options?: {
+    status?: string; feedbackType?: string; page?: number; limit?: number;
+  }) {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      userId: parentId,
+      action: 'PARENT_FEEDBACK',
+    };
+
+    const [feedbacks, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    const feedbackList = feedbacks.map((log) => {
+      const changes = log.changes as any;
+      return {
+        id: log.id,
+        ticketNumber: `FB-${log.id.substring(0, 8).toUpperCase()}`,
+        feedbackType: changes.feedbackType,
+        subject: changes.subject,
+        description: changes.description,
+        status: changes.status,
+        priority: changes.priority,
+        studentId: changes.studentId,
+        submittedAt: log.timestamp,
+        resolution: changes.resolution,
+        resolvedAt: changes.resolvedAt,
+        resolvedBy: changes.resolvedBy,
+      };
+    });
+
+    // Filter if needed
+    let filtered = feedbackList;
+    if (options?.status) {
+      filtered = filtered.filter((f) => f.status === options.status);
+    }
+    if (options?.feedbackType) {
+      filtered = filtered.filter((f) => f.feedbackType === options.feedbackType);
+    }
+
+    return {
+      parentId,
+      pagination: { page, limit, total: filtered.length, pages: Math.ceil(filtered.length / limit) },
+      feedbacks: filtered,
+      summary: {
+        total: feedbackList.length,
+        open: feedbackList.filter((f) => f.status === 'OPEN').length,
+        inProgress: feedbackList.filter((f) => f.status === 'IN_PROGRESS').length,
+        resolved: feedbackList.filter((f) => f.status === 'RESOLVED').length,
+        closed: feedbackList.filter((f) => f.status === 'CLOSED').length,
+      },
+    };
+  }
+
+  async updateParentFeedbackStatus(adminId: string, feedbackId: string, dto: {
+    status: string; resolution?: string; internalNotes?: string;
+  }) {
+    const feedback = await this.prisma.auditLog.findUnique({
+      where: { id: feedbackId },
+    });
+
+    if (!feedback || feedback.action !== 'PARENT_FEEDBACK') {
+      throw new NotFoundException('Feedback not found');
+    }
+
+    const changes = feedback.changes as any;
+    const updatedChanges = {
+      ...changes,
+      status: dto.status,
+      resolution: dto.resolution,
+      internalNotes: dto.internalNotes,
+      ...(dto.status === 'RESOLVED' || dto.status === 'CLOSED'
+        ? { resolvedAt: new Date().toISOString(), resolvedBy: adminId }
+        : {}),
+    };
+
+    await this.prisma.auditLog.update({
+      where: { id: feedbackId },
+      data: { changes: updatedChanges },
+    });
+
+    // Notify parent if resolved
+    if (dto.status === 'RESOLVED' || dto.status === 'CLOSED') {
+      await this.eventBus.publish('parent.feedback.resolved', {
+        feedbackId,
+        parentId: feedback.userId,
+        status: dto.status,
+        resolution: dto.resolution,
+      });
+    }
+
+    return {
+      success: true,
+      feedbackId,
+      status: dto.status,
+      message: `Feedback ${dto.status.toLowerCase()} successfully`,
+    };
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // FR-USER-059: User Segmentation
+  // ───────────────────────────────────────────────────────────────────────
+
+  async segmentUsers(adminId: string, criteria: {
+    role?: string; status?: string; organizationId?: string;
+    createdAfter?: Date; createdBefore?: Date;
+    lastLoginAfter?: Date; lastLoginBefore?: Date;
+    ageMin?: number; ageMax?: number; gender?: string;
+  }) {
+    const where: any = { deletedAt: null };
+
+    if (criteria.role) where.role = criteria.role;
+    if (criteria.status) where.status = criteria.status;
+    if (criteria.gender) where.gender = criteria.gender;
+
+    if (criteria.organizationId) {
+      where.organizationUsers = {
+        some: { organizationId: criteria.organizationId, isActive: true },
+      };
+    }
+
+    if (criteria.createdAfter || criteria.createdBefore) {
+      where.createdAt = {
+        ...(criteria.createdAfter ? { gte: criteria.createdAfter } : {}),
+        ...(criteria.createdBefore ? { lte: criteria.createdBefore } : {}),
+      };
+    }
+
+    if (criteria.lastLoginAfter || criteria.lastLoginBefore) {
+      where.lastLogin = {
+        ...(criteria.lastLoginAfter ? { gte: criteria.lastLoginAfter } : {}),
+        ...(criteria.lastLoginBefore ? { lte: criteria.lastLoginBefore } : {}),
+      };
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          lastLogin: true,
+          dateOfBirth: true,
+          gender: true,
+        },
+        take: 1000, // Limit for performance
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    // Filter by age if specified
+    let filteredUsers = users;
+    if (criteria.ageMin !== undefined || criteria.ageMax !== undefined) {
+      filteredUsers = users.filter((user) => {
+        if (!user.dateOfBirth) return false;
+        const age = Math.floor(
+          (new Date().getTime() - new Date(user.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+        );
+        if (criteria.ageMin !== undefined && age < criteria.ageMin) return false;
+        if (criteria.ageMax !== undefined && age > criteria.ageMax) return false;
+        return true;
+      });
+    }
+
+    // Log segmentation query
+    await this.prisma.auditLog.create({
+      data: {
+        userId: adminId,
+        action: 'USER_SEGMENTATION',
+        tableName: 'User',
+        recordId: adminId,
+        changes: { criteria, resultCount: filteredUsers.length } as any,
+        ipAddress: '127.0.0.1',
+        userAgent: 'System',
+      },
+    });
+
+    return {
+      segmentId: `SEG-${Date.now()}`,
+      criteria,
+      totalMatched: filteredUsers.length,
+      users: filteredUsers.slice(0, 100), // Return first 100
+      demographics: {
+        byRole: this.groupBy(filteredUsers, 'role'),
+        byStatus: this.groupBy(filteredUsers, 'status'),
+        byGender: this.groupBy(filteredUsers, 'gender'),
+      },
+      generatedAt: new Date(),
+      generatedBy: adminId,
+    };
+  }
+
+  private groupBy(arr: any[], key: string): Record<string, number> {
+    return arr.reduce((acc, item) => {
+      const value = item[key] || 'unknown';
+      acc[value] = (acc[value] || 0) + 1;
+      return acc;
+    }, {});
+  }
 }

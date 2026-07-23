@@ -741,4 +741,72 @@ export class UsersController {
   ) {
     return this.usersService.getStudentBehaviorReport(studentId, academicYearId);
   }
+
+  // ── Parent Meeting History & Feedback (FR-USER-031, FR-USER-032) ──────
+
+  @Get('parents/:parentId/meeting-history')
+  @ApiOperation({ summary: 'Get parent meeting history (FR-USER-031)' })
+  getParentMeetingHistory(
+    @Param('parentId') parentId: string,
+    @Query('studentId') studentId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getParentMeetingHistory(parentId, {
+      studentId,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+    });
+  }
+
+  @Post('parents/:parentId/feedback')
+  @ApiOperation({ summary: 'Submit parent feedback/concerns (FR-USER-032)' })
+  submitParentFeedback(@Param('parentId') parentId: string, @Body() dto: any) {
+    return this.usersService.submitParentFeedback(parentId, dto);
+  }
+
+  @Get('parents/:parentId/feedback')
+  @ApiOperation({ summary: 'Get parent feedback list (FR-USER-032)' })
+  getParentFeedbackList(
+    @Param('parentId') parentId: string,
+    @Query('status') status?: string,
+    @Query('feedbackType') feedbackType?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getParentFeedbackList(parentId, {
+      status,
+      feedbackType,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+    });
+  }
+
+  @Put('feedback/:feedbackId/status')
+  @ApiOperation({ summary: 'Update parent feedback status (Admin) (FR-USER-032)' })
+  updateParentFeedbackStatus(
+    @Request() req,
+    @Param('feedbackId') feedbackId: string,
+    @Body() dto: any,
+  ) {
+    return this.usersService.updateParentFeedbackStatus(req.user.userId, feedbackId, dto);
+  }
+
+  // ── User Segmentation (FR-USER-059) ────────────────────────────────────
+
+  @Post('segmentation')
+  @ApiOperation({ summary: 'Segment users by criteria (FR-USER-059)' })
+  segmentUsers(@Request() req, @Body() criteria: any) {
+    return this.usersService.segmentUsers(req.user.userId, {
+      ...criteria,
+      createdAfter: criteria.createdAfter ? new Date(criteria.createdAfter) : undefined,
+      createdBefore: criteria.createdBefore ? new Date(criteria.createdBefore) : undefined,
+      lastLoginAfter: criteria.lastLoginAfter ? new Date(criteria.lastLoginAfter) : undefined,
+      lastLoginBefore: criteria.lastLoginBefore ? new Date(criteria.lastLoginBefore) : undefined,
+    });
+  }
 }
