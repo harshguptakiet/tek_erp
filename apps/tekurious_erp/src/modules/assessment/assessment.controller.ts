@@ -272,4 +272,54 @@ export class AssessmentController {
       isPublic !== undefined ? isPublic === 'true' : undefined,
     );
   }
+
+  // ── Exam Proctoring & Security (FR-SECURITY-001-008) ──────────────────
+
+  @Post('exams/:examId/proctoring/enable')
+  @ApiOperation({ summary: 'Enable proctoring for exam (FR-SECURITY-001)' })
+  enableProctoring(@Request() req, @Param('examId') examId: string, @Body() config: any) {
+    return this.assessmentService.enableProctoring(req.user.userId, examId, config);
+  }
+
+  @Post('attempts/:attemptId/proctoring/start')
+  @ApiOperation({ summary: 'Start proctoring session (FR-SECURITY-002)' })
+  startProctoringSession(@Param('attemptId') attemptId: string, @Body() metadata?: any) {
+    return this.assessmentService.startProctoringSession(attemptId, metadata);
+  }
+
+  @Post('attempts/:attemptId/proctoring/events')
+  @ApiOperation({ summary: 'Log proctoring event (FR-SECURITY-003)' })
+  logProctoringEvent(@Param('attemptId') attemptId: string, @Body() event: any) {
+    return this.assessmentService.logProctoringEvent(attemptId, event);
+  }
+
+  @Get('attempts/:attemptId/proctoring/status')
+  @ApiOperation({ summary: 'Get proctoring status (FR-SECURITY-004)' })
+  getProctoringStatus(@Param('attemptId') attemptId: string) {
+    return this.assessmentService.getProctoringStatus(attemptId);
+  }
+
+  @Post('attempts/:attemptId/proctoring/review')
+  @ApiOperation({ summary: 'Review flagged attempt (FR-SECURITY-005)' })
+  reviewFlaggedAttempt(@Request() req, @Param('attemptId') attemptId: string, @Body() review: any) {
+    return this.assessmentService.reviewFlaggedAttempt(req.user.userId, attemptId, review);
+  }
+
+  @Post('exams/:examId/access-control')
+  @ApiOperation({ summary: 'Set exam access controls (FR-SECURITY-006)' })
+  setExamAccessControl(@Request() req, @Param('examId') examId: string, @Body() controls: any) {
+    return this.assessmentService.setExamAccessControl(req.user.userId, examId, controls);
+  }
+
+  @Post('exams/:examId/security/log')
+  @ApiOperation({ summary: 'Log security event (FR-SECURITY-007)' })
+  logSecurityEvent(@Param('examId') examId: string, @Body() event: any) {
+    return this.assessmentService.logSecurityEvent(examId, event);
+  }
+
+  @Get('exams/:examId/analytics-report')
+  @ApiOperation({ summary: 'Generate exam analytics report (FR-SECURITY-008)' })
+  generateExamAnalyticsReport(@Param('examId') examId: string) {
+    return this.assessmentService.generateExamAnalyticsReport(examId);
+  }
 }

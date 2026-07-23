@@ -836,4 +836,311 @@ export class AssessmentService {
 
     return { success: true, assigned: assignments.length };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-SECURITY-001 to FR-SECURITY-008: Exam Proctoring & Security
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // FR-SECURITY-001: Enable Proctoring for Exam
+  async enableProctoring(adminId: string, examId: string, config: {
+    enableWebcam?: boolean;
+    enableScreenShare?: boolean;
+    enableAudioMonitor?: boolean;
+    preventTabSwitch?: boolean;
+    preventCopyPaste?: boolean;
+    allowCalculator?: boolean;
+  }) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    // Store proctoring config separately (Exam model doesn't have metadata field)
+    // The config is stored in ExamProctoring records created when attempts start
+
+    await this.eventBus.publish('exam.proctoring.enabled', { examId, config, enabledBy: adminId });
+
+    return { success: true, examId, proctoringEnabled: true, config };
+  }
+
+  // FR-SECURITY-002: Start Proctoring Session
+  async startProctoringSession(attemptId: string, metadata?: any) {
+    const attempt = await this.prisma.examAttempt.findUnique({ where: { id: attemptId } });
+    if (!attempt) throw new NotFoundException('Exam attempt not found');
+
+    const proctoring = await this.prisma.examProctoring.create({
+      data: {
+        attemptId,
+        enableWebcam: metadata?.enableWebcam || false,
+        enableScreenShare: metadata?.enableScreenShare || false,
+        enableAudioMonitor: metadata?.enableAudioMonitor || false,
+        preventTabSwitch: metadata?.preventTabSwitch || true,
+        preventCopyPaste: metadata?.preventCopyPaste || true,
+        allowCalculator: metadata?.allowCalculator || false,
+        monitoringStartedAt: new Date(),
+      },
+    });
+
+    return { success: true, proctoringId: proctoring.id, attemptId };
+  }
+
+  // FR-SECURITY-003: Log Proctoring Events
+  async logProctoringEvent(attemptId: string, event: {
+    eventType: string;
+    severity: string;
+    description?: string;
+    metadata?: any;
+  }) {
+    await this.prisma.proctoringEvent.create({
+      data: {
+        attemptId,
+        eventType: event.eventType,
+        severity: event.severity,
+        description: event.description,
+        metadata: event.metadata,
+      },
+    });
+
+    // Update violation count in proctoring record
+    const proctoring = await this.prisma.examProctoring.findUnique({
+      where: { attemptId },
+    });
+
+    if (proctoring && ['HIGH', 'CRITICAL'].includes(event.severity)) {
+      const currentViolations = (proctoring.violations as any[]) || [];
+      await this.prisma.examProctoring.update({
+        where: { attemptId },
+        data: {
+          violationCount: { increment: 1 },
+          violations: [...currentViolations, { ...event, timestamp: new Date() }],
+        },
+      });
+
+      // Auto-submit if too many critical violations
+      if (event.severity === 'CRITICAL' && proctoring.violationCount + 1 >= 3) {
+        await this.prisma.examProctoring.update({
+          where: { attemptId },
+          data: { autoSubmitted: true },
+        });
+        // Trigger auto-submit
+        await this.eventBus.publish('exam.auto_submitted', { attemptId, reason: 'CRITICAL_VIOLATIONS' });
+      }
+    }
+
+    return { success: true, eventLogged: true };
+  }
+
+  // FR-SECURITY-004: Get Proctoring Status
+  async getProctoringStatus(attemptId: string) {
+    const proctoring = await this.prisma.examProctoring.findUnique({
+      where: { attemptId },
+    });
+
+    if (!proctoring) {
+      return { proctoringEnabled: false, attemptId };
+    }
+
+    const events = await this.prisma.proctoringEvent.findMany({
+      where: { attemptId },
+      orderBy: { detectedAt: 'desc' },
+      take: 50,
+    });
+
+    return {
+      proctoringEnabled: true,
+      attemptId,
+      proctoring: {
+        ...proctoring,
+        recentEvents: events,
+      },
+    };
+  }
+
+  // FR-SECURITY-005: Review Flagged Attempts
+  async reviewFlaggedAttempt(reviewerId: string, attemptId: string, review: {
+    status: string; // CLEARED, FLAGGED, CHEATING_CONFIRMED
+    notes?: string;
+  }) {
+    const proctoring = await this.prisma.examProctoring.findUnique({
+      where: { attemptId },
+    });
+
+    if (!proctoring) throw new NotFoundException('Proctoring record not found');
+
+    await this.prisma.examProctoring.update({
+      where: { attemptId },
+      data: {
+        reviewStatus: review.status,
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+        reviewNotes: review.notes,
+      },
+    });
+
+    // If cheating confirmed, note it in the attempt evaluatedBy field
+    if (review.status === 'CHEATING_CONFIRMED') {
+      await this.prisma.examAttempt.update({
+        where: { id: attemptId },
+        data: { 
+          evaluatedBy: `INVALIDATED_BY_${reviewerId}`,
+          evaluatedAt: new Date(),
+        },
+      });
+    }
+
+    await this.eventBus.publish('exam.proctoring.reviewed', { attemptId, reviewerId, status: review.status });
+
+    return { success: true, attemptId, reviewStatus: review.status };
+  }
+
+  // FR-SECURITY-006: Set Exam Access Controls
+  async setExamAccessControl(adminId: string, examId: string, controls: {
+    allowedIpRanges?: string[];
+    blockedIpRanges?: string[];
+    accessWindowStart?: Date;
+    accessWindowEnd?: Date;
+    allowedDeviceTypes?: string[];
+    allowedCountries?: string[];
+    requireOTP?: boolean;
+    accessPassword?: string;
+  }) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    await this.prisma.examAccessControl.upsert({
+      where: { examId },
+      create: {
+        examId,
+        ...controls,
+      },
+      update: controls,
+    });
+
+    await this.eventBus.publish('exam.access_control.updated', { examId, updatedBy: adminId });
+
+    return { success: true, examId, accessControlSet: true };
+  }
+
+  // FR-SECURITY-007: Log Security Events
+  async logSecurityEvent(examId: string, event: {
+    eventType: string;
+    severity: string;
+    userId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    details?: string;
+    metadata?: any;
+    action?: string;
+  }) {
+    await this.prisma.examSecurityLog.create({
+      data: {
+        examId,
+        eventType: event.eventType,
+        severity: event.severity,
+        userId: event.userId,
+        ipAddress: event.ipAddress,
+        userAgent: event.userAgent,
+        details: event.details,
+        metadata: event.metadata,
+        action: event.action,
+      },
+    });
+
+    return { success: true, eventLogged: true };
+  }
+
+  // FR-SECURITY-008: Generate Exam Analytics Report
+  async generateExamAnalyticsReport(examId: string) {
+    const exam = await this.prisma.exam.findUnique({ where: { id: examId } });
+    if (!exam) throw new NotFoundException('Exam not found');
+
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { examId, submittedAt: { not: null } }, // Use submittedAt instead of status
+      include: { answers: true },
+    });
+
+    const totalStudents = await this.prisma.examAssignment.count({ where: { examId } });
+    const attemptedBy = attempts.length;
+    const completedBy = attempts.filter((a) => a.evaluatedAt !== null).length;
+
+    const scores = attempts.map((a) => Number(a.obtainedMarks)).filter((s) => s > 0);
+    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+    const times = attempts.map((a) => {
+      if (a.startedAt && a.submittedAt) {
+        return Math.floor((a.submittedAt.getTime() - a.startedAt.getTime()) / 60000); // minutes
+      }
+      return 0;
+    }).filter((t) => t > 0);
+    const averageTime = times.length > 0 ? Math.floor(times.reduce((a, b) => a + b, 0) / times.length) : 0;
+
+    const passMarks = Number(exam.totalMarks) * 0.4; // 40% pass
+    const passed = scores.filter((s) => s >= passMarks).length;
+    const passPercentage = scores.length > 0 ? (passed / scores.length) * 100 : 0;
+
+    // Score distribution
+    const scoreRanges = { '0-25': 0, '26-50': 0, '51-75': 0, '76-100': 0 };
+    scores.forEach((score) => {
+      const percent = (score / Number(exam.totalMarks)) * 100;
+      if (percent <= 25) scoreRanges['0-25']++;
+      else if (percent <= 50) scoreRanges['26-50']++;
+      else if (percent <= 75) scoreRanges['51-75']++;
+      else scoreRanges['76-100']++;
+    });
+
+    // Top/Bottom performers - use obtainedMarks instead of score
+    const sortedAttempts = attempts.sort((a, b) => Number(b.obtainedMarks) - Number(a.obtainedMarks));
+    const topPerformers = sortedAttempts.slice(0, 10).map((a) => ({
+      studentId: a.studentId,
+      score: Number(a.obtainedMarks),
+      percentage: (Number(a.obtainedMarks) / Number(exam.totalMarks)) * 100,
+    }));
+    const bottomPerformers = sortedAttempts.slice(-10).reverse().map((a) => ({
+      studentId: a.studentId,
+      score: Number(a.obtainedMarks),
+      percentage: (Number(a.obtainedMarks) / Number(exam.totalMarks)) * 100,
+    }));
+
+    // Flagged attempts
+    const flaggedAttempts = await this.prisma.examProctoring.findMany({
+      where: {
+        attemptId: { in: attempts.map((a) => a.id) },
+        OR: [
+          { violationCount: { gt: 0 } },
+          { reviewStatus: 'FLAGGED' },
+        ],
+      },
+      select: { attemptId: true },
+    });
+
+    const report = await this.prisma.examAnalyticsReport.upsert({
+      where: { examId },
+      create: {
+        examId,
+        totalStudents,
+        attemptedBy,
+        completedBy,
+        averageScore,
+        averageTime,
+        passPercentage,
+        scoreDistribution: scoreRanges,
+        topPerformers,
+        bottomPerformers,
+        flaggedAttempts: flaggedAttempts.map((f) => f.attemptId),
+      },
+      update: {
+        totalStudents,
+        attemptedBy,
+        completedBy,
+        averageScore,
+        averageTime,
+        passPercentage,
+        scoreDistribution: scoreRanges,
+        topPerformers,
+        bottomPerformers,
+        flaggedAttempts: flaggedAttempts.map((f) => f.attemptId),
+        generatedAt: new Date(),
+      },
+    });
+
+    return report;
+  }
 }

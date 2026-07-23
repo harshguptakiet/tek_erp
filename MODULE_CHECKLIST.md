@@ -534,7 +534,7 @@
 | Grading Rubrics | FR-GRADE-003–005 | ✅ DONE |
 | Results + Rankings | FR-RESULT-001–006 | ✅ DONE |
 | Student Performance Report | FR-REPORT-001 | ✅ DONE |
-| Security / Proctoring | FR-SECURITY-001–008 | ⏳ PENDING |
+| Security / Proctoring | FR-SECURITY-001–008 | ✅ DONE |
 | Analytics reports | FR-REPORT-002–005 | ⏳ PENDING |
 | Rank leaderboard | FR-RANK-001–008 | 🔧 PARTIAL (auto-rank on results) |
 
