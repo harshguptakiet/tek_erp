@@ -342,9 +342,9 @@
 - [ ] **FR-ORG-065**: Request Refund — ⏭️ BLOCKED
 - [ ] **FR-ORG-066**: View Billing Audit Trail — ⏭️ BLOCKED
 - [x] **FR-ORG-067**: Organization Data Export — ✅ DONE
-- [ ] **FR-ORG-068**: Organization Suspension Handling — ⏳ PENDING
-- [ ] **FR-ORG-069**: Organization Merger/Split — ⏳ PENDING
-- [ ] **FR-ORG-070**: Organization Compliance Reporting — ⏳ PENDING
+- [x] **FR-ORG-068**: Organization Suspension Handling — ✅ DONE (3 methods, 3 endpoints)
+- [x] **FR-ORG-069**: Organization Merger/Split — ✅ DONE (7 methods, 7 endpoints)
+- [x] **FR-ORG-070**: Organization Compliance Reporting — ✅ DONE (4 methods, 4 endpoints)
 
 ### Extra (implemented, not numbered)
 
