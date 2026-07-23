@@ -809,4 +809,84 @@ export class UsersController {
       lastLoginBefore: criteria.lastLoginBefore ? new Date(criteria.lastLoginBefore) : undefined,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-USER-041: Find Classmates/Colleagues (User Connections)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Post('connections/request')
+  @ApiOperation({ summary: 'Send connection request (FR-USER-041)' })
+  sendConnectionRequest(@Request() req, @Body() dto: {
+    connectedUserId: string;
+    connectionType: string;
+    message?: string;
+    context?: { schoolId?: string; classId?: string; sectionId?: string; organizationId?: string };
+  }) {
+    return this.usersService.sendConnectionRequest(req.user.userId, dto);
+  }
+
+  @Post('connections/:connectionId/accept')
+  @ApiOperation({ summary: 'Accept connection request (FR-USER-041)' })
+  acceptConnectionRequest(
+    @Request() req,
+    @Param('connectionId') connectionId: string,
+  ) {
+    return this.usersService.acceptConnectionRequest(req.user.userId, connectionId);
+  }
+
+  @Post('connections/:connectionId/reject')
+  @ApiOperation({ summary: 'Reject connection request (FR-USER-041)' })
+  rejectConnectionRequest(
+    @Request() req,
+    @Param('connectionId') connectionId: string,
+  ) {
+    return this.usersService.rejectConnectionRequest(req.user.userId, connectionId);
+  }
+
+  @Post('connections/block/:userId')
+  @ApiOperation({ summary: 'Block user (FR-USER-041)' })
+  blockUser(@Request() req, @Param('userId') userId: string) {
+    return this.usersService.blockUser(req.user.userId, userId);
+  }
+
+  @Delete('connections/block/:userId')
+  @ApiOperation({ summary: 'Unblock user (FR-USER-041)' })
+  unblockUser(@Request() req, @Param('userId') userId: string) {
+    return this.usersService.unblockUser(req.user.userId, userId);
+  }
+
+  @Get('connections')
+  @ApiOperation({ summary: 'List my connections (FR-USER-041)' })
+  listMyConnections(
+    @Request() req,
+    @Query('connectionType') connectionType?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.listMyConnections(req.user.userId, {
+      connectionType,
+      status,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+    });
+  }
+
+  @Get('classmates')
+  @ApiOperation({ summary: 'Find classmates (FR-USER-041)' })
+  findClassmates(@Request() req) {
+    return this.usersService.findClassmates(req.user.userId);
+  }
+
+  @Get('colleagues')
+  @ApiOperation({ summary: 'Find colleagues (FR-USER-041)' })
+  findColleagues(@Request() req) {
+    return this.usersService.findColleagues(req.user.userId);
+  }
+
+  @Post('classmates/recommendations')
+  @ApiOperation({ summary: 'Generate classmate recommendations (FR-USER-041)' })
+  generateClassmateRecommendations(@Request() req) {
+    return this.usersService.generateClassmateRecommendations(req.user.userId);
+  }
 }

@@ -1816,4 +1816,459 @@ export class UsersService {
       return acc;
     }, {});
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-USER-041: Find Classmates/Colleagues (User Connections)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async sendConnectionRequest(userId: string, dto: {
+    connectedUserId: string;
+    connectionType: string; // CLASSMATE, COLLEAGUE, FRIEND, MENTOR, MENTEE
+    message?: string;
+    context?: { schoolId?: string; classId?: string; sectionId?: string; organizationId?: string };
+  }) {
+    if (userId === dto.connectedUserId) {
+      throw new BadRequestException('Cannot connect with yourself');
+    }
+
+    // Check if connection already exists
+    const existingConnection = await this.prisma.userConnection.findFirst({
+      where: {
+        OR: [
+          { userId, connectedUserId: dto.connectedUserId },
+          { userId: dto.connectedUserId, connectedUserId: userId },
+        ],
+      },
+    });
+
+    if (existingConnection) {
+      throw new BadRequestException('Connection request already exists');
+    }
+
+    const connection = await this.prisma.userConnection.create({
+      data: {
+        userId,
+        connectedUserId: dto.connectedUserId,
+        connectionType: dto.connectionType,
+        message: dto.message,
+        schoolId: dto.context?.schoolId,
+        classId: dto.context?.classId,
+        sectionId: dto.context?.sectionId,
+        organizationId: dto.context?.organizationId,
+        status: 'PENDING',
+      },
+    });
+
+    await this.eventBus.publish('user.connection.requested', {
+      connectionId: connection.id,
+      fromUserId: userId,
+      toUserId: dto.connectedUserId,
+      connectionType: dto.connectionType,
+    });
+
+    return { success: true, connectionId: connection.id, status: 'PENDING' };
+  }
+
+  async acceptConnectionRequest(userId: string, connectionId: string) {
+    const connection = await this.prisma.userConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection request not found');
+    }
+
+    if (connection.connectedUserId !== userId) {
+      throw new ForbiddenException('You are not authorized to accept this request');
+    }
+
+    if (connection.status !== 'PENDING') {
+      throw new BadRequestException('Connection request is not pending');
+    }
+
+    const updated = await this.prisma.userConnection.update({
+      where: { id: connectionId },
+      data: {
+        status: 'ACCEPTED',
+        acceptedAt: new Date(),
+      },
+    });
+
+    await this.eventBus.publish('user.connection.accepted', {
+      connectionId,
+      userId: connection.userId,
+      connectedUserId: connection.connectedUserId,
+    });
+
+    return { success: true, connectionId, status: 'ACCEPTED' };
+  }
+
+  async rejectConnectionRequest(userId: string, connectionId: string) {
+    const connection = await this.prisma.userConnection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection request not found');
+    }
+
+    if (connection.connectedUserId !== userId) {
+      throw new ForbiddenException('You are not authorized to reject this request');
+    }
+
+    await this.prisma.userConnection.update({
+      where: { id: connectionId },
+      data: {
+        status: 'REJECTED',
+        rejectedAt: new Date(),
+      },
+    });
+
+    return { success: true, connectionId, status: 'REJECTED' };
+  }
+
+  async blockUser(userId: string, blockedUserId: string) {
+    if (userId === blockedUserId) {
+      throw new BadRequestException('Cannot block yourself');
+    }
+
+    // Find or create connection
+    const connection = await this.prisma.userConnection.findFirst({
+      where: {
+        OR: [
+          { userId, connectedUserId: blockedUserId },
+          { userId: blockedUserId, connectedUserId: userId },
+        ],
+      },
+    });
+
+    if (connection) {
+      await this.prisma.userConnection.update({
+        where: { id: connection.id },
+        data: { status: 'BLOCKED' },
+      });
+    } else {
+      await this.prisma.userConnection.create({
+        data: {
+          userId,
+          connectedUserId: blockedUserId,
+          connectionType: 'FRIEND',
+          status: 'BLOCKED',
+        },
+      });
+    }
+
+    return { success: true, message: 'User blocked successfully' };
+  }
+
+  async unblockUser(userId: string, blockedUserId: string) {
+    const connection = await this.prisma.userConnection.findFirst({
+      where: {
+        userId,
+        connectedUserId: blockedUserId,
+        status: 'BLOCKED',
+      },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Blocked connection not found');
+    }
+
+    await this.prisma.userConnection.delete({
+      where: { id: connection.id },
+    });
+
+    return { success: true, message: 'User unblocked successfully' };
+  }
+
+  async listMyConnections(userId: string, filters?: {
+    connectionType?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      OR: [
+        { userId, ...(filters?.status ? { status: filters.status } : {}) },
+        { connectedUserId: userId, ...(filters?.status ? { status: filters.status } : {}) },
+      ],
+      ...(filters?.connectionType ? { connectionType: filters.connectionType } : {}),
+    };
+
+    const [connections, total] = await Promise.all([
+      this.prisma.userConnection.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { requestedAt: 'desc' },
+      }),
+      this.prisma.userConnection.count({ where }),
+    ]);
+
+    return {
+      connections,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findClassmates(userId: string) {
+    // Get user's student profile
+    const studentProfile = await this.prisma.studentProfile.findUnique({
+      where: { userId },
+      include: {
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          include: { section: true },
+        },
+      },
+    });
+
+    if (!studentProfile || studentProfile.enrollments.length === 0) {
+      return { classmates: [], recommendations: [] };
+    }
+
+    const currentEnrollment = studentProfile.enrollments[0];
+    const sectionId = currentEnrollment.sectionId;
+
+    // Find all students in the same section
+    const classmates = await this.prisma.studentEnrollment.findMany({
+      where: {
+        sectionId,
+        status: 'ACTIVE',
+        studentId: { not: studentProfile.id },
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profileImage: true,
+              },
+            },
+          },
+        },
+      },
+      take: 50,
+    });
+
+    // Get existing connections
+    const existingConnections = await this.prisma.userConnection.findMany({
+      where: {
+        userId,
+        connectedUserId: { in: classmates.map((c) => c.student.userId) },
+      },
+      select: { connectedUserId: true, status: true },
+    });
+
+    const connectionMap = new Map(
+      existingConnections.map((c) => [c.connectedUserId, c.status])
+    );
+
+    // Get recommendations
+    const recommendations = await this.prisma.classmateRecommendation.findMany({
+      where: { userId },
+      orderBy: { score: 'desc' },
+      take: 10,
+    });
+
+    return {
+      classmates: classmates.map((c) => ({
+        studentId: c.studentId,
+        userId: c.student.userId,
+        name: `${c.student.user.firstName} ${c.student.user.lastName}`,
+        profileImage: c.student.user.profileImage,
+        rollNumber: c.rollNumber,
+        connectionStatus: connectionMap.get(c.student.userId) || 'NOT_CONNECTED',
+      })),
+      recommendations: recommendations.map((r) => ({
+        userId: r.recommendedUserId,
+        score: Number(r.score),
+        reason: r.reason,
+        viewed: r.viewed,
+      })),
+      sectionInfo: {
+        sectionId: currentEnrollment.section.id,
+        sectionName: currentEnrollment.section.sectionName,
+        classId: currentEnrollment.section.classId,
+      },
+    };
+  }
+
+  async findColleagues(userId: string) {
+    // Get user's organizations
+    const orgUsers = await this.prisma.organizationUser.findMany({
+      where: { userId, isActive: true },
+      include: { organization: true },
+    });
+
+    if (orgUsers.length === 0) {
+      return { colleagues: [], byOrganization: [] };
+    }
+
+    const organizationIds = orgUsers.map((ou) => ou.organizationId);
+
+    // Find all users in the same organizations
+    const colleagues = await this.prisma.organizationUser.findMany({
+      where: {
+        organizationId: { in: organizationIds },
+        userId: { not: userId },
+        isActive: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profileImage: true,
+            role: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      take: 100,
+    });
+
+    // Get existing connections
+    const existingConnections = await this.prisma.userConnection.findMany({
+      where: {
+        userId,
+        connectedUserId: { in: colleagues.map((c) => c.userId) },
+      },
+      select: { connectedUserId: true, status: true },
+    });
+
+    const connectionMap = new Map(
+      existingConnections.map((c) => [c.connectedUserId, c.status])
+    );
+
+    // Group by organization
+    const byOrganization = organizationIds.map((orgId) => {
+      const orgColleagues = colleagues.filter((c) => c.organizationId === orgId);
+      const org = orgUsers.find((ou) => ou.organizationId === orgId);
+
+      return {
+        organizationId: orgId,
+        organizationName: org?.organization.name,
+        colleagues: orgColleagues.map((c) => ({
+          userId: c.userId,
+          name: `${c.user.firstName} ${c.user.lastName}`,
+          profileImage: c.user.profileImage,
+          role: c.user.role,
+          designation: c.designation,
+          department: c.department,
+          connectionStatus: connectionMap.get(c.userId) || 'NOT_CONNECTED',
+        })),
+        totalCount: orgColleagues.length,
+      };
+    });
+
+    return {
+      colleagues: colleagues.map((c) => ({
+        userId: c.userId,
+        name: `${c.user.firstName} ${c.user.lastName}`,
+        profileImage: c.user.profileImage,
+        role: c.user.role,
+        organizationName: c.organization.name,
+        connectionStatus: connectionMap.get(c.userId) || 'NOT_CONNECTED',
+      })),
+      byOrganization,
+      totalOrganizations: organizationIds.length,
+    };
+  }
+
+  async generateClassmateRecommendations(userId: string) {
+    // This would use ML/AI algorithms in production
+    // For now, we'll use simple heuristics
+
+    const studentProfile = await this.prisma.studentProfile.findUnique({
+      where: { userId },
+      include: {
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          include: { section: { include: { class: true } } },
+        },
+      },
+    });
+
+    if (!studentProfile || studentProfile.enrollments.length === 0) {
+      return { recommendations: [] };
+    }
+
+    const currentEnrollment = studentProfile.enrollments[0];
+    
+    // Find students in same grade but different sections
+    const samegradeStudents = await this.prisma.studentEnrollment.findMany({
+      where: {
+        status: 'ACTIVE',
+        studentId: { not: studentProfile.id },
+        section: {
+          class: {
+            grade: currentEnrollment.section.class.grade,
+            academicYearId: currentEnrollment.section.class.academicYearId,
+          },
+        },
+      },
+      include: {
+        student: {
+          include: {
+            user: { select: { id: true } },
+          },
+        },
+      },
+      take: 20,
+    });
+
+    // Create recommendations with basic scoring
+    const recommendations = samegradeStudents.map((s) => ({
+      userId,
+      recommendedUserId: s.student.userId,
+      score: 75, // Base score for same grade
+      reason: 'Same grade, different section',
+      metadata: {
+        grade: currentEnrollment.section.class.grade,
+        sectionId: s.sectionId,
+      },
+    }));
+
+    // Bulk upsert recommendations
+    for (const rec of recommendations) {
+      await this.prisma.classmateRecommendation.upsert({
+        where: {
+          userId_recommendedUserId: {
+            userId: rec.userId,
+            recommendedUserId: rec.recommendedUserId,
+          },
+        },
+        create: rec,
+        update: {
+          score: rec.score,
+          reason: rec.reason,
+          metadata: rec.metadata,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      recommendationsGenerated: recommendations.length,
+    };
+  }
 }
