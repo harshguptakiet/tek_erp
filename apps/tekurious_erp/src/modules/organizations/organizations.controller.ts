@@ -9,9 +9,12 @@ import {
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OrganizationsService } from './organizations.service';
 import {
   CreateOrganizationDto,
@@ -411,5 +414,159 @@ export class OrganizationsController {
     @Body() dto: { format?: 'JSON' | 'CSV' },
   ) {
     return this.orgsService.exportOrganizationData(id, dto.format);
+  }
+
+  // ==================== FR-ORG-068: ORGANIZATION SUSPENSION HANDLING ====================
+
+  @Post(':id/suspend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Suspend an organization (FR-ORG-068)' })
+  async suspendOrganization(
+    @CurrentUser('id') adminId: string,
+    @Param('id') id: string,
+    @Body() dto: { reason: string; duration?: number; dataAccessLocked?: boolean }
+  ) {
+    return this.orgsService.suspendOrganization(adminId, id, dto);
+  }
+
+  @Post(':id/reactivate-suspended')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reactivate suspended organization (FR-ORG-068)' })
+  async reactivateSuspended(
+    @CurrentUser('id') adminId: string,
+    @Param('id') id: string,
+    @Body() dto: { notes?: string }
+  ) {
+    return this.orgsService.reactivateSuspendedOrganization(adminId, id, dto.notes);
+  }
+
+  @Get(':id/suspension-history')
+  @ApiOperation({ summary: 'Get suspension history (FR-ORG-068)' })
+  async getSuspensionHistory(@Param('id') id: string) {
+    return this.orgsService.getSuspensionHistory(id);
+  }
+
+  // ==================== FR-ORG-069: ORGANIZATION MERGER/SPLIT ====================
+
+  @Post('transfer/request')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Request organization transfer (FR-ORG-069)' })
+  async requestTransfer(
+    @CurrentUser('id') requesterId: string,
+    @Body() dto: {
+      organizationId: string;
+      fromOwnerId: string;
+      toOwnerId: string;
+      reason?: string;
+    }
+  ) {
+    return this.orgsService.requestOrganizationTransfer(requesterId, dto);
+  }
+
+  @Post('transfer/:transferId/approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve organization transfer (FR-ORG-069)' })
+  async approveTransfer(
+    @CurrentUser('id') approverId: string,
+    @Param('transferId') transferId: string
+  ) {
+    return this.orgsService.approveOrganizationTransfer(approverId, transferId);
+  }
+
+  @Post('transfer/:transferId/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject organization transfer (FR-ORG-069)' })
+  async rejectTransfer(
+    @CurrentUser('id') approverId: string,
+    @Param('transferId') transferId: string,
+    @Body() dto: { reason: string }
+  ) {
+    return this.orgsService.rejectOrganizationTransfer(approverId, transferId, dto.reason);
+  }
+
+  @Post('merger/initiate')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Initiate organization merger (FR-ORG-069)' })
+  async initiateMerger(
+    @CurrentUser('id') initiatorId: string,
+    @Body() dto: {
+      sourceOrganizationIds: string[];
+      targetOrganizationId: string;
+      mergerType: 'ACQUISITION' | 'CONSOLIDATION' | 'PARTNERSHIP';
+      reason?: string;
+      migrationPlan?: any;
+    }
+  ) {
+    return this.orgsService.initiateOrganizationMerger(initiatorId, dto);
+  }
+
+  @Post('merger/:mergerId/execute')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Execute organization merger (FR-ORG-069)' })
+  async executeMerger(
+    @CurrentUser('id') executorId: string,
+    @Param('mergerId') mergerId: string
+  ) {
+    return this.orgsService.executeOrganizationMerger(executorId, mergerId);
+  }
+
+  @Get('merger/:mergerId/status')
+  @ApiOperation({ summary: 'Get merger status (FR-ORG-069)' })
+  async getMergerStatus(@Param('mergerId') mergerId: string) {
+    return this.orgsService.getMergerStatus(mergerId);
+  }
+
+  // ==================== FR-ORG-070: ORGANIZATION COMPLIANCE REPORTING ====================
+
+  @Post(':id/compliance/generate')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Generate compliance report (FR-ORG-070)' })
+  async generateComplianceReport(
+    @Param('id') id: string,
+    @Body() dto: {
+      reportType: 'GDPR' | 'DATA_PROTECTION' | 'FINANCIAL' | 'ACADEMIC' | 'SAFETY';
+      period: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+      periodStart: Date;
+      periodEnd: Date;
+    }
+  ) {
+    return this.orgsService.generateComplianceReport(id, dto);
+  }
+
+  @Post(':id/compliance/:reportId/submit')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Submit compliance report (FR-ORG-070)' })
+  async submitComplianceReport(
+    @Param('id') id: string,
+    @Param('reportId') reportId: string
+  ) {
+    return this.orgsService.submitComplianceReport(id, reportId);
+  }
+
+  @Get(':id/compliance/reports')
+  @ApiOperation({ summary: 'Get compliance reports (FR-ORG-070)' })
+  async getComplianceReports(
+    @Param('id') id: string,
+    @Query('reportType') reportType?: string,
+    @Query('status') status?: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string
+  ) {
+    const filters: any = {};
+    if (reportType) filters.reportType = reportType;
+    if (status) filters.status = status;
+    if (periodStart) filters.periodStart = new Date(periodStart);
+    if (periodEnd) filters.periodEnd = new Date(periodEnd);
+
+    return this.orgsService.getComplianceReports(id, filters);
+  }
+
+  @Get(':id/compliance/:reportId')
+  @ApiOperation({ summary: 'Get compliance report (FR-ORG-070)' })
+  async getComplianceReport(
+    @Param('id') id: string,
+    @Param('reportId') reportId: string
+  ) {
+    return this.orgsService.getComplianceReport(id, reportId);
   }
 }

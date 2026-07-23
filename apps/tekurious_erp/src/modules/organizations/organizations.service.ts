@@ -1605,5 +1605,529 @@ export class OrganizationsService {
       estimatedCompletionTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
     };
   }
+
+  // ==================== FR-ORG-068: ORGANIZATION SUSPENSION HANDLING ====================
+
+  async suspendOrganization(
+    adminId: string,
+    organizationId: string,
+    dto: {
+      reason: string;
+      duration?: number;
+      dataAccessLocked?: boolean;
+    }
+  ) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: { users: true, schools: true },
+    });
+
+    if (!org) throw new NotFoundException('Organization not found');
+    if (!org.isActive) throw new BadRequestException('Organization is already inactive');
+
+    let suspendedUntil: Date | null = null;
+    if (dto.duration) {
+      suspendedUntil = new Date();
+      suspendedUntil.setDate(suspendedUntil.getDate() + dto.duration);
+    }
+
+    const suspension = await this.prisma.organizationSuspension.create({
+      data: {
+        organizationId,
+        reason: dto.reason,
+        suspendedBy: adminId,
+        duration: dto.duration,
+        suspendedUntil,
+        affectedUsers: org.users.length,
+        affectedSchools: org.schools.length,
+        dataAccessLocked: dto.dataAccessLocked ?? true,
+        status: 'ACTIVE',
+      },
+    });
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { isActive: false },
+    });
+
+    this.eventBus.publish('organization.suspended', {
+      organizationId,
+      suspensionId: suspension.id,
+      reason: dto.reason,
+      timestamp: new Date(),
+    });
+
+    return {
+      suspensionId: suspension.id,
+      message: 'Organization suspended successfully',
+      affectedUsers: org.users.length,
+      suspendedUntil,
+    };
+  }
+
+  async reactivateSuspendedOrganization(
+    adminId: string,
+    organizationId: string,
+    notes?: string
+  ) {
+    const suspension = await this.prisma.organizationSuspension.findFirst({
+      where: { organizationId, status: 'ACTIVE' },
+    });
+
+    if (!suspension) throw new BadRequestException('No active suspension found');
+
+    await this.prisma.organizationSuspension.update({
+      where: { id: suspension.id },
+      data: {
+        status: 'REACTIVATED',
+        reactivatedAt: new Date(),
+        reactivatedBy: adminId,
+        reactivationNotes: notes,
+      },
+    });
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { isActive: true },
+    });
+
+    this.eventBus.publish('organization.reactivated', {
+      organizationId,
+      suspensionId: suspension.id,
+      timestamp: new Date(),
+    });
+
+    return { message: 'Organization reactivated successfully' };
+  }
+
+  async getSuspensionHistory(organizationId: string) {
+    return this.prisma.organizationSuspension.findMany({
+      where: { organizationId },
+      orderBy: { suspendedAt: 'desc' },
+    });
+  }
+
+  // ==================== FR-ORG-069: ORGANIZATION MERGER/SPLIT ====================
+
+  async requestOrganizationTransfer(
+    requesterId: string,
+    dto: {
+      organizationId: string;
+      fromOwnerId: string;
+      toOwnerId: string;
+      reason?: string;
+    }
+  ) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: dto.organizationId },
+      include: { users: true, schools: true },
+    });
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const newOwner = await this.prisma.user.findUnique({
+      where: { id: dto.toOwnerId },
+    });
+
+    if (!newOwner) throw new NotFoundException('New owner not found');
+
+    const transfer = await this.prisma.organizationTransfer.create({
+      data: {
+        organizationId: dto.organizationId,
+        fromOwnerId: dto.fromOwnerId,
+        toOwnerId: dto.toOwnerId,
+        reason: dto.reason,
+        transferredUsers: org.users.length,
+        transferredSchools: org.schools.length,
+        requestedBy: requesterId,
+        status: 'PENDING',
+      },
+    });
+
+    this.eventBus.publish('organization.transfer_requested', {
+      transferId: transfer.id,
+      organizationId: dto.organizationId,
+      timestamp: new Date(),
+    });
+
+    return {
+      transferId: transfer.id,
+      message: 'Transfer request created successfully',
+      status: 'PENDING',
+    };
+  }
+
+  async approveOrganizationTransfer(approverId: string, transferId: string) {
+    const transfer = await this.prisma.organizationTransfer.findUnique({
+      where: { id: transferId },
+    });
+
+    if (!transfer) throw new NotFoundException('Transfer request not found');
+    if (transfer.status !== 'PENDING') throw new BadRequestException('Transfer request is not pending');
+
+    await this.prisma.organizationTransfer.update({
+      where: { id: transferId },
+      data: {
+        status: 'APPROVED',
+        approvedBy: approverId,
+        approvedAt: new Date(),
+      },
+    });
+
+    await this.prisma.organizationUser.updateMany({
+      where: {
+        organizationId: transfer.organizationId,
+        userId: transfer.fromOwnerId,
+      },
+      data: { isActive: false },
+    });
+
+    await this.prisma.organizationUser.upsert({
+      where: {
+        organizationId_userId: {
+          organizationId: transfer.organizationId,
+          userId: transfer.toOwnerId,
+        },
+      },
+      create: {
+        organizationId: transfer.organizationId,
+        userId: transfer.toOwnerId,
+        designation: 'Owner',
+        isActive: true,
+      },
+      update: { isActive: true, designation: 'Owner' },
+    });
+
+    await this.prisma.organizationTransfer.update({
+      where: { id: transferId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    });
+
+    this.eventBus.publish('organization.transfer_completed', {
+      transferId,
+      organizationId: transfer.organizationId,
+      timestamp: new Date(),
+    });
+
+    return { message: 'Transfer approved and completed successfully' };
+  }
+
+  async rejectOrganizationTransfer(
+    approverId: string,
+    transferId: string,
+    reason: string
+  ) {
+    const transfer = await this.prisma.organizationTransfer.findUnique({
+      where: { id: transferId },
+    });
+
+    if (!transfer) throw new NotFoundException('Transfer request not found');
+    if (transfer.status !== 'PENDING') throw new BadRequestException('Transfer request is not pending');
+
+    await this.prisma.organizationTransfer.update({
+      where: { id: transferId },
+      data: {
+        status: 'REJECTED',
+        approvedBy: approverId,
+        approvedAt: new Date(),
+        rejectionReason: reason,
+      },
+    });
+
+    this.eventBus.publish('organization.transfer_rejected', {
+      transferId,
+      organizationId: transfer.organizationId,
+      reason,
+      timestamp: new Date(),
+    });
+
+    return { message: 'Transfer request rejected' };
+  }
+
+  async initiateOrganizationMerger(
+    initiatorId: string,
+    dto: {
+      sourceOrganizationIds: string[];
+      targetOrganizationId: string;
+      mergerType: 'ACQUISITION' | 'CONSOLIDATION' | 'PARTNERSHIP';
+      reason?: string;
+      migrationPlan?: any;
+    }
+  ) {
+    const orgs = await this.prisma.organization.findMany({
+      where: {
+        id: { in: [...dto.sourceOrganizationIds, dto.targetOrganizationId] },
+      },
+    });
+
+    if (orgs.length !== dto.sourceOrganizationIds.length + 1) {
+      throw new BadRequestException('One or more organizations not found');
+    }
+
+    const merger = await this.prisma.organizationMerger.create({
+      data: {
+        sourceOrganizationIds: dto.sourceOrganizationIds,
+        targetOrganizationId: dto.targetOrganizationId,
+        mergerType: dto.mergerType,
+        reason: dto.reason,
+        initiatedBy: initiatorId,
+        migrationPlan: dto.migrationPlan,
+        status: 'PLANNED',
+      },
+    });
+
+    this.eventBus.publish('organization.merger_initiated', {
+      mergerId: merger.id,
+      sourceOrganizations: dto.sourceOrganizationIds,
+      targetOrganization: dto.targetOrganizationId,
+      timestamp: new Date(),
+    });
+
+    return {
+      mergerId: merger.id,
+      message: 'Organization merger initiated successfully',
+      status: 'PLANNED',
+    };
+  }
+
+  async executeOrganizationMerger(executorId: string, mergerId: string) {
+    const merger = await this.prisma.organizationMerger.findUnique({
+      where: { id: mergerId },
+    });
+
+    if (!merger) throw new NotFoundException('Merger not found');
+    if (merger.status !== 'PLANNED') throw new BadRequestException('Merger is not in planned state');
+
+    await this.prisma.organizationMerger.update({
+      where: { id: mergerId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: new Date(),
+      },
+    });
+
+    try {
+      let totalUsers = 0;
+      let totalSchools = 0;
+
+      for (const sourceOrgId of merger.sourceOrganizationIds) {
+        const users = await this.prisma.organizationUser.updateMany({
+          where: { organizationId: sourceOrgId },
+          data: { organizationId: merger.targetOrganizationId },
+        });
+
+        const schools = await this.prisma.school.updateMany({
+          where: { organizationId: sourceOrgId },
+          data: { organizationId: merger.targetOrganizationId },
+        });
+
+        totalUsers += users.count;
+        totalSchools += schools.count;
+
+        await this.prisma.organization.update({
+          where: { id: sourceOrgId },
+          data: { isActive: false },
+        });
+      }
+
+      await this.prisma.organizationMerger.update({
+        where: { id: mergerId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          migratedUsers: totalUsers,
+          migratedSchools: totalSchools,
+        },
+      });
+
+      this.eventBus.publish('organization.merger_completed', {
+        mergerId,
+        migratedUsers: totalUsers,
+        migratedSchools: totalSchools,
+        timestamp: new Date(),
+      });
+
+      return {
+        message: 'Organization merger completed successfully',
+        migratedUsers: totalUsers,
+        migratedSchools: totalSchools,
+      };
+    } catch (error) {
+      await this.prisma.organizationMerger.update({
+        where: { id: mergerId },
+        data: {
+          status: 'FAILED',
+          errors: { message: error.message, stack: error.stack },
+        },
+      });
+
+      throw new BadRequestException(`Merger execution failed: ${error.message}`);
+    }
+  }
+
+  async getMergerStatus(mergerId: string) {
+    const merger = await this.prisma.organizationMerger.findUnique({
+      where: { id: mergerId },
+    });
+
+    if (!merger) throw new NotFoundException('Merger not found');
+
+    return merger;
+  }
+
+  // ==================== FR-ORG-070: ORGANIZATION COMPLIANCE REPORTING ====================
+
+  async generateComplianceReport(
+    organizationId: string,
+    dto: {
+      reportType: 'GDPR' | 'DATA_PROTECTION' | 'FINANCIAL' | 'ACADEMIC' | 'SAFETY';
+      period: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+      periodStart: Date;
+      periodEnd: Date;
+    }
+  ) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: { users: true, schools: true },
+    });
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const metrics: any = {};
+    let findings: any[] = [];
+    let complianceScore = 100;
+
+    if (dto.reportType === 'GDPR' || dto.reportType === 'DATA_PROTECTION') {
+      metrics.totalUsers = org.users.length;
+      metrics.dataRetentionPolicySet = !!org.users.length;
+      metrics.privacyPolicyAccepted = org.users.length;
+      
+      if (!org.users.length) {
+        findings.push({
+          severity: 'HIGH',
+          finding: 'No data retention policy configured',
+          recommendation: 'Set up data retention policy',
+        });
+        complianceScore -= 20;
+      }
+    }
+
+    if (dto.reportType === 'ACADEMIC') {
+      metrics.totalSchools = org.schools.length;
+      metrics.activeSchools = org.schools.filter(s => s.isActive).length;
+      metrics.totalStudents = await this.prisma.studentProfile.count({
+        where: { schoolId: { in: org.schools.map(s => s.id) } },
+      });
+    }
+
+    if (dto.reportType === 'SAFETY') {
+      metrics.safetyPoliciesInPlace = true;
+      metrics.emergencyContactsUpdated = org.users.length;
+    }
+
+    const report = await this.prisma.complianceReport.create({
+      data: {
+        organizationId,
+        reportType: dto.reportType,
+        period: dto.period,
+        periodStart: dto.periodStart,
+        periodEnd: dto.periodEnd,
+        complianceScore,
+        findings,
+        metrics,
+        status: 'DRAFT',
+      },
+    });
+
+    this.eventBus.publish('compliance.report_generated', {
+      reportId: report.id,
+      organizationId,
+      reportType: dto.reportType,
+      complianceScore,
+      timestamp: new Date(),
+    });
+
+    return {
+      reportId: report.id,
+      reportType: dto.reportType,
+      complianceScore,
+      metrics,
+      findings,
+      status: 'DRAFT',
+    };
+  }
+
+  async submitComplianceReport(organizationId: string, reportId: string) {
+    const report = await this.prisma.complianceReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report) throw new NotFoundException('Compliance report not found');
+    if (report.organizationId !== organizationId) {
+      throw new BadRequestException('Report does not belong to this organization');
+    }
+    if (report.status !== 'DRAFT') {
+      throw new BadRequestException('Report is not in draft state');
+    }
+
+    await this.prisma.complianceReport.update({
+      where: { id: reportId },
+      data: { status: 'SUBMITTED' },
+    });
+
+    this.eventBus.publish('compliance.report_submitted', {
+      reportId,
+      organizationId,
+      timestamp: new Date(),
+    });
+
+    return {
+      message: 'Compliance report submitted successfully',
+      status: 'SUBMITTED',
+    };
+  }
+
+  async getComplianceReports(
+    organizationId: string,
+    filters?: {
+      reportType?: string;
+      status?: string;
+      periodStart?: Date;
+      periodEnd?: Date;
+    }
+  ) {
+    const where: any = { organizationId };
+
+    if (filters?.reportType) where.reportType = filters.reportType;
+    if (filters?.status) where.status = filters.status;
+    if (filters?.periodStart) {
+      where.periodStart = { gte: filters.periodStart };
+    }
+    if (filters?.periodEnd) {
+      where.periodEnd = { lte: filters.periodEnd };
+    }
+
+    return this.prisma.complianceReport.findMany({
+      where,
+      orderBy: { periodStart: 'desc' },
+    });
+  }
+
+  async getComplianceReport(organizationId: string, reportId: string) {
+    const report = await this.prisma.complianceReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report) throw new NotFoundException('Compliance report not found');
+    if (report.organizationId !== organizationId) {
+      throw new BadRequestException('Report does not belong to this organization');
+    }
+
+    return report;
+  }
 }
+
 
