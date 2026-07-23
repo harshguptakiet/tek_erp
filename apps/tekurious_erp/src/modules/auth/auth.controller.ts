@@ -449,4 +449,81 @@ export class AuthController {
     this.logger.log(`POST /auth/logout-all - User: ${userId}`);
     return this.authService.logoutAllDevices(userId, dto.password, dto.twoFactorCode);
   }
+
+  // ==================== FR-AUTH-031: ACCOUNT RECOVERY VIA SECURITY QUESTIONS ====================
+
+  /**
+   * Set security questions for authenticated user
+   * POST /api/v1/auth/security-questions/set
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security-questions/set')
+  @HttpCode(HttpStatus.OK)
+  async setSecurityQuestions(
+    @CurrentUser('id') userId: string,
+    @Body() body: { questions: Array<{ question: string; answer: string }> },
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/security-questions/set - User: ${userId}`);
+    return this.authService.setSecurityQuestions(userId, body.questions);
+  }
+
+  /**
+   * Get security questions for account recovery
+   * POST /api/v1/auth/security-questions
+   */
+  @Public()
+  @Post('security-questions')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async getSecurityQuestions(
+    @Body('identifier') identifier: string,
+  ): Promise<Array<{ id: string; question: string }>> {
+    this.logger.log(`POST /auth/security-questions - Identifier: ${identifier}`);
+    return this.authService.getSecurityQuestions(identifier);
+  }
+
+  /**
+   * Initiate account recovery
+   * POST /api/v1/auth/account-recovery/initiate
+   */
+  @Public()
+  @Post('account-recovery/initiate')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 3 per 5 minutes
+  async initiateAccountRecovery(
+    @Body() body: { identifier: string; recoveryMethod: 'SECURITY_QUESTIONS' | 'EMAIL_LINK' | 'ADMIN_APPROVAL' },
+  ): Promise<{ recoveryId: string; questions?: Array<{ id: string; question: string }>; message: string }> {
+    this.logger.log(`POST /auth/account-recovery/initiate - Method: ${body.recoveryMethod}`);
+    return this.authService.initiateAccountRecovery(body.identifier, body.recoveryMethod);
+  }
+
+  /**
+   * Verify security answers
+   * POST /api/v1/auth/account-recovery/verify
+   */
+  @Public()
+  @Post('account-recovery/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 300000 } }) // 5 per 5 minutes
+  async verifySecurityAnswers(
+    @Body() body: { recoveryId: string; answers: Array<{ questionId: string; answer: string }> },
+  ): Promise<{ verified: boolean; message: string; resetToken?: string }> {
+    this.logger.log(`POST /auth/account-recovery/verify - Recovery ID: ${body.recoveryId}`);
+    return this.authService.verifySecurityAnswers(body.recoveryId, body.answers);
+  }
+
+  /**
+   * Complete account recovery and reset password
+   * POST /api/v1/auth/account-recovery/complete
+   */
+  @Public()
+  @Post('account-recovery/complete')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
+  async completeAccountRecovery(
+    @Body() body: { recoveryId: string; newPassword: string },
+  ): Promise<{ message: string; accessToken: string }> {
+    this.logger.log(`POST /auth/account-recovery/complete - Recovery ID: ${body.recoveryId}`);
+    return this.authService.completeAccountRecovery(body.recoveryId, body.newPassword);
+  }
 }
