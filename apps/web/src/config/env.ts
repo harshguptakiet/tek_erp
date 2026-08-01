@@ -4,17 +4,19 @@
  */
 
 function getEnvVar(key: string, defaultValue?: string): string {
-  const value = process.env[key] || defaultValue;
-  if (!value) {
-    throw new Error(`Missing environment variable: ${key}`);
+  if (typeof window === 'undefined') {
+    // Server-side: use process.env
+    return process.env[key] || defaultValue || '';
   }
-  return value;
+  // Client-side: environment variables are already embedded
+  return process.env[key] || defaultValue || '';
 }
 
+// Provide sensible defaults for development
 export const config = {
-  apiUrl: getEnvVar('NEXT_PUBLIC_API_URL'),
-  socketUrl: getEnvVar('NEXT_PUBLIC_SOCKET_URL'),
-  sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  apiUrl: getEnvVar('NEXT_PUBLIC_API_URL', 'http://localhost:3000/api/v1'),
+  socketUrl: getEnvVar('NEXT_PUBLIC_SOCKET_URL', 'ws://localhost:3000'),
+  sentryDsn: getEnvVar('NEXT_PUBLIC_SENTRY_DSN'),
   env: process.env.NODE_ENV || 'development',
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',
