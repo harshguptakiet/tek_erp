@@ -680,4 +680,360 @@ export class ContentService {
       })),
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-CONTENT-021 to 030: Curriculum Builder
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async createCurriculum(userId: string, dto: any) {
+    const curriculum = await this.prisma.curriculum.create({
+      data: {
+        boardId: dto.boardId,
+        name: dto.name,
+        code: dto.code,
+        gradeRange: dto.gradeRange || { min: 1, max: 12 },
+        description: dto.description,
+        isActive: dto.isActive ?? true,
+        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : null,
+        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
+      },
+    });
+
+    this.eventBus.publish('curriculum.created', {
+      curriculumId: curriculum.id,
+      createdBy: userId,
+    });
+
+    return curriculum;
+  }
+
+  async getCurriculum(curriculumId: string) {
+    const curriculum = await this.prisma.curriculum.findUnique({
+      where: { id: curriculumId },
+      include: {
+        board: { select: { id: true, name: true } },
+        subjects: {
+          include: {
+            subject: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!curriculum) throw new NotFoundException('Curriculum not found');
+    return curriculum;
+  }
+
+  async listCurricula(boardId?: string, isActive?: boolean) {
+    return this.prisma.curriculum.findMany({
+      where: {
+        ...(boardId ? { boardId } : {}),
+        ...(isActive !== undefined ? { isActive } : {}),
+      },
+      include: {
+        board: { select: { id: true, name: true } },
+        subjects: { include: { subject: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateCurriculum(userId: string, curriculumId: string, dto: any) {
+    const curriculum = await this.prisma.curriculum.findUnique({
+      where: { id: curriculumId },
+    });
+
+    if (!curriculum) throw new NotFoundException('Curriculum not found');
+
+    const updated = await this.prisma.curriculum.update({
+      where: { id: curriculumId },
+      data: {
+        name: dto.name ?? curriculum.name,
+        description: dto.description ?? curriculum.description,
+        gradeRange: dto.gradeRange ?? curriculum.gradeRange,
+        isActive: dto.isActive ?? curriculum.isActive,
+        effectiveFrom: dto.effectiveFrom ? new Date(dto.effectiveFrom) : curriculum.effectiveFrom,
+        effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : curriculum.effectiveTo,
+      },
+    });
+
+    this.eventBus.publish('curriculum.updated', {
+      curriculumId,
+      updatedBy: userId,
+    });
+
+    return updated;
+  }
+
+  async deleteCurriculum(userId: string, curriculumId: string) {
+    const curriculum = await this.prisma.curriculum.findUnique({
+      where: { id: curriculumId },
+    });
+
+    if (!curriculum) throw new NotFoundException('Curriculum not found');
+
+    await this.prisma.curriculum.delete({
+      where: { id: curriculumId },
+    });
+
+    this.eventBus.publish('curriculum.deleted', {
+      curriculumId,
+      deletedBy: userId,
+    });
+
+    return { success: true, message: 'Curriculum deleted' };
+  }
+
+  async addSubjectToCurriculum(userId: string, curriculumId: string, dto: any) {
+    const [curriculum, subject] = await Promise.all([
+      this.prisma.curriculum.findUnique({ where: { id: curriculumId } }),
+      this.prisma.subject.findUnique({ where: { id: dto.subjectId } }),
+    ]);
+
+    if (!curriculum) throw new NotFoundException('Curriculum not found');
+    if (!subject) throw new NotFoundException('Subject not found');
+
+    const existing = await this.prisma.curriculumSubject.findUnique({
+      where: {
+        curriculumId_subjectId_grade: {
+          curriculumId,
+          subjectId: dto.subjectId,
+          grade: dto.grade,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('Subject already exists in this curriculum for this grade');
+    }
+
+    const curriculumSubject = await this.prisma.curriculumSubject.create({
+      data: {
+        curriculumId,
+        subjectId: dto.subjectId,
+        grade: dto.grade,
+        isMandatory: dto.isMandatory ?? true,
+        isElective: dto.isElective ?? false,
+        credits: dto.credits,
+        hoursPerWeek: dto.hoursPerWeek,
+      },
+    });
+
+    this.eventBus.publish('curriculum.subject_added', {
+      curriculumId,
+      subjectId: dto.subjectId,
+      addedBy: userId,
+    });
+
+    return curriculumSubject;
+  }
+
+  async removeSubjectFromCurriculum(userId: string, curriculumId: string, curriculumSubjectId: string) {
+    const curriculumSubject = await this.prisma.curriculumSubject.findUnique({
+      where: { id: curriculumSubjectId },
+    });
+
+    if (!curriculumSubject) throw new NotFoundException('Curriculum subject not found');
+    if (curriculumSubject.curriculumId !== curriculumId) {
+      throw new BadRequestException('Subject does not belong to this curriculum');
+    }
+
+    await this.prisma.curriculumSubject.delete({
+      where: { id: curriculumSubjectId },
+    });
+
+    this.eventBus.publish('curriculum.subject_removed', {
+      curriculumId,
+      curriculumSubjectId,
+      removedBy: userId,
+    });
+
+    return { success: true, message: 'Subject removed from curriculum' };
+  }
+
+  async getCurriculumByGrade(boardId: string, grade: number) {
+    const curricula = await this.prisma.curriculum.findMany({
+      where: {
+        boardId,
+        isActive: true,
+      },
+      include: {
+        subjects: {
+          where: { grade },
+          include: {
+            subject: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
+    });
+
+    return curricula.filter((c) => {
+      const range = c.gradeRange as any;
+      return grade >= range.min && grade <= range.max;
+    });
+  }
+
+  async bulkUploadContent(userId: string, contents: any[]) {
+    const created = await this.prisma.content.createMany({
+      data: contents.map((c) => ({
+        creatorId: userId,
+        title: c.title,
+        description: c.description,
+        contentType: c.contentType,
+        status: 'DRAFT',
+        subjectId: c.subjectId,
+        topicId: c.topicId,
+        grade: c.grade,
+        board: c.board,
+        fileUrl: c.fileUrl,
+        fileSize: c.fileSize,
+        fileMimeType: c.fileMimeType,
+        duration: c.duration,
+        difficultyLevel: c.difficultyLevel,
+        language: c.language || 'en',
+        tags: c.tags || [],
+        keywords: c.keywords || [],
+        learningOutcomes: c.learningOutcomes || [],
+        isFree: c.isFree ?? true,
+        price: c.price,
+        thumbnail: c.thumbnail,
+      })),
+    });
+
+    this.eventBus.publish('content.bulk_uploaded', {
+      count: created.count,
+      uploadedBy: userId,
+    });
+
+    return { success: true, count: created.count };
+  }
+
+  async tagContent(userId: string, contentId: string, tags: string[]) {
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId, deletedAt: null },
+    });
+
+    if (!content) throw new NotFoundException('Content not found');
+
+    const existingTags = content.tags as string[];
+    const newTags = [...new Set([...existingTags, ...tags])];
+
+    const updated = await this.prisma.content.update({
+      where: { id: contentId },
+      data: { tags: newTags },
+    });
+
+    return updated;
+  }
+
+  async getPopularTags(limit = 20) {
+    const contents = await this.prisma.content.findMany({
+      where: { deletedAt: null, status: 'PUBLISHED' },
+      select: { tags: true },
+    });
+
+    const tagCounts: Record<string, number> = {};
+    contents.forEach((c) => {
+      (c.tags as string[]).forEach((tag) => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+    });
+
+    const sorted = Object.entries(tagCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, limit)
+      .map(([tag, count]) => ({ tag, count }));
+
+    return sorted;
+  }
+
+  async duplicateContent(userId: string, contentId: string) {
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId, deletedAt: null },
+    });
+
+    if (!content) throw new NotFoundException('Content not found');
+
+    const duplicate = await this.prisma.content.create({
+      data: {
+        creatorId: userId,
+        title: `${content.title} (Copy)`,
+        description: content.description,
+        contentType: content.contentType,
+        status: 'DRAFT',
+        subjectId: content.subjectId,
+        topicId: content.topicId,
+        grade: content.grade,
+        board: content.board,
+        fileUrl: content.fileUrl,
+        fileSize: content.fileSize,
+        fileMimeType: content.fileMimeType,
+        duration: content.duration,
+        difficultyLevel: content.difficultyLevel,
+        language: content.language,
+        tags: content.tags,
+        keywords: content.keywords,
+        learningOutcomes: content.learningOutcomes,
+        isFree: content.isFree,
+        price: content.price,
+        thumbnail: content.thumbnail,
+        versionNumber: '1.0',
+      },
+    });
+
+    this.eventBus.publish('content.duplicated', {
+      originalId: contentId,
+      duplicateId: duplicate.id,
+      duplicatedBy: userId,
+    });
+
+    return duplicate;
+  }
+
+  async getContentRecommendations(userId: string, contentId?: string, limit = 10) {
+    let baseContent;
+    if (contentId) {
+      baseContent = await this.prisma.content.findUnique({
+        where: { id: contentId, deletedAt: null },
+      });
+      if (!baseContent) throw new NotFoundException('Content not found');
+    }
+
+    // Simple recommendation: same subject, grade, similar tags
+    const where: any = {
+      deletedAt: null,
+      status: 'PUBLISHED',
+      ...(contentId ? { id: { not: contentId } } : {}),
+    };
+
+    if (baseContent) {
+      where.OR = [
+        { subjectId: baseContent.subjectId },
+        { grade: baseContent.grade },
+        { tags: { hasSome: baseContent.tags as string[] } },
+      ];
+    }
+
+    const recommendations = await this.prisma.content.findMany({
+      where,
+      take: limit,
+      orderBy: [{ rating: 'desc' }, { viewCount: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        contentType: true,
+        thumbnail: true,
+        duration: true,
+        grade: true,
+        difficultyLevel: true,
+        rating: true,
+        viewCount: true,
+        isFree: true,
+        price: true,
+      },
+    });
+
+    return recommendations;
+  }
 }

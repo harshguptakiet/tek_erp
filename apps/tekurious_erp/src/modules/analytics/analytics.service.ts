@@ -969,4 +969,369 @@ export class AnalyticsService {
 
     return { schoolId, academicYearId, sections: results };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Missing Analytics Features (FR-REPORT-002 to 005, FR-LEARN-003 to 004)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getAttendanceAnalytics(schoolId: string, startDate: Date, endDate: Date) {
+    const attendanceRecords = await this.prisma.attendance.findMany({
+      where: {
+        student: { schoolId },
+        date: { gte: startDate, lte: endDate },
+      },
+      include: {
+        student: { select: { id: true, userId: true } },
+        school: { select: { id: true, name: true } },
+      },
+    });
+
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const byStatus = attendanceRecords.reduce((acc, r) => {
+      acc[r.status] = (acc[r.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const byClass = attendanceRecords.reduce((acc, r) => {
+      const classId = r.section.classId;
+      if (!acc[classId]) acc[classId] = { present: 0, absent: 0, late: 0, excused: 0 };
+      acc[classId][r.status.toLowerCase()] = (acc[classId][r.status.toLowerCase()] || 0) + 1;
+      return acc;
+    }, {} as Record<string, any>);
+
+    return {
+      schoolId,
+      startDate,
+      endDate,
+      totalDays,
+      totalRecords: attendanceRecords.length,
+      byStatus,
+      byClass,
+      averageAttendanceRate: byStatus.PRESENT
+        ? ((byStatus.PRESENT / attendanceRecords.length) * 100).toFixed(2)
+        : 0,
+    };
+  }
+
+  async getSubjectWiseAnalytics(schoolId: string, grade: number, subjectId: string) {
+    const students = await this.prisma.studentProfile.findMany({
+      where: { 
+        schoolId,
+        enrollments: { some: { section: { class: { grade } } } },
+      },
+      select: { id: true, userId: true },
+    });
+
+    const studentIds = students.map(s => s.id);
+
+    // Get exam results for this subject
+    const examResults = await this.prisma.examAttempt.findMany({
+      where: {
+        studentId: { in: studentIds },
+        exam: { subjectId },
+      },
+      include: {
+        exam: { select: { title: true, totalMarks: true } },
+      },
+    });
+
+    const totalMarks = examResults.reduce((sum, r) => sum + (Number(r.obtainedMarks) || 0), 0);
+    const totalPossible = examResults.reduce((sum, r) => sum + (Number(r.exam.totalMarks) || 0), 0);
+    const avgPercentage = totalPossible > 0 ? (totalMarks / totalPossible) * 100 : 0;
+
+    const gradeDistribution = examResults.reduce((acc, r) => {
+      const grade = r.grade || 'N/A';
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      schoolId,
+      grade,
+      subjectId,
+      totalStudents: studentIds.length,
+      totalExams: examResults.length,
+      averagePercentage: avgPercentage.toFixed(2),
+      gradeDistribution,
+      passRate: examResults.filter(r => r.status === 'PASS').length / examResults.length * 100,
+    };
+  }
+
+  async getTeacherBenchmarks(schoolId: string) {
+    const teachers = await this.prisma.teacherProfile.findMany({
+      where: { schoolId },
+      select: { id: true, userId: true, subjectExpertise: true },
+    });
+
+    const teacherMetrics = await Promise.all(
+      teachers.map(async (teacher) => {
+        const [assignedSections, liveClassCount, avgRating] = await Promise.all([
+          this.prisma.sectionTeacher.count({ where: { teacherId: teacher.id } }),
+          this.prisma.liveClass.count({ where: { teacherId: teacher.id } }),
+          this.prisma.teacherAnalytics.aggregate({
+            where: { teacherId: teacher.id },
+            _avg: { rating: true },
+          }),
+        ]);
+
+        return {
+          teacherId: teacher.id,
+          userId: teacher.userId,
+          assignedSections,
+          liveClassCount,
+          avgRating: avgRating._avg.rating || 0,
+        };
+      })
+    );
+
+    const avgSections = teacherMetrics.reduce((sum, t) => sum + t.assignedSections, 0) / teachers.length;
+    const avgLiveClasses = teacherMetrics.reduce((sum, t) => sum + t.liveClassCount, 0) / teachers.length;
+    const avgRatingOverall = teacherMetrics.reduce((sum, t) => sum + t.avgRating, 0) / teachers.length;
+
+    return {
+      schoolId,
+      totalTeachers: teachers.length,
+      benchmarks: {
+        avgSectionsPerTeacher: avgSections.toFixed(2),
+        avgLiveClassesPerTeacher: avgLiveClasses.toFixed(2),
+        avgRating: avgRatingOverall.toFixed(2),
+      },
+      topPerformers: teacherMetrics
+        .sort((a, b) => b.avgRating - a.avgRating)
+        .slice(0, 10),
+    };
+  }
+
+  async getStudentProgressTracking(studentId: string, subjectId?: string) {
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { id: studentId },
+      select: { id: true, userId: true, schoolId: true },
+    });
+
+    if (!student) throw new NotFoundException('Student not found');
+
+    const where: any = { studentId };
+    if (subjectId) where.exam = { subjectId };
+
+    const [examResults, assignments, attendance] = await Promise.all([
+      this.prisma.examAttempt.findMany({
+        where,
+        include: { exam: { select: { title: true, subjectId: true, scheduledAt: true } } },
+        orderBy: { exam: { scheduledAt: 'asc' } },
+      }),
+      this.prisma.assignmentSubmission.findMany({
+        where: { studentId },
+        include: { assignment: { select: { title: true, subjectId: true, dueDate: true } } },
+        orderBy: { submittedAt: 'asc' },
+      }),
+      this.prisma.attendance.findMany({
+        where: { studentId },
+        orderBy: { date: 'desc' },
+        take: 30,
+      }),
+    ]);
+
+    const progressOverTime = examResults.map((r) => ({
+      date: r.exam.scheduledAt,
+      percentage: r.percentage,
+      subject: r.exam.subjectId,
+    }));
+
+    const assignmentProgress = assignments.map((a) => ({
+      date: a.submittedAt,
+      score: a.score,
+      status: a.status,
+    }));
+
+    const attendanceRate = attendance.length > 0
+      ? (attendance.filter(a => a.status === 'PRESENT').length / attendance.length) * 100
+      : 0;
+
+    return {
+      studentId,
+      progressOverTime,
+      assignmentProgress,
+      attendanceRate: attendanceRate.toFixed(2),
+      totalExams: examResults.length,
+      totalAssignments: assignments.length,
+    };
+  }
+
+  async getLearningGapAnalysis(schoolId: string, grade: number, subjectId: string) {
+    const students = await this.prisma.studentProfile.findMany({
+      where: { 
+        schoolId,
+        enrollments: { some: { section: { class: { grade } } } },
+      },
+      select: { id: true },
+    });
+
+    const studentIds = students.map(s => s.id);
+
+    const examResults = await this.prisma.examAttempt.findMany({
+      where: {
+        studentId: { in: studentIds },
+        exam: { subjectId },
+      },
+      include: {
+        exam: { select: { title: true, topics: true } },
+      },
+    });
+
+    // Identify struggling students (below 50%)
+    const strugglingStudents = examResults.filter(r => (r.percentage || 0) < 50);
+    
+    // Identify common weak topics
+    const topicPerformance: Record<string, { total: number; weak: number }> = {};
+    examResults.forEach((r) => {
+      const topics = (r.exam.topics as string[]) || [];
+      topics.forEach((topic) => {
+        if (!topicPerformance[topic]) topicPerformance[topic] = { total: 0, weak: 0 };
+        topicPerformance[topic].total++;
+        if ((r.percentage || 0) < 50) topicPerformance[topic].weak++;
+      });
+    });
+
+    const weakTopics = Object.entries(topicPerformance)
+      .map(([topic, data]) => ({
+        topic,
+        weakPercentage: (data.weak / data.total) * 100,
+        affectedStudents: data.weak,
+      }))
+      .filter(t => t.weakPercentage > 30)
+      .sort((a, b) => b.weakPercentage - a.weakPercentage);
+
+    return {
+      schoolId,
+      grade,
+      subjectId,
+      totalStudents: studentIds.length,
+      strugglingStudents: strugglingStudents.length,
+      weakTopics,
+      recommendations: weakTopics.slice(0, 5).map(t => `Focus on ${t.topic} - ${t.affectedStudents} students struggling`),
+    };
+  }
+
+  async getPredictiveAnalytics(studentId: string) {
+    const student = await this.prisma.studentProfile.findUnique({
+      where: { id: studentId },
+      select: { id: true, userId: true },
+    });
+
+    if (!student) throw new NotFoundException('Student not found');
+
+    const [examResults, attendance, assignments] = await Promise.all([
+      this.prisma.examAttempt.findMany({
+        where: { studentId },
+        orderBy: { exam: { scheduledAt: 'desc' } },
+        take: 10,
+        include: { exam: { select: { subjectId: true } } },
+      }),
+      this.prisma.attendance.findMany({
+        where: { studentId },
+        orderBy: { date: 'desc' },
+        take: 30,
+      }),
+      this.prisma.assignmentSubmission.findMany({
+        where: { studentId },
+        orderBy: { submittedAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    // Simple prediction based on trends
+    const recentExamAvg = examResults.length > 0
+      ? examResults.reduce((sum, r) => sum + (r.percentage || 0), 0) / examResults.length
+      : 0;
+
+    const attendanceRate = attendance.length > 0
+      ? (attendance.filter(a => a.status === 'PRESENT').length / attendance.length) * 100
+      : 0;
+
+    const assignmentCompletionRate = assignments.length > 0
+      ? (assignments.filter(a => a.status === 'GRADED' || a.status === 'SUBMITTED').length / assignments.length) * 100
+      : 0;
+
+    // Risk factors
+    const riskFactors = [];
+    if (recentExamAvg < 50) riskFactors.push('Low exam performance');
+    if (attendanceRate < 75) riskFactors.push('Poor attendance');
+    if (assignmentCompletionRate < 70) riskFactors.push('Low assignment completion');
+
+    const riskLevel = riskFactors.length >= 2 ? 'HIGH' : riskFactors.length === 1 ? 'MEDIUM' : 'LOW';
+
+    return {
+      studentId,
+      predictedPerformance: recentExamAvg.toFixed(2),
+      attendanceRate: attendanceRate.toFixed(2),
+      assignmentCompletionRate: assignmentCompletionRate.toFixed(2),
+      riskLevel,
+      riskFactors,
+      recommendations: riskLevel === 'HIGH'
+        ? ['Schedule intervention meeting', 'Assign peer tutor', 'Parent notification']
+        : riskLevel === 'MEDIUM'
+        ? ['Monitor progress weekly', 'Provide additional resources']
+        : ['Continue current support'],
+    };
+  }
+
+  async getComparativeBenchmarking(schoolId: string, compareWithSchoolIds?: string[]) {
+    const school = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true, name: true, organizationId: true },
+    });
+
+    if (!school) throw new NotFoundException('School not found');
+
+    // If no comparison schools provided, get schools from same organization
+    const comparisonSchools = compareWithSchoolIds && compareWithSchoolIds.length > 0
+      ? await this.prisma.school.findMany({ where: { id: { in: compareWithSchoolIds } } })
+      : await this.prisma.school.findMany({
+          where: { organizationId: school.organizationId, id: { not: schoolId } },
+          take: 5,
+        });
+
+    const allSchoolIds = [schoolId, ...comparisonSchools.map(s => s.id)];
+
+    const metrics = await Promise.all(
+      allSchoolIds.map(async (sid) => {
+        const [studentCount, avgAttendance, avgExamScore] = await Promise.all([
+          this.prisma.studentProfile.count({ where: { schoolId: sid } }),
+          this.prisma.attendance.findMany({
+            where: { student: { schoolId: sid } },
+            select: { status: true },
+          }).then((records) => {
+            const present = records.filter(r => r.status === 'PRESENT').length;
+            return records.length > 0 ? (present / records.length) * 100 : 0;
+          }),
+          this.prisma.examAttempt.aggregate({
+            where: { student: { schoolId: sid } },
+            _avg: { percentage: true },
+          }).then((result) => result._avg.percentage || 0),
+        ]);
+
+        return {
+          schoolId: sid,
+          studentCount,
+          avgAttendance: avgAttendance.toFixed(2),
+          avgExamScore: avgExamScore.toFixed(2),
+        };
+      })
+    );
+
+    const mySchoolMetrics = metrics.find(m => m.schoolId === schoolId);
+    const comparisons = metrics.filter(m => m.schoolId !== schoolId);
+
+    return {
+      schoolId,
+      myMetrics: mySchoolMetrics,
+      comparisons,
+      ranking: {
+        attendance: metrics.sort((a, b) => parseFloat(b.avgAttendance) - parseFloat(a.avgAttendance))
+          .findIndex(m => m.schoolId === schoolId) + 1,
+        examScore: metrics.sort((a, b) => parseFloat(b.avgExamScore) - parseFloat(a.avgExamScore))
+          .findIndex(m => m.schoolId === schoolId) + 1,
+      },
+    };
+  }
 }

@@ -121,6 +121,75 @@ export class ContentController {
     return this.contentService.getCreatorAnalytics(creatorId);
   }
 
+  @Post('curriculum')
+  @ApiOperation({ summary: 'Create curriculum (FR-CONTENT-021)' })
+  createCurriculum(@Request() req, @Body() dto: any) {
+    return this.contentService.createCurriculum(req.user.userId, dto);
+  }
+
+  @Get('curriculum')
+  @ApiOperation({ summary: 'List curricula (FR-CONTENT-022)' })
+  listCurricula(@Query('boardId') boardId?: string, @Query('isActive') isActive?: string) {
+    return this.contentService.listCurricula(
+      boardId,
+      isActive !== undefined ? isActive === 'true' : undefined,
+    );
+  }
+
+  @Get('curriculum/:curriculumId')
+  @ApiOperation({ summary: 'Get curriculum details (FR-CONTENT-023)' })
+  getCurriculum(@Param('curriculumId') curriculumId: string) {
+    return this.contentService.getCurriculum(curriculumId);
+  }
+
+  @Put('curriculum/:curriculumId')
+  @ApiOperation({ summary: 'Update curriculum (FR-CONTENT-024)' })
+  updateCurriculum(@Request() req, @Param('curriculumId') curriculumId: string, @Body() dto: any) {
+    return this.contentService.updateCurriculum(req.user.userId, curriculumId, dto);
+  }
+
+  @Delete('curriculum/:curriculumId')
+  @ApiOperation({ summary: 'Delete curriculum (FR-CONTENT-025)' })
+  deleteCurriculum(@Request() req, @Param('curriculumId') curriculumId: string) {
+    return this.contentService.deleteCurriculum(req.user.userId, curriculumId);
+  }
+
+  @Post('curriculum/:curriculumId/subjects')
+  @ApiOperation({ summary: 'Add subject to curriculum (FR-CONTENT-026)' })
+  addSubjectToCurriculum(@Request() req, @Param('curriculumId') curriculumId: string, @Body() dto: any) {
+    return this.contentService.addSubjectToCurriculum(req.user.userId, curriculumId, dto);
+  }
+
+  @Delete('curriculum/:curriculumId/subjects/:curriculumSubjectId')
+  @ApiOperation({ summary: 'Remove subject from curriculum (FR-CONTENT-027)' })
+  removeSubjectFromCurriculum(@Request() req, @Param('curriculumId') cId: string, @Param('curriculumSubjectId') csId: string) {
+    return this.contentService.removeSubjectFromCurriculum(req.user.userId, cId, csId);
+  }
+
+  @Get('curriculum/board/:boardId/grade/:grade')
+  @ApiOperation({ summary: 'Get curriculum by grade (FR-CONTENT-028)' })
+  getCurriculumByGrade(@Param('boardId') boardId: string, @Param('grade') grade: string) {
+    return this.contentService.getCurriculumByGrade(boardId, parseInt(grade));
+  }
+
+  @Post('bulk-upload')
+  @ApiOperation({ summary: 'Bulk upload content (FR-CONTENT-066)' })
+  bulkUploadContent(@Request() req, @Body() body: { contents: any[] }) {
+    return this.contentService.bulkUploadContent(req.user.userId, body.contents);
+  }
+
+  @Post('tags/popular')
+  @ApiOperation({ summary: 'Get popular tags (FR-CONTENT-067)' })
+  getPopularTags(@Body() body: { limit?: number }) {
+    return this.contentService.getPopularTags(body.limit);
+  }
+
+  @Post('recommendations')
+  @ApiOperation({ summary: 'Get content recommendations (FR-CONTENT-068)' })
+  getContentRecommendations(@Request() req, @Body() body: { contentId?: string; limit?: number }) {
+    return this.contentService.getContentRecommendations(req.user.userId, body.contentId, body.limit);
+  }
+
   // ── Dynamic /:id routes LAST ───────────────────────────────────────────────
 
   @Get(':id')
@@ -169,5 +238,17 @@ export class ContentController {
   @ApiOperation({ summary: 'Get content analytics (FR-CONTENT-012)' })
   getContentAnalytics(@Param('id') id: string) {
     return this.contentService.getContentAnalytics(id);
+  }
+
+  @Post(':id/tag')
+  @ApiOperation({ summary: 'Tag content (FR-CONTENT-069)' })
+  tagContent(@Request() req, @Param('id') id: string, @Body() body: { tags: string[] }) {
+    return this.contentService.tagContent(req.user.userId, id, body.tags);
+  }
+
+  @Post(':id/duplicate')
+  @ApiOperation({ summary: 'Duplicate content (FR-CONTENT-070)' })
+  duplicateContent(@Request() req, @Param('id') id: string) {
+    return this.contentService.duplicateContent(req.user.userId, id);
   }
 }

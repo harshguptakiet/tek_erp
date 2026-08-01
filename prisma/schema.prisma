@@ -88,6 +88,7 @@ model User {
 
   // Relations
   userSessions      UserSession[]
+  oAuthAccounts     OAuthAccount[]
   userRoles         UserRoleMapping[]
   userRolesNew      UserRole[]         @relation("UserRoles") // New RBAC system
   customPermissions CustomPermission[]
@@ -115,14 +116,18 @@ model UserSession {
   token        String   @unique
   refreshToken String?  @unique
   deviceInfo   String?  // Changed from Json to String for simplified device info
+  deviceName   String?  // Device name (e.g., "iPhone 12", "Chrome on Windows")
+  deviceType   String?  // Device type (e.g., "mobile", "desktop", "tablet")
   ipAddress    String?
   location     String?  // Geographic location from IP
   userAgent    String?
   isActive     Boolean  @default(true) // Track active sessions
+  revokedAt    DateTime? // When session was revoked
   expiresAt    DateTime
 
-  createdAt    DateTime @default(now())
-  lastActivity DateTime @default(now())
+  createdAt       DateTime @default(now())
+  lastActivity    DateTime @default(now())
+  lastActivityAt  DateTime @default(now()) // Alias for compatibility
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -130,7 +135,27 @@ model UserSession {
   @@index([token])
   @@index([expiresAt])
   @@index([userId, isActive])
+  @@index([revokedAt])
   @@map("user_sessions")
+}
+
+// OAuth Account Linking
+model OAuthAccount {
+  id             String   @id @default(uuid())
+  userId         String
+  provider       String   // GOOGLE, MICROSOFT, AADHAAR
+  providerUserId String   // User ID from the OAuth provider
+  providerData   Json?    // Additional data from provider (profile, tokens, etc.)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider])
+  @@map("oauth_accounts")
 }
 
 // Custom Role-Based Access Control (for B2B dynamic roles)
@@ -915,6 +940,9 @@ model Organization {
   dataResidency   String? // INDIA, EU, US
   complianceFlags Json? // GDPR, ISO, etc.
 
+  // Security Settings
+  securitySettings Json? // { ipWhitelist: [], ipWhitelistEnabled: false, blockedCountries: [], geoBlockingEnabled: false }
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
@@ -1447,6 +1475,7 @@ model TeacherProfile {
   designation   String?
   qualification String?
   experience    Int? // years
+  subjectExpertise String[] // Subject IDs or names the teacher specializes in
 
   joiningDate DateTime?
   leavingDate DateTime?
@@ -5373,8 +5402,9 @@ model AuditLog {
   action String // LOGIN, CREATE, UPDATE, DELETE, APPROVE, REJECT, etc.
 
   // Table-level tracking
-  tableName String // The database table/model name
-  recordId  String? // The ID of the affected record
+  tableName    String? // The database table/model name
+  resourceType String? // Alias for tableName (for API compatibility)
+  recordId     String? // The ID of the affected record
 
   // Column-level tracking (for UPDATE actions)
   columnName String? // Specific column changed
@@ -5382,7 +5412,7 @@ model AuditLog {
   newValue   String? // New value (JSON stringified)
 
   // Legacy field for backward compatibility
-  resource   String? // Deprecated: use tableName
+  resource   String? // Deprecated: use tableName or resourceType
   resourceId String? // Deprecated: use recordId
   changes    Json? // Deprecated: use columnName/oldValue/newValue
 

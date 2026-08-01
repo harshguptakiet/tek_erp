@@ -915,5 +915,281 @@ export class AuthService {
       accessToken: tokens.accessToken,
     };
   }
-}
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-AUTH-008: Enhanced OAuth Features
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async linkOAuthProvider(userId: string, provider: string, providerUserId: string, providerData: any) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Check if this OAuth account is already linked to another user
+    const existing = await this.prisma.oAuthAccount.findFirst({
+      where: { provider, providerUserId },
+    });
+
+    if (existing && existing.userId !== userId) {
+      throw new BadRequestException('This OAuth account is already linked to another user');
+    }
+
+    if (existing && existing.userId === userId) {
+      throw new BadRequestException('This OAuth account is already linked to your account');
+    }
+
+    const oauthAccount = await this.prisma.oAuthAccount.create({
+      data: {
+        userId,
+        provider,
+        providerUserId,
+        providerData,
+      },
+    });
+
+    this.eventBus.publish('auth.oauth_linked', {
+      userId,
+      provider,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`OAuth provider ${provider} linked for user: ${userId}`);
+    return { success: true, provider, message: 'OAuth provider linked successfully' };
+  }
+
+  async unlinkOAuthProvider(userId: string, provider: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Ensure user has a password before unlinking OAuth
+    if (!user.passwordHash) {
+      const oauthAccounts = await this.prisma.oAuthAccount.count({ where: { userId } });
+      if (oauthAccounts <= 1) {
+        throw new BadRequestException('Cannot unlink OAuth provider. Set a password first.');
+      }
+    }
+
+    const deleted = await this.prisma.oAuthAccount.deleteMany({
+      where: { userId, provider },
+    });
+
+    if (deleted.count === 0) {
+      throw new BadRequestException('OAuth provider not linked');
+    }
+
+    this.eventBus.publish('auth.oauth_unlinked', {
+      userId,
+      provider,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`OAuth provider ${provider} unlinked for user: ${userId}`);
+    return { success: true, message: 'OAuth provider unlinked successfully' };
+  }
+
+  async getLinkedOAuthProviders(userId: string) {
+    const oauthAccounts = await this.prisma.oAuthAccount.findMany({
+      where: { userId },
+      select: { provider: true, createdAt: true },
+    });
+
+    return oauthAccounts.map(acc => ({
+      provider: acc.provider,
+      linkedAt: acc.createdAt,
+    }));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-AUTH-015: Session Management
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getAllSessions(userId: string) {
+    const sessions = await this.prisma.userSession.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gte: new Date() } },
+      orderBy: { lastActivityAt: 'desc' },
+      select: {
+        id: true,
+        deviceName: true,
+        deviceType: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+        lastActivityAt: true,
+        expiresAt: true,
+      },
+    });
+
+    return sessions;
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const session = await this.prisma.userSession.findFirst({
+      where: { id: sessionId, userId },
+    });
+
+    if (!session) {
+      throw new BadRequestException('Session not found');
+    }
+
+    await this.prisma.userSession.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+
+    this.eventBus.publish('auth.session_revoked', {
+      userId,
+      sessionId,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Session ${sessionId} revoked for user: ${userId}`);
+    return { success: true, message: 'Session revoked successfully' };
+  }
+
+  async revokeAllSessions(userId: string, exceptSessionId?: string) {
+    const where: any = { userId, revokedAt: null };
+    if (exceptSessionId) {
+      where.id = { not: exceptSessionId };
+    }
+
+    const result = await this.prisma.userSession.updateMany({
+      where,
+      data: { revokedAt: new Date() },
+    });
+
+    this.eventBus.publish('auth.all_sessions_revoked', {
+      userId,
+      count: result.count,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`${result.count} sessions revoked for user: ${userId}`);
+    return { success: true, count: result.count, message: 'All sessions revoked successfully' };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-AUTH-033 to 040: Advanced Security Features
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async enableIPWhitelist(userId: string, organizationId: string, ipAddresses: string[]) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new BadRequestException('Organization not found');
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        securitySettings: {
+          ...(org.securitySettings as any || {}),
+          ipWhitelist: ipAddresses,
+          ipWhitelistEnabled: true,
+        },
+      },
+    });
+
+    this.eventBus.publish('security.ip_whitelist_enabled', {
+      organizationId,
+      ipCount: ipAddresses.length,
+      enabledBy: userId,
+    });
+
+    return { success: true, message: 'IP whitelist enabled', ipAddresses };
+  }
+
+  async disableIPWhitelist(userId: string, organizationId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new BadRequestException('Organization not found');
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        securitySettings: {
+          ...(org.securitySettings as any || {}),
+          ipWhitelistEnabled: false,
+        },
+      },
+    });
+
+    this.eventBus.publish('security.ip_whitelist_disabled', {
+      organizationId,
+      disabledBy: userId,
+    });
+
+    return { success: true, message: 'IP whitelist disabled' };
+  }
+
+  async checkIPWhitelist(organizationId: string, ipAddress: string): Promise<boolean> {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) return true; // No org, allow
+
+    const settings = org.securitySettings as any;
+    if (!settings?.ipWhitelistEnabled) return true; // Not enabled, allow
+
+    const whitelist = settings.ipWhitelist as string[] || [];
+    return whitelist.includes(ipAddress);
+  }
+
+  async enableGeoBlocking(userId: string, organizationId: string, blockedCountries: string[]) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new BadRequestException('Organization not found');
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        securitySettings: {
+          ...(org.securitySettings as any || {}),
+          blockedCountries,
+          geoBlockingEnabled: true,
+        },
+      },
+    });
+
+    this.eventBus.publish('security.geo_blocking_enabled', {
+      organizationId,
+      countryCount: blockedCountries.length,
+      enabledBy: userId,
+    });
+
+    return { success: true, message: 'Geo-blocking enabled', blockedCountries };
+  }
+
+  async disableGeoBlocking(userId: string, organizationId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) throw new BadRequestException('Organization not found');
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        securitySettings: {
+          ...(org.securitySettings as any || {}),
+          geoBlockingEnabled: false,
+        },
+      },
+    });
+
+    this.eventBus.publish('security.geo_blocking_disabled', {
+      organizationId,
+      disabledBy: userId,
+    });
+
+    return { success: true, message: 'Geo-blocking disabled' };
+  }
+
+  async logSecurityEvent(userId: string, eventType: string, metadata: any) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: `SECURITY_${eventType.toUpperCase()}`,
+        resourceType: 'USER',
+        resourceId: userId,
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent,
+        metadata,
+      },
+    });
+
+    this.eventBus.publish('security.event_logged', {
+      userId,
+      eventType,
+      timestamp: new Date(),
+    });
+  }
+}

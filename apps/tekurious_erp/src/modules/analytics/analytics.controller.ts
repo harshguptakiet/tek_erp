@@ -208,3 +208,72 @@ export class AnalyticsController {
     return this.service.getSectionBenchmarks(schoolId, academicYearId);
   }
 }
+
+
+  // ── Advanced Analytics Features ───────────────────────────────────────────
+
+  @Get('schools/:schoolId/attendance-analytics')
+  @ApiOperation({ summary: 'Get attendance analytics (FR-REPORT-002)' })
+  getAttendanceAnalytics(
+    @Param('schoolId') schoolId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    return this.service.getAttendanceAnalytics(
+      schoolId,
+      new Date(startDate),
+      new Date(endDate),
+    );
+  }
+
+  @Get('schools/:schoolId/subject-analytics')
+  @ApiOperation({ summary: 'Get subject-wise analytics (FR-LEARN-005)' })
+  getSubjectWiseAnalytics(
+    @Param('schoolId') schoolId: string,
+    @Query('grade') grade: string,
+    @Query('subjectId') subjectId: string,
+  ) {
+    return this.service.getSubjectWiseAnalytics(schoolId, parseInt(grade), subjectId);
+  }
+
+  @Get('schools/:schoolId/teacher-benchmarks')
+  @ApiOperation({ summary: 'Get teacher benchmarks (FR-TEACH-ANALYTICS-007)' })
+  getTeacherBenchmarks(@Param('schoolId') schoolId: string) {
+    return this.service.getTeacherBenchmarks(schoolId);
+  }
+
+  @Get('students/:studentId/progress-tracking')
+  @ApiOperation({ summary: 'Get student progress tracking (FR-STU-ANALYTICS-004)' })
+  getStudentProgressTracking(
+    @Param('studentId') studentId: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    return this.service.getStudentProgressTracking(studentId, subjectId);
+  }
+
+  @Get('schools/:schoolId/learning-gap-analysis')
+  @ApiOperation({ summary: 'Get learning gap analysis (FR-LEARN-003)' })
+  getLearningGapAnalysis(
+    @Param('schoolId') schoolId: string,
+    @Query('grade') grade: string,
+    @Query('subjectId') subjectId: string,
+  ) {
+    return this.service.getLearningGapAnalysis(schoolId, parseInt(grade), subjectId);
+  }
+
+  @Get('students/:studentId/predictive-analytics')
+  @ApiOperation({ summary: 'Get predictive analytics for student (FR-STU-ANALYTICS-010)' })
+  getPredictiveAnalytics(@Param('studentId') studentId: string) {
+    return this.service.getPredictiveAnalytics(studentId);
+  }
+
+  @Get('schools/:schoolId/comparative-benchmarking')
+  @ApiOperation({ summary: 'Get comparative benchmarking (FR-TEACH-ANALYTICS-008)' })
+  getComparativeBenchmarking(
+    @Param('schoolId') schoolId: string,
+    @Query('compareWith') compareWith?: string, // comma-separated school IDs
+  ) {
+    const compareWithSchoolIds = compareWith ? compareWith.split(',') : undefined;
+    return this.service.getComparativeBenchmarking(schoolId, compareWithSchoolIds);
+  }
+}

@@ -274,4 +274,176 @@ export class AuthController {
     this.logger.log(`POST /auth/account-recovery/complete - Recovery ID: ${body.recoveryId}`);
     return this.authService.completeAccountRecovery(body.recoveryId, body.newPassword);
   }
+
+  // ==================== FR-AUTH-029 & 030: OAUTH ACCOUNT LINKING ====================
+
+  /**
+   * Link OAuth provider to existing account
+   * POST /api/v1/auth/oauth/link
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('oauth/link')
+  @HttpCode(HttpStatus.OK)
+  async linkOAuthProvider(
+    @CurrentUser('id') userId: string,
+    @Body() body: { provider: string; providerUserId: string; providerData: any },
+  ): Promise<{ success: boolean; provider: string; message: string }> {
+    this.logger.log(`POST /auth/oauth/link - User: ${userId}, Provider: ${body.provider}`);
+    return this.authService.linkOAuthProvider(userId, body.provider, body.providerUserId, body.providerData);
+  }
+
+  /**
+   * Unlink OAuth provider from account
+   * DELETE /api/v1/auth/oauth/unlink/:provider
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('oauth/unlink/:provider')
+  @HttpCode(HttpStatus.OK)
+  async unlinkOAuthProvider(
+    @CurrentUser('id') userId: string,
+    @Param('provider') provider: string,
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`DELETE /auth/oauth/unlink/${provider} - User: ${userId}`);
+    return this.authService.unlinkOAuthProvider(userId, provider);
+  }
+
+  /**
+   * Get linked OAuth providers
+   * GET /api/v1/auth/oauth/linked
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('oauth/linked')
+  async getLinkedOAuthProviders(
+    @CurrentUser('id') userId: string,
+  ): Promise<Array<{ provider: string; linkedAt: Date }>> {
+    this.logger.log(`GET /auth/oauth/linked - User: ${userId}`);
+    return this.authService.getLinkedOAuthProviders(userId);
+  }
+
+  // ==================== FR-AUTH-015: SESSION MANAGEMENT ====================
+
+  /**
+   * Get all active sessions
+   * GET /api/v1/auth/sessions
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  async getAllSessions(@CurrentUser('id') userId: string) {
+    this.logger.log(`GET /auth/sessions - User: ${userId}`);
+    return this.authService.getAllSessions(userId);
+  }
+
+  /**
+   * Revoke a specific session
+   * DELETE /api/v1/auth/sessions/:sessionId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('sessionId') sessionId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`DELETE /auth/sessions/${sessionId} - User: ${userId}`);
+    return this.authService.revokeSession(userId, sessionId);
+  }
+
+  /**
+   * Revoke all sessions except current
+   * POST /api/v1/auth/sessions/revoke-all
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('sessions/revoke-all')
+  @HttpCode(HttpStatus.OK)
+  async revokeAllSessions(
+    @CurrentUser('id') userId: string,
+    @Body() body: { exceptSessionId?: string },
+  ): Promise<{ success: boolean; count: number; message: string }> {
+    this.logger.log(`POST /auth/sessions/revoke-all - User: ${userId}`);
+    return this.authService.revokeAllSessions(userId, body.exceptSessionId);
+  }
+
+  // ==================== FR-AUTH-033 to 040: ADVANCED SECURITY ====================
+
+  /**
+   * Enable IP whitelist for organization
+   * POST /api/v1/auth/security/ip-whitelist/enable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security/ip-whitelist/enable')
+  @HttpCode(HttpStatus.OK)
+  async enableIPWhitelist(
+    @CurrentUser('id') userId: string,
+    @Body() body: { organizationId: string; ipAddresses: string[] },
+  ): Promise<{ success: boolean; message: string; ipAddresses: string[] }> {
+    this.logger.log(`POST /auth/security/ip-whitelist/enable - User: ${userId}`);
+    return this.authService.enableIPWhitelist(userId, body.organizationId, body.ipAddresses);
+  }
+
+  /**
+   * Disable IP whitelist for organization
+   * POST /api/v1/auth/security/ip-whitelist/disable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security/ip-whitelist/disable')
+  @HttpCode(HttpStatus.OK)
+  async disableIPWhitelist(
+    @CurrentUser('id') userId: string,
+    @Body() body: { organizationId: string },
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`POST /auth/security/ip-whitelist/disable - User: ${userId}`);
+    return this.authService.disableIPWhitelist(userId, body.organizationId);
+  }
+
+  /**
+   * Enable geo-blocking for organization
+   * POST /api/v1/auth/security/geo-blocking/enable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security/geo-blocking/enable')
+  @HttpCode(HttpStatus.OK)
+  async enableGeoBlocking(
+    @CurrentUser('id') userId: string,
+    @Body() body: { organizationId: string; blockedCountries: string[] },
+  ): Promise<{ success: boolean; message: string; blockedCountries: string[] }> {
+    this.logger.log(`POST /auth/security/geo-blocking/enable - User: ${userId}`);
+    return this.authService.enableGeoBlocking(userId, body.organizationId, body.blockedCountries);
+  }
+
+  /**
+   * Disable geo-blocking for organization
+   * POST /api/v1/auth/security/geo-blocking/disable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security/geo-blocking/disable')
+  @HttpCode(HttpStatus.OK)
+  async disableGeoBlocking(
+    @CurrentUser('id') userId: string,
+    @Body() body: { organizationId: string },
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`POST /auth/security/geo-blocking/disable - User: ${userId}`);
+    return this.authService.disableGeoBlocking(userId, body.organizationId);
+  }
+
+  /**
+   * Log security event
+   * POST /api/v1/auth/security/log-event
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('security/log-event')
+  @HttpCode(HttpStatus.OK)
+  async logSecurityEvent(
+    @CurrentUser('id') userId: string,
+    @Body() body: { eventType: string; metadata: any },
+    @Req() req: Request,
+  ): Promise<{ success: boolean }> {
+    const metadata = {
+      ...body.metadata,
+      ipAddress: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    await this.authService.logSecurityEvent(userId, body.eventType, metadata);
+    return { success: true };
+  }
 }
+
