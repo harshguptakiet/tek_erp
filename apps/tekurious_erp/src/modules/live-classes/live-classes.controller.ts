@@ -88,4 +88,132 @@ export class LiveClassesController {
   analytics(@Param('id') id: string) {
     return this.service.getClassAnalytics(id);
   }
+
+  // ==================== LIVE INTERACTIVITY (FR-VIDEO-003-010) ====================
+
+  @Post(':id/chat')
+  @ApiOperation({ summary: 'Send chat message (FR-VIDEO-003)' })
+  sendChatMessage(@Request() req, @Param('id') id: string, @Body('message') message: string) {
+    return this.service.sendChatMessage(id, req.user.userId, message);
+  }
+
+  @Get(':id/chat')
+  @ApiOperation({ summary: 'Get chat history (FR-VIDEO-003)' })
+  getChatHistory(@Param('id') id: string) {
+    return this.service.getChatHistory(id);
+  }
+
+  @Post(':id/raise-hand')
+  @ApiOperation({ summary: 'Raise hand in live class (FR-VIDEO-004)' })
+  raiseHand(@Request() req, @Param('id') id: string) {
+    return this.service.raiseHand(id, req.user.userId);
+  }
+
+  @Post(':id/lower-hand')
+  @ApiOperation({ summary: 'Lower hand in live class (FR-VIDEO-004)' })
+  lowerHand(@Request() req, @Param('id') id: string) {
+    return this.service.lowerHand(id, req.user.userId);
+  }
+
+  @Get(':id/raised-hands')
+  @ApiOperation({ summary: 'Get list of raised hands (FR-VIDEO-004)' })
+  getRaisedHands(@Param('id') id: string) {
+    return this.service.getRaisedHands(id);
+  }
+
+  @Post(':id/screen-share/start')
+  @ApiOperation({ summary: 'Start screen share (FR-VIDEO-005)' })
+  startScreenShare(@Request() req, @Param('id') id: string, @Body('streamId') streamId?: string) {
+    return this.service.startScreenShare(id, req.user.userId, streamId);
+  }
+
+  @Post(':id/screen-share/stop')
+  @ApiOperation({ summary: 'Stop screen share (FR-VIDEO-005)' })
+  stopScreenShare(@Request() req, @Param('id') id: string) {
+    return this.service.stopScreenShare(id, req.user.userId);
+  }
+
+  @Post(':id/whiteboard')
+  @ApiOperation({ summary: 'Create whiteboard session (FR-VIDEO-006)' })
+  createWhiteboardSession(@Request() req, @Param('id') id: string) {
+    return this.service.createWhiteboardSession(id, req.user.userId);
+  }
+
+  @Get(':id/whiteboard')
+  @ApiOperation({ summary: 'Get whiteboard data (FR-VIDEO-006)' })
+  getWhiteboardData(@Param('id') id: string) {
+    return this.service.getWhiteboardData(id);
+  }
+
+  @Put(':id/whiteboard')
+  @ApiOperation({ summary: 'Update whiteboard canvas (FR-VIDEO-006)' })
+  updateWhiteboard(@Param('id') id: string, @Body('elements') elements: any[]) {
+    return this.service.updateWhiteboard(id, elements);
+  }
+
+  @Post(':id/breakout-rooms')
+  @ApiOperation({ summary: 'Create breakout room (FR-VIDEO-007)' })
+  createBreakoutRoom(
+    @Param('id') id: string,
+    @Body('name') name: string,
+    @Body('participantUserIds') participantUserIds: string[],
+  ) {
+    return this.service.createBreakoutRoom(id, name, participantUserIds);
+  }
+
+  @Get(':id/breakout-rooms')
+  @ApiOperation({ summary: 'List breakout rooms (FR-VIDEO-007)' })
+  listBreakoutRooms(@Param('id') id: string) {
+    return this.service.listBreakoutRooms(id);
+  }
+
+  @Post(':id/polls')
+  @ApiOperation({ summary: 'Create live poll/quiz (FR-VIDEO-008)' })
+  createPoll(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('question') question: string,
+    @Body('options') options: string[],
+  ) {
+    return this.service.createPoll(id, req.user.userId, question, options);
+  }
+
+  @Post('polls/:pollId/respond')
+  @ApiOperation({ summary: 'Submit response to live poll (FR-VIDEO-008)' })
+  submitPollResponse(
+    @Request() req,
+    @Param('pollId') pollId: string,
+    @Body('optionIndex') optionIndex: number,
+  ) {
+    return this.service.submitPollResponse(pollId, req.user.userId, optionIndex);
+  }
+
+  @Get('polls/:pollId/results')
+  @ApiOperation({ summary: 'Get live poll results (FR-VIDEO-008)' })
+  getPollResults(@Param('pollId') pollId: string) {
+    return this.service.getPollResults(pollId);
+  }
+
+  @Get(':id/auto-attendance')
+  @ApiOperation({ summary: 'Get auto-tracked class attendance (FR-VIDEO-009)' })
+  getAutoAttendance(@Param('id') id: string) {
+    return this.service.getAutoAttendance(id);
+  }
+
+  @Post(':id/resources')
+  @ApiOperation({ summary: 'Add class resource file (FR-VIDEO-010)' })
+  addClassResource(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('title') title: string,
+    @Body('fileUrl') fileUrl: string,
+  ) {
+    return this.service.addClassResource(id, req.user.userId, title, fileUrl);
+  }
+
+  @Get(':id/resources')
+  @ApiOperation({ summary: 'List class resources (FR-VIDEO-010)' })
+  listClassResources(@Param('id') id: string) {
+    return this.service.listClassResources(id);
+  }
 }

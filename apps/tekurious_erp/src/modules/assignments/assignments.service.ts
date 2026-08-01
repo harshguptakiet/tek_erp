@@ -302,4 +302,124 @@ export class AssignmentsService {
       })),
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-MANAGE-001–005: Assignment Management Dashboard
+  // ─────────────────────────────────────────────────────────────────────────
+  async getAssignmentDashboard(teacherId?: string, sectionId?: string) {
+    const where: any = {
+      deletedAt: null,
+      ...(teacherId ? { teacherId } : {}),
+      ...(sectionId ? { sectionId } : {}),
+    };
+
+    const [totalAssignments, published, draft, totalSubmissions, pendingGrading] = await Promise.all([
+      this.prisma.assignment.count({ where }),
+      this.prisma.assignment.count({ where: { ...where, isPublished: true } }),
+      this.prisma.assignment.count({ where: { ...where, isPublished: false } }),
+      this.prisma.assignmentSubmission.count({
+        where: { assignment: where },
+      }),
+      this.prisma.assignmentSubmission.count({
+        where: { assignment: where, status: 'SUBMITTED' },
+      }),
+    ]);
+
+    return {
+      totalAssignments,
+      published,
+      draft,
+      totalSubmissions,
+      pendingGrading,
+    };
+  }
+
+  async getTeacherAssignmentWorkload(teacherId: string) {
+    const assignments = await this.prisma.assignment.findMany({
+      where: { teacherId, deletedAt: null },
+      include: {
+        _count: { select: { submissions: true } },
+      },
+    });
+
+    const pendingGradingCount = await this.prisma.assignmentSubmission.count({
+      where: { assignment: { teacherId }, status: 'SUBMITTED' },
+    });
+
+    return {
+      teacherId,
+      activeAssignments: assignments.length,
+      pendingGrading: pendingGradingCount,
+      assignments: assignments.map((a) => ({
+        id: a.id,
+        title: a.title,
+        dueDate: a.dueDate,
+        submissionsCount: a._count.submissions,
+      })),
+    };
+  }
+
+  async getStudentAssignmentProgress(studentId: string) {
+    return this.getStudentAssignmentReport(studentId);
+  }
+
+  async getOverdueAssignments(studentId?: string, teacherId?: string) {
+    const now = new Date();
+
+    if (teacherId) {
+      return this.prisma.assignment.findMany({
+        where: {
+          teacherId,
+          dueDate: { lt: now },
+          isPublished: true,
+          deletedAt: null,
+        },
+        include: {
+          _count: { select: { submissions: true } },
+        },
+      });
+    }
+
+    const activeEnrollment = await this.prisma.studentEnrollment.findFirst({
+      where: { student: { userId: studentId }, status: 'ACTIVE' },
+    });
+
+    if (!activeEnrollment) return [];
+
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        sectionId: activeEnrollment.sectionId,
+        dueDate: { lt: now },
+        isPublished: true,
+        deletedAt: null,
+      },
+      include: {
+        submissions: { where: { studentId: activeEnrollment.studentId } },
+      },
+    });
+
+    return assignments.filter((a) => a.submissions.length === 0);
+  }
+
+  async getAssignmentCompletionTrends(sectionId?: string) {
+    const assignments = await this.prisma.assignment.findMany({
+      where: {
+        ...(sectionId ? { sectionId } : {}),
+        isPublished: true,
+        deletedAt: null,
+      },
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { submissions: true } },
+      },
+    });
+
+    return assignments.map((a) => ({
+      assignmentId: a.id,
+      title: a.title,
+      dueDate: a.dueDate,
+      submissionCount: a._count.submissions,
+    }));
+  }
 }

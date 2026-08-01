@@ -3322,4 +3322,286 @@ export class ErpService {
 
     return { message: 'Supplier deactivated successfully' };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FR-TIME-001–012: TIMETABLE MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // FR-TIME-001 & FR-TIME-002: Master Timetable & Time Slots
+  async createTimeSlot(createdBy: string, dto: {
+    schoolId: string; slotNumber: number; startTime: string; endTime: string;
+    slotName?: string; duration?: number; isBreak?: boolean; effectiveFrom: string;
+  }) {
+    const timeSlot = await this.prisma.timeSlot.create({
+      data: {
+        schoolId: dto.schoolId,
+        slotName: dto.slotName || `Period ${dto.slotNumber}`,
+        slotNumber: dto.slotNumber,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        duration: dto.duration || 45,
+        isBreak: dto.isBreak ?? false,
+        effectiveFrom: new Date(dto.effectiveFrom),
+      },
+    });
+    return timeSlot;
+  }
+
+  async listTimeSlots(schoolId: string) {
+    return this.prisma.timeSlot.findMany({
+      where: { schoolId },
+      orderBy: { slotNumber: 'asc' },
+    });
+  }
+
+  // FR-TIME-002 & 003: Create & Assign Timetable Entry
+  async createTimetableEntry(createdBy: string, dto: {
+    schoolId: string; sectionId: string; academicYearId: string;
+    dayOfWeek: string; timeSlotId: string; subjectId?: string;
+    teacherId?: string; roomId?: string; effectiveFrom: string;
+  }) {
+    const conflicts = await this.checkTimetableConflicts({
+      schoolId: dto.schoolId,
+      sectionId: dto.sectionId,
+      dayOfWeek: dto.dayOfWeek,
+      timeSlotId: dto.timeSlotId,
+      teacherId: dto.teacherId,
+      roomId: dto.roomId,
+      effectiveFrom: dto.effectiveFrom,
+    });
+
+    if (conflicts.hasConflict) {
+      throw new BadRequestException(`Timetable conflict detected: ${conflicts.reasons.join(', ')}`);
+    }
+
+    const entry = await this.prisma.timetableEntry.create({
+      data: {
+        schoolId: dto.schoolId,
+        sectionId: dto.sectionId,
+        academicYearId: dto.academicYearId,
+        dayOfWeek: dto.dayOfWeek as any,
+        timeSlotId: dto.timeSlotId,
+        subjectId: dto.subjectId,
+        teacherId: dto.teacherId,
+        roomId: dto.roomId,
+        effectiveFrom: new Date(dto.effectiveFrom),
+      },
+    });
+
+    return entry;
+  }
+
+  // FR-TIME-004: View Timetable by Section / Teacher / Room
+  async getSectionTimetable(sectionId: string) {
+    return this.prisma.timetableEntry.findMany({
+      where: { sectionId },
+      include: {
+        timeSlot: true,
+        room: true,
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { timeSlot: { slotNumber: 'asc' } }],
+    });
+  }
+
+  async getTeacherTimetable(teacherId: string) {
+    return this.prisma.timetableEntry.findMany({
+      where: { teacherId },
+      include: {
+        timeSlot: true,
+        section: { select: { id: true, sectionName: true, class: { select: { grade: true, stream: true } } } },
+        room: true,
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { timeSlot: { slotNumber: 'asc' } }],
+    });
+  }
+
+  async getRoomSchedule(roomId: string) {
+    return this.prisma.timetableEntry.findMany({
+      where: { roomId },
+      include: {
+        timeSlot: true,
+        section: { select: { id: true, sectionName: true } },
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { timeSlot: { slotNumber: 'asc' } }],
+    });
+  }
+
+  // FR-TIME-005 & 006: Update / Delete Period
+  async updateTimetableEntry(id: string, dto: any) {
+    const entry = await this.prisma.timetableEntry.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException('Timetable entry not found');
+
+    const updated = await this.prisma.timetableEntry.update({
+      where: { id },
+      data: {
+        ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+        ...(dto.teacherId ? { teacherId: dto.teacherId } : {}),
+        ...(dto.roomId ? { roomId: dto.roomId } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteTimetableEntry(id: string) {
+    const entry = await this.prisma.timetableEntry.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException('Timetable entry not found');
+
+    await this.prisma.timetableEntry.delete({ where: { id } });
+    return { success: true, message: 'Period removed from timetable' };
+  }
+
+  // FR-TIME-007: Conflict Detection
+  async checkTimetableConflicts(dto: {
+    schoolId: string; sectionId: string; dayOfWeek: string; timeSlotId: string;
+    teacherId?: string; roomId?: string; effectiveFrom: string; excludeEntryId?: string;
+  }) {
+    const reasons: string[] = [];
+
+    if (dto.teacherId) {
+      const teacherConflict = await this.prisma.timetableEntry.findFirst({
+        where: {
+          schoolId: dto.schoolId,
+          dayOfWeek: dto.dayOfWeek as any,
+          timeSlotId: dto.timeSlotId,
+          teacherId: dto.teacherId,
+          ...(dto.excludeEntryId ? { id: { not: dto.excludeEntryId } } : {}),
+        },
+      });
+      if (teacherConflict) {
+        reasons.push('Teacher is already assigned to another class in this time slot');
+      }
+    }
+
+    if (dto.roomId) {
+      const roomConflict = await this.prisma.timetableEntry.findFirst({
+        where: {
+          schoolId: dto.schoolId,
+          dayOfWeek: dto.dayOfWeek as any,
+          timeSlotId: dto.timeSlotId,
+          roomId: dto.roomId,
+          ...(dto.excludeEntryId ? { id: { not: dto.excludeEntryId } } : {}),
+        },
+      });
+      if (roomConflict) {
+        reasons.push('Room is already allocated to another class in this time slot');
+      }
+    }
+
+    return {
+      hasConflict: reasons.length > 0,
+      reasons,
+    };
+  }
+
+  // FR-TIME-008: Auto-generate Timetable
+  async autoGenerateTimetable(dto: {
+    schoolId: string; academicYearId: string; sectionIds: string[];
+  }) {
+    const slots = await this.prisma.timeSlot.findMany({
+      where: { schoolId: dto.schoolId, isBreak: false },
+      orderBy: { slotNumber: 'asc' },
+    });
+
+    if (slots.length === 0) {
+      throw new BadRequestException('No time slots configured for school');
+    }
+
+    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+    let generatedCount = 0;
+
+    for (const sectionId of dto.sectionIds) {
+      for (const day of days) {
+        for (const slot of slots) {
+          const exists = await this.prisma.timetableEntry.findFirst({
+            where: { sectionId, dayOfWeek: day as any, timeSlotId: slot.id },
+          });
+
+          if (!exists) {
+            await this.prisma.timetableEntry.create({
+              data: {
+                schoolId: dto.schoolId,
+                sectionId,
+                academicYearId: dto.academicYearId,
+                dayOfWeek: day as any,
+                timeSlotId: slot.id,
+                effectiveFrom: new Date(),
+              },
+            });
+            generatedCount++;
+          }
+        }
+      }
+    }
+
+    return { success: true, message: `Auto-generated ${generatedCount} timetable entries` };
+  }
+
+  // FR-TIME-009: Substitute Assignment
+  async assignTimetableSubstitute(entryId: string, substituteTeacherId: string, reason: string) {
+    const entry = await this.prisma.timetableEntry.findUnique({ where: { id: entryId } });
+    if (!entry) throw new NotFoundException('Timetable entry not found');
+
+    const updated = await this.prisma.timetableEntry.update({
+      where: { id: entryId },
+      data: {
+        originalTeacherId: entry.teacherId,
+        teacherId: substituteTeacherId,
+        isSubstitution: true,
+        substitutionReason: reason,
+      },
+    });
+
+    return updated;
+  }
+
+  // FR-TIME-010: Class Swap
+  async swapTimetablePeriods(entryId1: string, entryId2: string) {
+    const [e1, e2] = await Promise.all([
+      this.prisma.timetableEntry.findUnique({ where: { id: entryId1 } }),
+      this.prisma.timetableEntry.findUnique({ where: { id: entryId2 } }),
+    ]);
+
+    if (!e1 || !e2) throw new NotFoundException('One or both timetable entries not found');
+
+    await this.prisma.$transaction([
+      this.prisma.timetableEntry.update({
+        where: { id: entryId1 },
+        data: {
+          subjectId: e2.subjectId,
+          teacherId: e2.teacherId,
+          roomId: e2.roomId,
+        },
+      }),
+      this.prisma.timetableEntry.update({
+        where: { id: entryId2 },
+        data: {
+          subjectId: e1.subjectId,
+          teacherId: e1.teacherId,
+          roomId: e1.roomId,
+        },
+      }),
+    ]);
+
+    return { success: true, message: 'Periods swapped successfully' };
+  }
+
+  // FR-TIME-011: Teacher Workload
+  async getTimetableTeacherWorkload(teacherId: string) {
+    const entries = await this.prisma.timetableEntry.findMany({
+      where: { teacherId },
+      include: { timeSlot: true },
+    });
+
+    const totalPeriodsPerWeek = entries.length;
+    const daysActive = new Set(entries.map((e) => e.dayOfWeek)).size;
+
+    return {
+      teacherId,
+      totalPeriodsPerWeek,
+      daysActive,
+      averagePeriodsPerDay: daysActive > 0 ? (totalPeriodsPerWeek / daysActive).toFixed(1) : 0,
+    };
+  }
 }

@@ -209,4 +209,18 @@ export class SearchController {
   deleteSynonym(@Param('id') id: string) {
     return this.service.manageSynonyms({ action: 'delete', id });
   }
+
+  // ==================== EXTENDED SEARCH (FR-SEARCH-006, 008) ====================
+
+  @Post('federated')
+  @ApiOperation({ summary: 'Federated search across data sources (FR-SEARCH-006)' })
+  federatedSearch(@Request() req, @Body('query') query: string, @Body('sources') sources: string[]) {
+    return this.service.federatedSearch(req.user.userId, query, sources || []);
+  }
+
+  @Post('semantic')
+  @ApiOperation({ summary: 'Semantic vector search (FR-SEARCH-008)' })
+  semanticSearch(@Request() req, @Body('query') query: string, @Body('threshold') threshold?: number) {
+    return this.service.semanticSearch(req.user.userId, query, threshold);
+  }
 }

@@ -2957,6 +2957,9 @@ model LiveClassParticipant {
   isMuted    Boolean @default(false)
   isVideoOff Boolean @default(false)
 
+  handRaised   Boolean   @default(false)
+  handRaisedAt DateTime?
+
   isRemoved Boolean @default(false)
 
   liveClass LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
@@ -2984,6 +2987,94 @@ model ClassRecording {
 
   @@index([liveClassId])
   @@map("class_recordings")
+}
+
+model LiveClassChatMessage {
+  id          String   @id @default(uuid())
+  liveClassId String
+  senderId    String
+  recipientId String? // null = public message, non-null = private message
+
+  message     String   @db.Text
+  messageType String   @default("TEXT") // TEXT, EMOJI, FILE, SYSTEM
+
+  sentAt    DateTime @default(now())
+  isDeleted Boolean  @default(false)
+
+  @@index([liveClassId])
+  @@index([senderId])
+  @@index([liveClassId, sentAt])
+  @@map("live_class_chat_messages")
+}
+
+model LiveClassWhiteboard {
+  id          String @id @default(uuid())
+  liveClassId String
+  createdBy   String
+
+  title      String
+  canvasData Json   @default("{}")
+
+  allowedEditors String[] @default([]) // User IDs who can edit
+
+  isActive     Boolean   @default(true)
+  lastModified DateTime? @updatedAt
+
+  createdAt DateTime @default(now())
+
+  @@index([liveClassId])
+  @@map("live_class_whiteboards")
+}
+
+model LiveClassPoll {
+  id          String @id @default(uuid())
+  liveClassId String
+  createdBy   String
+
+  question      String
+  options       String[] // Array of option strings
+  allowMultiple Boolean  @default(false)
+
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  responses LiveClassPollResponse[]
+
+  @@index([liveClassId])
+  @@index([isActive])
+  @@map("live_class_polls")
+}
+
+model LiveClassPollResponse {
+  id     String @id @default(uuid())
+  pollId String
+  userId String
+
+  selectedOptions Int[] // Array of option indices
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  poll LiveClassPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@map("live_class_poll_responses")
+}
+
+model LiveClassReaction {
+  id           String @id @default(uuid())
+  liveClassId  String
+  userId       String
+  reactionType String // LIKE, LOVE, CLAP, THINK, CONFUSED, THUMBS_UP, THUMBS_DOWN
+
+  createdAt DateTime @default(now())
+
+  @@index([liveClassId])
+  @@index([userId])
+  @@map("live_class_reactions")
 }
 
 // ============================================================================

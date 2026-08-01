@@ -131,4 +131,65 @@ export class LicensesController {
   revoke(@Request() req, @Param('id') id: string, @Body() body: { userId: string }) {
     return this.service.revokeLicense(req.user.userId, id, body.userId);
   }
+
+  // ==================== INVOICING & BILLING (FR-BILLING-001-008) ====================
+
+  @Post(':id/invoices/generate')
+  @ApiOperation({ summary: 'Generate subscription invoice (FR-BILLING-003)' })
+  generateInvoice(@Param('id') id: string) {
+    return this.service.generateInvoice(id);
+  }
+
+  @Get('invoices/list')
+  @ApiOperation({ summary: 'List invoices (FR-BILLING-004)' })
+  listInvoices(
+    @Query('organizationId') organizationId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.service.listInvoices(organizationId, userId);
+  }
+
+  @Get('invoices/:invoiceId')
+  @ApiOperation({ summary: 'Get invoice details (FR-BILLING-005)' })
+  getInvoice(@Param('invoiceId') invoiceId: string) {
+    return this.service.getInvoice(invoiceId);
+  }
+
+  @Post('invoices/:invoiceId/send')
+  @ApiOperation({ summary: 'Send invoice email (FR-BILLING-006)' })
+  sendInvoiceEmail(@Param('invoiceId') invoiceId: string) {
+    return this.service.sendInvoiceEmail(invoiceId);
+  }
+
+  @Get(':id/payments')
+  @ApiOperation({ summary: 'Get subscription payment history (FR-BILLING-007)' })
+  getPaymentHistory(@Param('id') id: string) {
+    return this.service.getPaymentHistory(id);
+  }
+
+  // ==================== EXTENDED SUBSCRIPTION FEATURES (FR-SUB-004–007) ====================
+
+  @Post('group-plans')
+  @ApiOperation({ summary: 'Create group/family plan (FR-SUB-004)' })
+  createGroupPlan(@Request() req, @Body() dto: any) {
+    return this.service.createGroupPlan(req.user.userId, dto);
+  }
+
+  @Post('trials/start')
+  @ApiOperation({ summary: 'Start trial period (FR-SUB-005)' })
+  startTrial(@Request() req, @Body('planId') planId: string, @Body('durationDays') durationDays?: number) {
+    return this.service.startTrial(req.user.userId, planId, durationDays);
+  }
+
+  @Post('promo-codes/apply')
+  @ApiOperation({ summary: 'Apply promo/discount code (FR-SUB-006)' })
+  applyPromoCode(@Request() req, @Body('promoCode') promoCode: string) {
+    return this.service.applyPromoCode(req.user.userId, promoCode);
+  }
+
+  @Get('plans/compare')
+  @ApiOperation({ summary: 'Compare subscription plans (FR-SUB-007)' })
+  compareSubscriptionPlans() {
+    return this.service.compareSubscriptionPlans();
+  }
 }

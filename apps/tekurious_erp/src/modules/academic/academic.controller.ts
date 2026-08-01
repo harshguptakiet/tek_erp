@@ -468,7 +468,6 @@ export class AcademicController {
     return this.academicService.updateGrievanceStatus(req.user.userId, id, dto);
   }
 
-  // FR-ACAD-050: Academic Audit Reports
   @Get('schools/:schoolId/audit-report')
   @ApiOperation({ summary: 'Get academic audit report (FR-ACAD-050)' })
   getAuditReport(
@@ -488,5 +487,73 @@ export class AcademicController {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 50,
     });
+  }
+
+  // ==================== EXTENDED ACADEMIC FEATURES (FR-ACAD-012, 013, 017, 018, 024, 025) ====================
+
+  @Post('schools/:schoolId/grading-system')
+  @ApiOperation({ summary: 'Configure grading system (FR-ACAD-012)' })
+  configureGradingSystem(@Param('schoolId') schoolId: string, @Body() dto: any) {
+    return this.academicService.configureGradingSystem(schoolId, dto);
+  }
+
+  @Get('schools/:schoolId/grading-system')
+  @ApiOperation({ summary: 'Get grading system (FR-ACAD-012)' })
+  getGradingSystem(@Param('schoolId') schoolId: string) {
+    return this.academicService.getGradingSystem(schoolId);
+  }
+
+  @Post('schools/:schoolId/report-card-templates')
+  @ApiOperation({ summary: 'Create report card template (FR-ACAD-013)' })
+  createReportCardTemplate(@Param('schoolId') schoolId: string, @Body() dto: any) {
+    return this.academicService.createReportCardTemplate(schoolId, dto);
+  }
+
+  @Post('students/:studentId/report-cards/generate')
+  @ApiOperation({ summary: 'Generate report card (FR-ACAD-013)' })
+  generateReportCard(@Param('studentId') studentId: string, @Body('academicYearId') academicYearId: string) {
+    return this.academicService.generateReportCard(studentId, academicYearId);
+  }
+
+  @Post('students/:studentId/leaves')
+  @ApiOperation({ summary: 'Apply student leave (FR-ACAD-017)' })
+  applyStudentLeave(@Param('studentId') studentId: string, @Body() dto: any) {
+    return this.academicService.applyStudentLeave(studentId, dto);
+  }
+
+  @Get('students/:studentId/leaves')
+  @ApiOperation({ summary: 'List student leaves (FR-ACAD-017)' })
+  listStudentLeaves(@Param('studentId') studentId: string) {
+    return this.academicService.listStudentLeaves(studentId);
+  }
+
+  @Post('teachers/:teacherId/leaves')
+  @ApiOperation({ summary: 'Apply teacher leave (FR-ACAD-018)' })
+  applyTeacherLeave(@Param('teacherId') teacherId: string, @Body() dto: any) {
+    return this.academicService.applyTeacherLeave(teacherId, dto);
+  }
+
+  @Get('teachers/:teacherId/leaves')
+  @ApiOperation({ summary: 'List teacher leaves (FR-ACAD-018)' })
+  listTeacherLeaves(@Param('teacherId') teacherId: string) {
+    return this.academicService.listTeacherLeaves(teacherId);
+  }
+
+  @Post('schools/:schoolId/sibling-discounts')
+  @ApiOperation({ summary: 'Configure sibling discounts (FR-ACAD-024)' })
+  configureSiblingDiscount(@Param('schoolId') schoolId: string, @Body('discountPercentage') discountPercentage: number) {
+    return this.academicService.configureSiblingDiscount(schoolId, discountPercentage);
+  }
+
+  @Post('schools/:schoolId/learning-paths')
+  @ApiOperation({ summary: 'Create learning path (FR-ACAD-025)' })
+  createLearningPath(@Param('schoolId') schoolId: string, @Body() dto: any) {
+    return this.academicService.createLearningPath(schoolId, dto);
+  }
+
+  @Post('students/:studentId/learning-paths/assign')
+  @ApiOperation({ summary: 'Assign learning path to student (FR-ACAD-025)' })
+  assignLearningPath(@Param('studentId') studentId: string, @Body('pathId') pathId: string) {
+    return this.academicService.assignLearningPath(studentId, pathId);
   }
 }

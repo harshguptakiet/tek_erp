@@ -2271,4 +2271,222 @@ export class UsersService {
       recommendationsGenerated: recommendations.length,
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-USER-033: Create Publisher Profile
+  // ─────────────────────────────────────────────────────────────────────────
+  async createPublisherProfile(userId: string, dto: any) {
+    const existing = await this.prisma.publisherProfile.findUnique({
+      where: { userId },
+    });
+    if (existing) throw new BadRequestException('Publisher profile already exists');
+
+    const profile = await this.prisma.publisherProfile.create({
+      data: {
+        userId,
+        companyName: dto.companyName,
+        registrationNumber: dto.registrationNumber,
+        taxId: dto.taxId,
+        website: dto.website,
+        description: dto.description,
+        termsAccepted: dto.termsAccepted ?? true,
+        termsAcceptedAt: new Date(),
+        bankDetails: dto.bankDetails || {},
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'PUBLISHER' },
+    });
+
+    this.eventBus.publish('user.publisher.created', { userId, profileId: profile.id });
+    return profile;
+  }
+
+  async getPublisherProfile(userId: string) {
+    const profile = await this.prisma.publisherProfile.findUnique({
+      where: { userId },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } },
+    });
+    if (!profile) throw new NotFoundException('Publisher profile not found');
+    return profile;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-USER-034: Create Creator Profile
+  // ─────────────────────────────────────────────────────────────────────────
+  async createCreatorProfile(userId: string, dto: any) {
+    const existing = await this.prisma.creatorProfile.findUnique({
+      where: { userId },
+    });
+    if (existing) throw new BadRequestException('Creator profile already exists');
+
+    const profile = await this.prisma.creatorProfile.create({
+      data: {
+        userId,
+        displayName: dto.displayName,
+        bio: dto.bio,
+        expertise: dto.expertise || [],
+        termsAccepted: dto.termsAccepted ?? true,
+        termsAcceptedAt: new Date(),
+        bankDetails: dto.bankDetails || {},
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'CREATOR' },
+    });
+
+    this.eventBus.publish('user.creator.created', { userId, profileId: profile.id });
+    return profile;
+  }
+
+  async getCreatorProfile(userId: string) {
+    const profile = await this.prisma.creatorProfile.findUnique({
+      where: { userId },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } },
+    });
+    if (!profile) throw new NotFoundException('Creator profile not found');
+    return profile;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-USER-035: Publisher/Creator Verification
+  // ─────────────────────────────────────────────────────────────────────────
+  async submitVerification(userId: string, type: 'PUBLISHER' | 'CREATOR', docs: string[]) {
+    const verification = await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'VERIFICATION_REQUEST',
+        resourceType: type,
+        recordId: userId,
+        changes: { status: 'PENDING', documents: docs },
+      },
+    });
+
+    this.eventBus.publish('user.verification.submitted', { userId, type, verificationId: verification.id });
+    return { success: true, verificationId: verification.id, message: 'Verification request submitted' };
+  }
+
+  async reviewVerification(adminId: string, verificationId: string, status: 'APPROVED' | 'REJECTED', remarks?: string) {
+    const request = await this.prisma.auditLog.findUnique({
+      where: { id: verificationId },
+    });
+
+    if (!request || request.action !== 'VERIFICATION_REQUEST') {
+      throw new NotFoundException('Verification request not found');
+    }
+
+    const currentChanges = request.changes as any;
+    
+    await this.prisma.auditLog.update({
+      where: { id: verificationId },
+      data: {
+        changes: {
+          ...currentChanges,
+          status,
+          remarks,
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+        },
+      },
+    });
+
+    if (status === 'APPROVED') {
+      if (request.resourceType === 'PUBLISHER') {
+        await this.prisma.publisherProfile.update({
+          where: { userId: request.userId! },
+          data: { isVerified: true, verifiedAt: new Date() },
+        });
+      } else if (request.resourceType === 'CREATOR') {
+        await this.prisma.creatorProfile.update({
+          where: { userId: request.userId! },
+          data: { isVerified: true, verifiedAt: new Date() },
+        });
+      }
+    }
+
+    this.eventBus.publish('user.verification.reviewed', {
+      userId: request.userId,
+      type: request.resourceType,
+      status,
+    });
+
+    return { success: true, message: `Verification request ${status.toLowerCase()}` };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-USER-038: Publisher/Creator Support System
+  // ─────────────────────────────────────────────────────────────────────────
+  async createSupportTicket(userId: string, dto: any) {
+    const ticket = await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'CREATOR_SUPPORT_TICKET',
+        resourceType: 'SUPPORT_TICKET',
+        changes: {
+          title: dto.title,
+          description: dto.description,
+          category: dto.category,
+          status: 'OPEN',
+          priority: dto.priority || 'MEDIUM',
+          responses: [],
+        },
+      },
+    });
+
+    this.eventBus.publish('support.ticket.created', { ticketId: ticket.id, userId });
+    return ticket;
+  }
+
+  async listSupportTickets(userId: string) {
+    const records = await this.prisma.auditLog.findMany({
+      where: {
+        action: 'CREATOR_SUPPORT_TICKET',
+        ...(userId ? { userId } : {}),
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    return records.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      createdAt: r.timestamp,
+      ...(r.changes as any),
+    }));
+  }
+
+  async respondToTicket(adminId: string, ticketId: string, responseText: string) {
+    const ticket = await this.prisma.auditLog.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket || ticket.action !== 'CREATOR_SUPPORT_TICKET') {
+      throw new NotFoundException('Support ticket not found');
+    }
+
+    const currentChanges = ticket.changes as any;
+    const responses = currentChanges.responses || [];
+    responses.push({
+      responderId: adminId,
+      responseText,
+      respondedAt: new Date(),
+    });
+
+    const updated = await this.prisma.auditLog.update({
+      where: { id: ticketId },
+      data: {
+        changes: {
+          ...currentChanges,
+          status: 'RESOLVED',
+          responses,
+        },
+      },
+    });
+
+    this.eventBus.publish('support.ticket.responded', { ticketId, responderId: adminId });
+    return updated;
+  }
 }

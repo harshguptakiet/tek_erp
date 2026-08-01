@@ -145,4 +145,24 @@ export class FeesController {
   applyWaiver(@Request() req, @Body() dto: any) {
     return this.service.applyFeeWaiver(req.user.userId, dto);
   }
+
+  // ==================== EXTENDED FEE FEATURES (FR-FEE-013, 015, 016) ====================
+
+  @Get('parents/:parentId/portal')
+  @ApiOperation({ summary: 'Get parent fee portal view (FR-FEE-013)' })
+  getParentFeePortal(@Param('parentId') parentId: string) {
+    return this.service.getParentFeePortal(parentId);
+  }
+
+  @Get('schools/:schoolId/forecast')
+  @ApiOperation({ summary: 'Forecast fee revenue (FR-FEE-015)' })
+  forecastFeeRevenue(@Param('schoolId') schoolId: string, @Query('academicYearId') academicYearId: string) {
+    return this.service.forecastFeeRevenue(schoolId, academicYearId);
+  }
+
+  @Post('records/:id/demand-letter')
+  @ApiOperation({ summary: 'Generate fee demand letter (FR-FEE-016)' })
+  generateFeeDemandLetter(@Param('id') id: string) {
+    return this.service.generateFeeDemandLetter(id);
+  }
 }

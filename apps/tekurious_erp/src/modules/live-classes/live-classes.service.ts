@@ -301,4 +301,270 @@ export class LiveClassesService {
       take: 20,
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-VIDEO-003–010: Live Interactivity & In-Class Features
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-VIDEO-003: Chat
+  async sendChatMessage(classId: string, userId: string, message: string) {
+    const chat = await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_CHAT',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { message, sentAt: new Date() },
+      },
+    });
+
+    this.eventBus.publish('live_class.chat_sent', { classId, userId });
+    return { id: chat.id, classId, userId, message, sentAt: chat.timestamp };
+  }
+
+  async getChatHistory(classId: string) {
+    const logs = await this.prisma.auditLog.findMany({
+      where: { action: 'LIVE_CLASS_CHAT', recordId: classId },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    return logs.map((l) => ({
+      id: l.id,
+      userId: l.userId,
+      message: (l.changes as any)?.message,
+      sentAt: l.timestamp,
+    }));
+  }
+
+  // FR-VIDEO-004: Raise Hand
+  async raiseHand(classId: string, userId: string) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_RAISE_HAND',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { status: 'RAISED' },
+      },
+    });
+    return { classId, userId, isHandRaised: true };
+  }
+
+  async lowerHand(classId: string, userId: string) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_LOWER_HAND',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { status: 'LOWERED' },
+      },
+    });
+    return { classId, userId, isHandRaised: false };
+  }
+
+  async getRaisedHands(classId: string) {
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        action: { in: ['LIVE_CLASS_RAISE_HAND', 'LIVE_CLASS_LOWER_HAND'] },
+        recordId: classId,
+      },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    const statusMap: Record<string, boolean> = {};
+    logs.forEach((l) => {
+      statusMap[l.userId!] = l.action === 'LIVE_CLASS_RAISE_HAND';
+    });
+
+    const raised = Object.entries(statusMap)
+      .filter(([, isRaised]) => isRaised)
+      .map(([uId]) => uId);
+
+    return { classId, raisedHandUserIds: raised };
+  }
+
+  // FR-VIDEO-005: Screen Sharing
+  async startScreenShare(classId: string, userId: string, streamId?: string) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_SCREEN_SHARE_START',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { streamId },
+      },
+    });
+    return { classId, userId, isSharing: true, streamId };
+  }
+
+  async stopScreenShare(classId: string, userId: string) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_SCREEN_SHARE_STOP',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+      },
+    });
+    return { classId, userId, isSharing: false };
+  }
+
+  // FR-VIDEO-006: Whiteboard
+  async createWhiteboardSession(classId: string, userId: string) {
+    const board = await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'LIVE_CLASS_WHITEBOARD',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { canvasData: {}, elements: [] },
+      },
+    });
+    return { whiteboardId: board.id, classId, canvasData: {}, elements: [] };
+  }
+
+  async getWhiteboardData(classId: string) {
+    const board = await this.prisma.auditLog.findFirst({
+      where: { action: 'LIVE_CLASS_WHITEBOARD', recordId: classId },
+      orderBy: { timestamp: 'desc' },
+    });
+    return board ? board.changes : { canvasData: {}, elements: [] };
+  }
+
+  async updateWhiteboard(classId: string, elements: any[]) {
+    const board = await this.prisma.auditLog.findFirst({
+      where: { action: 'LIVE_CLASS_WHITEBOARD', recordId: classId },
+    });
+
+    if (board) {
+      await this.prisma.auditLog.update({
+        where: { id: board.id },
+        data: { changes: { elements } },
+      });
+    }
+    return { classId, elements };
+  }
+
+  // FR-VIDEO-007: Breakout Rooms
+  async createBreakoutRoom(classId: string, name: string, participantUserIds: string[]) {
+    const room = await this.prisma.auditLog.create({
+      data: {
+        action: 'LIVE_CLASS_BREAKOUT_ROOM',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { name, participantUserIds, status: 'ACTIVE' },
+      },
+    });
+    return { roomId: room.id, name, participantUserIds, status: 'ACTIVE' };
+  }
+
+  async listBreakoutRooms(classId: string) {
+    const rooms = await this.prisma.auditLog.findMany({
+      where: { action: 'LIVE_CLASS_BREAKOUT_ROOM', recordId: classId },
+    });
+    return rooms.map((r) => ({ id: r.id, ...(r.changes as any) }));
+  }
+
+  // FR-VIDEO-008: Polls & Quizzes
+  async createPoll(classId: string, teacherId: string, question: string, options: string[]) {
+    const poll = await this.prisma.auditLog.create({
+      data: {
+        userId: teacherId,
+        action: 'LIVE_CLASS_POLL',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { question, options, responses: {} },
+      },
+    });
+    return { pollId: poll.id, question, options };
+  }
+
+  async submitPollResponse(pollId: string, userId: string, optionIndex: number) {
+    const poll = await this.prisma.auditLog.findUnique({ where: { id: pollId } });
+    if (!poll) throw new NotFoundException('Poll not found');
+
+    const changes = poll.changes as any;
+    const responses = changes.responses || {};
+    responses[userId] = optionIndex;
+
+    await this.prisma.auditLog.update({
+      where: { id: pollId },
+      data: { changes: { ...changes, responses } },
+    });
+
+    return { success: true, optionIndex };
+  }
+
+  async getPollResults(pollId: string) {
+    const poll = await this.prisma.auditLog.findUnique({ where: { id: pollId } });
+    if (!poll) throw new NotFoundException('Poll not found');
+
+    const changes = poll.changes as any;
+    const responses = changes.responses || {};
+    const options: string[] = changes.options || [];
+
+    const counts = options.map((opt, idx) => ({
+      option: opt,
+      count: Object.values(responses).filter((v) => v === idx).length,
+    }));
+
+    return {
+      pollId,
+      question: changes.question,
+      totalVotes: Object.keys(responses).length,
+      results: counts,
+    };
+  }
+
+  // FR-VIDEO-009: Auto Attendance
+  async getAutoAttendance(classId: string) {
+    const liveClass = await this.prisma.liveClass.findUnique({
+      where: { id: classId },
+      include: {
+        participants: true,
+      },
+    });
+    if (!liveClass) throw new NotFoundException('Live class not found');
+
+    const scheduledMins = liveClass.scheduledEnd
+      ? Math.floor((liveClass.scheduledEnd.getTime() - liveClass.scheduledStart.getTime()) / 60000)
+      : 60;
+
+    return liveClass.participants.map((p) => {
+      const minsAttended = Math.floor((p.duration || 0) / 60);
+      const percentage = scheduledMins > 0 ? (minsAttended / scheduledMins) * 100 : 0;
+
+      return {
+        userId: p.userId,
+        joinedAt: p.joinedAt,
+        leftAt: p.leftAt,
+        minutesAttended: minsAttended,
+        attendancePercentage: percentage.toFixed(1),
+        status: percentage >= 75 ? 'PRESENT' : percentage >= 25 ? 'PARTIAL' : 'ABSENT',
+      };
+    });
+  }
+
+  // FR-VIDEO-010: Class Resources
+  async addClassResource(classId: string, teacherId: string, title: string, fileUrl: string) {
+    const resource = await this.prisma.auditLog.create({
+      data: {
+        userId: teacherId,
+        action: 'LIVE_CLASS_RESOURCE',
+        resourceType: 'LIVE_CLASS',
+        recordId: classId,
+        changes: { title, fileUrl, uploadedAt: new Date() },
+      },
+    });
+    return { resourceId: resource.id, title, fileUrl };
+  }
+
+  async listClassResources(classId: string) {
+    const resources = await this.prisma.auditLog.findMany({
+      where: { action: 'LIVE_CLASS_RESOURCE', recordId: classId },
+      orderBy: { timestamp: 'desc' },
+    });
+    return resources.map((r) => ({ id: r.id, ...(r.changes as any) }));
+  }
 }

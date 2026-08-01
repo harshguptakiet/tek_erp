@@ -251,4 +251,153 @@ export class ContentController {
   duplicateContent(@Request() req, @Param('id') id: string) {
     return this.contentService.duplicateContent(req.user.userId, id);
   }
+
+  // ==================== CURRICULUM EXPANSION (FR-CONTENT-021-030) ====================
+
+  @Post('curriculum/:curriculumSubjectId/units')
+  @ApiOperation({ summary: 'Create curriculum unit' })
+  createCurriculumUnit(
+    @Param('curriculumSubjectId') curriculumSubjectId: string,
+    @Body() dto: { name: string; description?: string },
+  ) {
+    return this.contentService.createCurriculumUnit(curriculumSubjectId, dto.name, dto.description);
+  }
+
+  @Post('curriculum/:curriculumSubjectId/units/reorder')
+  @ApiOperation({ summary: 'Reorder curriculum units' })
+  reorderUnits(
+    @Param('curriculumSubjectId') curriculumSubjectId: string,
+    @Body('unitIds') unitIds: string[],
+  ) {
+    return this.contentService.reorderUnits(curriculumSubjectId, unitIds);
+  }
+
+  @Post('curriculum/units/:unitId/map/:contentId')
+  @ApiOperation({ summary: 'Map content to curriculum unit' })
+  mapContentToUnit(
+    @Param('unitId') unitId: string,
+    @Param('contentId') contentId: string,
+  ) {
+    return this.contentService.mapContentToUnit(unitId, contentId);
+  }
+
+  @Get('curriculum/:curriculumId/progress')
+  @ApiOperation({ summary: 'Get student curriculum progress' })
+  getCurriculumProgress(
+    @Request() req,
+    @Param('curriculumId') curriculumId: string,
+  ) {
+    return this.contentService.getCurriculumProgress(req.user.userId, curriculumId);
+  }
+
+  @Post('curriculum/:curriculumId/clone')
+  @ApiOperation({ summary: 'Clone curriculum' })
+  cloneCurriculum(
+    @Param('curriculumId') curriculumId: string,
+    @Body('targetName') targetName: string,
+  ) {
+    return this.contentService.cloneCurriculum(curriculumId, targetName);
+  }
+
+  // ==================== ADVANCED CONTENT MANAGEMENT (FR-CONTENT-066-080) ====================
+
+  @Post(':id/archive')
+  @ApiOperation({ summary: 'Archive content' })
+  archiveContent(@Request() req, @Param('id') id: string) {
+    return this.contentService.archiveContent(req.user.userId, id);
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Restore content' })
+  restoreContent(@Request() req, @Param('id') id: string) {
+    return this.contentService.restoreContent(req.user.userId, id);
+  }
+
+  @Post(':id/transfer-ownership')
+  @ApiOperation({ summary: 'Transfer content ownership' })
+  transferContentOwnership(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('targetUserId') targetUserId: string,
+  ) {
+    return this.contentService.transferContentOwnership(req.user.userId, id, targetUserId);
+  }
+
+  @Get(':id/access-log')
+  @ApiOperation({ summary: 'Get content access log' })
+  getContentAccessLog(@Param('id') id: string) {
+    return this.contentService.getContentAccessLog(id);
+  }
+
+  @Post(':id/access-rules')
+  @ApiOperation({ summary: 'Set content access rules' })
+  setContentAccessRules(@Param('id') id: string, @Body() rules: any) {
+    return this.contentService.setContentAccessRules(id, rules);
+  }
+
+  @Post(':id/schedule-publish')
+  @ApiOperation({ summary: 'Schedule content publishing' })
+  scheduleContentPublish(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('publishAt') publishAt: string,
+  ) {
+    return this.contentService.scheduleContentPublish(req.user.userId, id, publishAt);
+  }
+
+  @Get(':id/dependencies')
+  @ApiOperation({ summary: 'Get content dependencies' })
+  getContentDependencies(@Param('id') id: string) {
+    return this.contentService.getContentDependencies(id);
+  }
+
+  @Get(':id/validate')
+  @ApiOperation({ summary: 'Validate content structure' })
+  validateContentStructure(@Param('id') id: string) {
+    return this.contentService.validateContentStructure(id);
+  }
+
+  @Get(':id/export')
+  @ApiOperation({ summary: 'Export content metadata' })
+  getContentExport(@Param('id') id: string) {
+    return this.contentService.getContentImportExport(id);
+  }
+
+  // ==================== EXTENDED CONTENT FEATURES (FR-CONTENT-029–035) ====================
+
+  @Post(':id/outcomes')
+  @ApiOperation({ summary: 'Track learning outcomes (FR-CONTENT-029)' })
+  trackLearningOutcomes(@Param('id') id: string, @Body('outcomes') outcomes: string[]) {
+    return this.contentService.trackLearningOutcomes(id, outcomes);
+  }
+
+  @Get(':id/effectiveness')
+  @ApiOperation({ summary: 'Get content effectiveness report (FR-CONTENT-030)' })
+  getContentEffectiveness(@Param('id') id: string) {
+    return this.contentService.getContentEffectiveness(id);
+  }
+
+  @Post('subject-libraries')
+  @ApiOperation({ summary: 'Create subject-wise content library (FR-CONTENT-032)' })
+  createSubjectLibrary(@Body() dto: { schoolId: string; subjectId: string; contentIds: string[] }) {
+    return this.contentService.createSubjectLibrary(dto.schoolId, dto.subjectId, dto.contentIds);
+  }
+
+  @Post('featured-collections')
+  @ApiOperation({ summary: 'Create featured collection (FR-CONTENT-033)' })
+  createFeaturedCollection(@Body() dto: { schoolId: string; title: string; contentIds: string[] }) {
+    return this.contentService.createFeaturedCollection(dto.schoolId, dto);
+  }
+
+  @Post('bundles')
+  @ApiOperation({ summary: 'Create content bundle (FR-CONTENT-034)' })
+  bundleContent(@Body() dto: { title: string; contentIds: string[]; price?: number }) {
+    return this.contentService.bundleContent(dto.title, dto.contentIds, dto.price);
+  }
+
+  @Get('recommendations/personalized')
+  @ApiOperation({ summary: 'Get personalized content recommendations (FR-CONTENT-035)' })
+  getPersonalizedRecommendations(@Request() req) {
+    return this.contentService.getContentRecommendations(req.user.userId);
+  }
 }

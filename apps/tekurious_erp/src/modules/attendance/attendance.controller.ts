@@ -86,4 +86,116 @@ export class AttendanceController {
   ) {
     return this.service.getAbsentStudents(schoolId, date, threshold ? parseInt(threshold) : undefined);
   }
+
+  // ── Biometric & Device Integration ──────────────────────────────────────
+  @Post('devices')
+  @ApiOperation({ summary: 'Register biometric device (FR-ATT-011)' })
+  registerDevice(@Request() req, @Body() dto: any) {
+    return this.service.registerBiometricDevice(req.user.userId, dto);
+  }
+
+  @Get('devices')
+  @ApiOperation({ summary: 'List biometric devices (FR-ATT-012)' })
+  listDevices(
+    @Query('schoolId') schoolId: string,
+    @Query('isActive') isActive?: string,
+  ) {
+    return this.service.listBiometricDevices(schoolId, isActive === 'true');
+  }
+
+  @Get('devices/:deviceId')
+  @ApiOperation({ summary: 'Get device details' })
+  getDevice(@Param('deviceId') deviceId: string) {
+    return this.service.getDeviceDetails(deviceId);
+  }
+
+  @Post('devices/punch')
+  @ApiOperation({ summary: 'Process biometric punch (FR-ATT-013)' })
+  processPunch(@Body() dto: any) {
+    return this.service.processBiometricPunch(dto);
+  }
+
+  @Get('biometric-logs')
+  @ApiOperation({ summary: 'Get biometric logs (FR-ATT-014)' })
+  getBiometricLogs(
+    @Query('deviceId') deviceId?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('userType') userType?: string,
+    @Query('processed') processed?: string,
+  ) {
+    return this.service.getBiometricLogs({
+      deviceId,
+      schoolId,
+      userId,
+      startDate,
+      endDate,
+      userType,
+      processed: processed === 'true' ? true : processed === 'false' ? false : undefined,
+    });
+  }
+
+  @Post('devices/:deviceId/sync')
+  @ApiOperation({ summary: 'Sync biometric data (FR-ATT-015)' })
+  syncBiometricData(@Param('deviceId') deviceId: string, @Body() body: { punches: any[] }) {
+    return this.service.syncBiometricData(deviceId, body.punches);
+  }
+
+  @Put('devices/:deviceId/status')
+  @ApiOperation({ summary: 'Update device status' })
+  updateDeviceStatus(@Param('deviceId') deviceId: string, @Body() body: { isActive: boolean }) {
+    return this.service.updateDeviceStatus(deviceId, body.isActive);
+  }
+
+  // ==================== ADVANCED ATTENDANCE METHODS (FR-ATT-012-015) ====================
+
+  @Post('rfid/register')
+  @ApiOperation({ summary: 'Register RFID card (FR-ATT-012)' })
+  registerRfidCard(@Body() dto: { userId: string; rfidCardId: string }) {
+    return this.service.registerRfidCard(dto.userId, dto.rfidCardId);
+  }
+
+  @Post('rfid/swipe')
+  @ApiOperation({ summary: 'Process RFID card swipe (FR-ATT-012)' })
+  processRfidSwipe(@Body() dto: { rfidCardId: string; locationId?: string }) {
+    return this.service.processRfidSwipe(dto.rfidCardId, dto.locationId);
+  }
+
+  @Post('geofence/configure')
+  @ApiOperation({ summary: 'Configure school geofence boundary (FR-ATT-013)' })
+  configureGeofence(@Body() dto: { schoolId: string; centerLat: number; centerLng: number; radiusMeters: number }) {
+    return this.service.configureGeofence(dto.schoolId, dto.centerLat, dto.centerLng, dto.radiusMeters);
+  }
+
+  @Post('geofence/mark')
+  @ApiOperation({ summary: 'Mark geo-fenced attendance (FR-ATT-013)' })
+  markGeoAttendance(@Request() req, @Body() dto: { lat: number; lng: number; schoolId: string }) {
+    return this.service.markGeoAttendance(req.user.userId, dto.lat, dto.lng, dto.schoolId);
+  }
+
+  @Post('qr/generate')
+  @ApiOperation({ summary: 'Generate attendance QR code token (FR-ATT-014)' })
+  generateAttendanceQR(@Body() dto: { schoolId: string; sectionId?: string }) {
+    return this.service.generateAttendanceQR(dto.schoolId, dto.sectionId);
+  }
+
+  @Post('qr/mark')
+  @ApiOperation({ summary: 'Mark QR code attendance (FR-ATT-014)' })
+  markQRAttendance(@Request() req, @Body('qrToken') qrToken: string) {
+    return this.service.markQRAttendance(req.user.userId, qrToken);
+  }
+
+  @Post('face/enroll')
+  @ApiOperation({ summary: 'Enroll face template (FR-ATT-015)' })
+  enrollFace(@Request() req, @Body('faceEncoding') faceEncoding: string) {
+    return this.service.enrollFace(req.user.userId, faceEncoding);
+  }
+
+  @Post('face/mark')
+  @ApiOperation({ summary: 'Mark face recognition attendance (FR-ATT-015)' })
+  markFaceAttendance(@Body() dto: { faceEncoding: string; deviceId: string }) {
+    return this.service.markFaceAttendance(dto.faceEncoding, dto.deviceId);
+  }
 }

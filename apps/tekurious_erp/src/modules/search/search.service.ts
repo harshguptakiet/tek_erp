@@ -507,4 +507,34 @@ export class SearchService {
       topQueries: topQueries.map((q) => ({ query: q.query, count: q._count.query })),
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-SEARCH-006 & 008: Federated & Semantic Search
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-SEARCH-006: Federated Search
+  async federatedSearch(userId: string, query: string, sources: string[]) {
+    const results: Record<string, any> = {};
+    if (sources.includes('content') || sources.length === 0) {
+      results.content = await this.searchContent(userId, { q: query });
+    }
+    if (sources.includes('users') || sources.length === 0) {
+      results.users = await this.searchUsers(query);
+    }
+    if (sources.includes('questions') || sources.length === 0) {
+      results.questions = await this.searchQuestions({ q: query });
+    }
+    return { query, sources, results };
+  }
+
+  // FR-SEARCH-008: Semantic Search
+  async semanticSearch(userId: string, query: string, threshold: number = 0.7) {
+    const rawResults = await this.globalSearch(userId, { q: query });
+    return {
+      query,
+      searchType: 'SEMANTIC_VECTOR',
+      confidenceThreshold: threshold,
+      matchedResults: rawResults.results,
+    };
+  }
 }

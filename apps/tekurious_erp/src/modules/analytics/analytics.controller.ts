@@ -207,8 +207,6 @@ export class AnalyticsController {
   ) {
     return this.service.getSectionBenchmarks(schoolId, academicYearId);
   }
-}
-
 
   // ── Advanced Analytics Features ───────────────────────────────────────────
 

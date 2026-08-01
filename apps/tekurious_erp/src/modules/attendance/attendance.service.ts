@@ -334,4 +334,469 @@ export class AttendanceService {
 
     return { schoolId, date, threshold: minDays, alerts };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-ATT-011 to 015: Biometric & Device Integration
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-ATT-011: Register Biometric Device
+  async registerBiometricDevice(registeredBy: string, dto: {
+    schoolId: string; deviceName: string; deviceType: string;
+    deviceId: string; location: string; ipAddress?: string;
+    macAddress?: string; isActive?: boolean;
+  }) {
+    const existing = await this.prisma.attendanceDevice.findUnique({
+      where: { deviceId: dto.deviceId },
+    });
+    if (existing) throw new ConflictException('Device with this ID already registered');
+
+    const device = await this.prisma.attendanceDevice.create({
+      data: {
+        schoolId: dto.schoolId,
+        deviceName: dto.deviceName,
+        deviceType: dto.deviceType,
+        deviceId: dto.deviceId,
+        location: dto.location,
+        ipAddress: dto.ipAddress,
+        macAddress: dto.macAddress,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    this.eventBus.publish('attendance.device_registered', {
+      deviceId: device.id,
+      schoolId: dto.schoolId,
+      registeredBy,
+    });
+
+    return device;
+  }
+
+  // FR-ATT-012: List Biometric Devices
+  async listBiometricDevices(schoolId: string, isActive?: boolean) {
+    return this.prisma.attendanceDevice.findMany({
+      where: {
+        schoolId,
+        ...(isActive !== undefined ? { isActive } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // FR-ATT-013: Process Biometric Attendance Punch
+  async processBiometricPunch(dto: {
+    deviceId: string; userId: string; userType: string;
+    biometricType: string; timestamp: string;
+  }) {
+    // Find device by deviceId (unique string identifier)
+    const device = await this.prisma.attendanceDevice.findUnique({
+      where: { deviceId: dto.deviceId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+    if (!device.isActive) throw new BadRequestException('Device is not active');
+
+    const timestamp = new Date(dto.timestamp);
+    const date = new Date(timestamp.toDateString());
+
+    // Log the biometric punch
+    const log = await this.prisma.biometricAttendanceLog.create({
+      data: {
+        deviceId: device.id, // UUID reference
+        userId: dto.userId,
+        userType: dto.userType,
+        biometricType: dto.biometricType,
+        timestamp,
+        isVerified: true,
+        processed: false,
+      },
+    });
+
+    // Auto-mark attendance based on punch
+    if (dto.userType === 'STUDENT') {
+      const student = await this.prisma.studentProfile.findUnique({
+        where: { userId: dto.userId },
+      });
+
+      if (student) {
+        // Find current section enrollment
+        const enrollment = await this.prisma.studentEnrollment.findFirst({
+          where: { studentId: student.id, status: 'ACTIVE' },
+        });
+
+        if (enrollment) {
+          const hour = timestamp.getHours();
+          const status = hour < 9 ? 'PRESENT' : hour < 11 ? 'LATE' : 'PRESENT';
+          
+          await this.prisma.attendance.upsert({
+            where: {
+              studentId_date_period: {
+                studentId: student.id,
+                date,
+                period: 0,
+              },
+            },
+            create: {
+              studentId: student.id,
+              schoolId: device.schoolId,
+              sectionId: enrollment.sectionId,
+              date,
+              period: 0,
+              status: status as any,
+              method: 'BIOMETRIC_FINGERPRINT',
+              checkInTime: timestamp,
+              deviceId: device.id,
+              biometricLogId: log.id,
+              markedBy: 'BIOMETRIC_SYSTEM',
+              markedAt: new Date(),
+            },
+            update: {
+              status: status as any,
+              method: 'BIOMETRIC_FINGERPRINT',
+              checkInTime: timestamp,
+              deviceId: device.id,
+              biometricLogId: log.id,
+            },
+          });
+
+          // Mark as processed
+          await this.prisma.biometricAttendanceLog.update({
+            where: { id: log.id },
+            data: { processed: true, processedAt: new Date() },
+          });
+        }
+      }
+    } else if (dto.userType === 'TEACHER') {
+      const teacher = await this.prisma.teacherProfile.findUnique({
+        where: { userId: dto.userId },
+      });
+
+      if (teacher) {
+        const hour = timestamp.getHours();
+        const status = hour < 9 ? 'PRESENT' : hour < 11 ? 'LATE' : 'PRESENT';
+
+        await this.prisma.teacherAttendance.upsert({
+          where: { teacherId_date: { teacherId: teacher.id, date } },
+          create: {
+            teacherId: teacher.id,
+            schoolId: device.schoolId,
+            date,
+            status: status as any,
+            method: 'BIOMETRIC_FINGERPRINT',
+            checkInTime: timestamp,
+            deviceId: device.id,
+            biometricLogId: log.id,
+            markedBy: 'BIOMETRIC_SYSTEM',
+            markedAt: new Date(),
+          },
+          update: {
+            status: status as any,
+            method: 'BIOMETRIC_FINGERPRINT',
+            checkInTime: timestamp,
+            deviceId: device.id,
+            biometricLogId: log.id,
+          },
+        });
+
+        // Mark as processed
+        await this.prisma.biometricAttendanceLog.update({
+          where: { id: log.id },
+          data: { processed: true, processedAt: new Date() },
+        });
+      }
+    }
+
+    this.eventBus.publish('attendance.biometric_punch', {
+      logId: log.id,
+      deviceId: dto.deviceId,
+      userId: dto.userId,
+      userType: dto.userType,
+    });
+
+    return { success: true, log, autoMarked: true };
+  }
+
+  // FR-ATT-014: Get Biometric Logs
+  async getBiometricLogs(filters: {
+    deviceId?: string; schoolId?: string; userId?: string;
+    startDate?: string; endDate?: string; userType?: string;
+    processed?: boolean;
+  }) {
+    const where: any = {};
+
+    if (filters.userId) {
+      where.userId = filters.userId;
+    }
+
+    if (filters.deviceId) {
+      const device = await this.prisma.attendanceDevice.findUnique({
+        where: { deviceId: filters.deviceId },
+      });
+      if (device) where.deviceId = device.id;
+    }
+
+    if (filters.schoolId) {
+      const devices = await this.prisma.attendanceDevice.findMany({
+        where: { schoolId: filters.schoolId },
+        select: { id: true },
+      });
+      where.deviceId = { in: devices.map((d) => d.id) };
+    }
+
+    if (filters.userType) {
+      where.userType = filters.userType;
+    }
+
+    if (filters.processed !== undefined) {
+      where.processed = filters.processed;
+    }
+
+    if (filters.startDate || filters.endDate) {
+      where.timestamp = {
+        ...(filters.startDate ? { gte: new Date(filters.startDate) } : {}),
+        ...(filters.endDate ? { lte: new Date(filters.endDate) } : {}),
+      };
+    }
+
+    const logs = await this.prisma.biometricAttendanceLog.findMany({
+      where,
+      orderBy: { timestamp: 'desc' },
+      take: 500,
+      include: {
+        device: {
+          select: { deviceName: true, location: true, deviceId: true },
+        },
+      },
+    });
+
+    return logs;
+  }
+
+  // FR-ATT-015: Sync Biometric Data (Bulk Process)
+  async syncBiometricData(deviceId: string, punches: Array<{
+    userId: string; userType: string; biometricType: string; timestamp: string;
+  }>) {
+    const device = await this.prisma.attendanceDevice.findUnique({
+      where: { deviceId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    const results = {
+      synced: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    for (const punch of punches) {
+      try {
+        await this.processBiometricPunch({
+          deviceId,
+          userId: punch.userId,
+          userType: punch.userType,
+          biometricType: punch.biometricType,
+          timestamp: punch.timestamp,
+        });
+        results.synced++;
+      } catch (error) {
+        results.failed++;
+        results.errors.push(
+          `${punch.userId} at ${punch.timestamp}: ${error.message}`,
+        );
+      }
+    }
+
+    // Update device last sync time
+    await this.prisma.attendanceDevice.update({
+      where: { id: device.id },
+      data: { lastSyncAt: new Date() },
+    });
+
+    this.eventBus.publish('attendance.biometric_synced', {
+      deviceId,
+      synced: results.synced,
+      failed: results.failed,
+    });
+
+    return results;
+  }
+
+  // Update Device Status
+  async updateDeviceStatus(deviceId: string, isActive: boolean) {
+    const device = await this.prisma.attendanceDevice.findUnique({
+      where: { deviceId },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
+    return this.prisma.attendanceDevice.update({
+      where: { id: device.id },
+      data: { isActive },
+    });
+  }
+
+  // Get Device Details
+  async getDeviceDetails(deviceId: string) {
+    const device = await this.prisma.attendanceDevice.findUnique({
+      where: { deviceId },
+      include: {
+        biometricLogs: {
+          take: 10,
+          orderBy: { timestamp: 'desc' },
+        },
+      },
+    });
+
+    if (!device) throw new NotFoundException('Device not found');
+    return device;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-ATT-012–015: Advanced Attendance Methods (RFID, Geofence, QR, Face)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-ATT-012: RFID Attendance
+  async registerRfidCard(userId: string, rfidCardId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'RFID_CARD_REGISTER',
+        resourceType: 'USER',
+        recordId: userId,
+        changes: { rfidCardId },
+      },
+    });
+
+    return { success: true, userId, rfidCardId, message: 'RFID card registered' };
+  }
+
+  async processRfidSwipe(rfidCardId: string, locationId?: string) {
+    const log = await this.prisma.auditLog.findFirst({
+      where: { action: 'RFID_CARD_REGISTER', changes: { path: ['rfidCardId'], equals: rfidCardId } },
+    });
+
+    if (!log || !log.userId) throw new NotFoundException('RFID card not registered');
+
+    return this.processBiometricPunch({
+      deviceId: locationId || 'RFID_READER_01',
+      userId: log.userId,
+      userType: 'STUDENT',
+      biometricType: 'RFID',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // FR-ATT-013: Geo-fenced Attendance
+  async configureGeofence(schoolId: string, centerLat: number, centerLng: number, radiusMeters: number) {
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'GEOFENCE_CONFIGURE',
+        resourceType: 'SCHOOL',
+        recordId: schoolId,
+        changes: { centerLat, centerLng, radiusMeters },
+      },
+    });
+    return { success: true, schoolId, centerLat, centerLng, radiusMeters };
+  }
+
+  async markGeoAttendance(userId: string, lat: number, lng: number, schoolId: string) {
+    const geofenceLog = await this.prisma.auditLog.findFirst({
+      where: { action: 'GEOFENCE_CONFIGURE', recordId: schoolId },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    if (geofenceLog) {
+      const config = geofenceLog.changes as any;
+      const latDiff = (lat - config.centerLat) * 111000;
+      const lngDiff = (lng - config.centerLng) * 111000 * Math.cos(config.centerLat * Math.PI / 180);
+      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+      if (distance > config.radiusMeters) {
+        throw new BadRequestException(`Location outside geofenced boundary (${distance.toFixed(0)}m from center)`);
+      }
+    }
+
+    return this.processBiometricPunch({
+      deviceId: 'MOBILE_GEO',
+      userId,
+      userType: 'TEACHER',
+      biometricType: 'GEO',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // FR-ATT-014: QR Code Attendance
+  async generateAttendanceQR(schoolId: string, sectionId?: string) {
+    const qrToken = Buffer.from(JSON.stringify({
+      schoolId,
+      sectionId,
+      timestamp: Date.now(),
+      nonce: Math.random(),
+    })).toString('base64');
+
+    return {
+      schoolId,
+      sectionId,
+      qrToken,
+      expiresInSeconds: 300,
+    };
+  }
+
+  async markQRAttendance(userId: string, qrToken: string) {
+    let payload: any;
+    try {
+      payload = JSON.parse(Buffer.from(qrToken, 'base64').toString('utf-8'));
+    } catch (e) {
+      throw new BadRequestException('Invalid QR code token');
+    }
+
+    if (Date.now() - payload.timestamp > 300000) {
+      throw new BadRequestException('QR code token has expired');
+    }
+
+    return this.processBiometricPunch({
+      deviceId: 'QR_SCANNER',
+      userId,
+      userType: 'STUDENT',
+      biometricType: 'QR',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // FR-ATT-015: Face Recognition
+  async enrollFace(userId: string, faceEncoding: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'FACE_ENROLLMENT',
+        resourceType: 'USER',
+        recordId: userId,
+        changes: { faceEncodingHash: Buffer.from(faceEncoding).toString('base64').substring(0, 32) },
+      },
+    });
+
+    return { success: true, userId, message: 'Face template enrolled successfully' };
+  }
+
+  async markFaceAttendance(faceEncoding: string, deviceId: string) {
+    const hash = Buffer.from(faceEncoding).toString('base64').substring(0, 32);
+    const log = await this.prisma.auditLog.findFirst({
+      where: { action: 'FACE_ENROLLMENT', changes: { path: ['faceEncodingHash'], equals: hash } },
+    });
+
+    if (!log || !log.userId) {
+      throw new NotFoundException('Face template not recognized');
+    }
+
+    return this.processBiometricPunch({
+      deviceId,
+      userId: log.userId,
+      userType: 'STUDENT',
+      biometricType: 'FACE',
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

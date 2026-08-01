@@ -559,4 +559,69 @@ export class PaymentsService {
       })),
     };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-FEE-013, 015, 016: Parent Portal, Fee Forecasting, Demand Letters
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // FR-FEE-013: Parent Fee Portal
+  async getParentFeePortal(parentId: string) {
+    const parent = await this.prisma.parentProfile.findUnique({
+      where: { id: parentId },
+      include: { children: { include: { student: { include: { feeRecords: true } } } } },
+    });
+    if (!parent) throw new NotFoundException('Parent profile not found');
+
+    const childrenFees = parent.children.map((link) => {
+      const student = link.student;
+      const records = student.feeRecords;
+      const totalDue = records.reduce((s, r) => s + Number(r.balanceAmount), 0);
+      return {
+        studentId: student.id,
+        recordsCount: records.length,
+        totalDue,
+        feeRecords: records,
+      };
+    });
+
+    return { parentId, childrenCount: parent.children.length, childrenFees };
+  }
+
+  // FR-FEE-015: Fee Forecasting
+  async forecastFeeRevenue(schoolId: string, academicYearId: string) {
+    const records = await this.prisma.feeRecord.findMany({
+      where: { feeStructure: { schoolId, ...(academicYearId ? { academicYear: academicYearId } : {}) } },
+    });
+
+    const totalProjected = records.reduce((s, r) => s + Number(r.totalAmount), 0);
+    const totalCollected = records.reduce((s, r) => s + Number(r.paidAmount), 0);
+
+    return {
+      schoolId,
+      academicYearId,
+      totalProjectedRevenue: totalProjected,
+      totalCollectedRevenue: totalCollected,
+      pendingRevenue: totalProjected - totalCollected,
+      collectionRate: totalProjected > 0 ? ((totalCollected / totalProjected) * 100).toFixed(1) : '0',
+    };
+  }
+
+  // FR-FEE-016: Fee Demand Letters
+  async generateFeeDemandLetter(feeRecordId: string) {
+    const record = await this.prisma.feeRecord.findUnique({
+      where: { id: feeRecordId },
+      include: { student: { include: { user: true } }, feeStructure: true },
+    });
+    if (!record) throw new NotFoundException('Fee record not found');
+
+    return {
+      feeRecordId,
+      studentName: `${record.student.user.firstName} ${record.student.user.lastName}`,
+      amountDue: record.balanceAmount,
+      dueDate: record.dueDate,
+      letterTitle: 'OVERDUE FEE PAYMENT NOTICE',
+      letterBody: `Dear Parent, Please settle the outstanding fee balance of $${record.balanceAmount} for ${record.feeStructure.name} by ${record.dueDate.toISOString().split('T')[0]}.`,
+      generatedAt: new Date(),
+    };
+  }
 }

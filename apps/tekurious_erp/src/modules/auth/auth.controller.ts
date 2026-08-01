@@ -445,5 +445,90 @@ export class AuthController {
     await this.authService.logSecurityEvent(userId, body.eventType, metadata);
     return { success: true };
   }
+
+  // ==================== OAUTH LOGIN ROUTE HANDLERS (FR-AUTH-008) ====================
+
+  @Public()
+  @UseGuards(GoogleOAuthGuard)
+  @Get('google')
+  async googleAuth(@Req() req) {}
+
+  @Public()
+  @UseGuards(GoogleOAuthGuard)
+  @Get('google/callback')
+  async googleAuthRedirect(@Req() req): Promise<AuthResponseDto> {
+    return this.authService.oauthLogin(req.user);
+  }
+
+  @Public()
+  @UseGuards(MicrosoftOAuthGuard)
+  @Get('microsoft')
+  async microsoftAuth(@Req() req) {}
+
+  @Public()
+  @UseGuards(MicrosoftOAuthGuard)
+  @Get('microsoft/callback')
+  async microsoftAuthRedirect(@Req() req): Promise<AuthResponseDto> {
+    return this.authService.oauthLogin(req.user);
+  }
+
+  // ==================== SESSION SECURITY & ROTATION (FR-AUTH-033) ====================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('security/rotate-keys')
+  @HttpCode(HttpStatus.OK)
+  async rotateKeys() {
+    return this.authService.rotateSessionKeys();
+  }
+
+  // ==================== MAGIC LINKS (FR-AUTH-041-071) ====================
+
+  @Public()
+  @Post('magic-link/send')
+  @HttpCode(HttpStatus.OK)
+  async sendMagicLink(@Body('email') email: string) {
+    return this.authService.sendMagicLink(email);
+  }
+
+  @Public()
+  @Post('magic-link/login')
+  @HttpCode(HttpStatus.OK)
+  async loginWithMagicLink(@Body('token') token: string): Promise<AuthResponseDto> {
+    return this.authService.loginWithMagicLink(token);
+  }
+
+  // ==================== API KEYS (FR-AUTH-041-071) ====================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('api-keys')
+  @HttpCode(HttpStatus.CREATED)
+  async generateApiKey(@CurrentUser('id') userId: string, @Body('name') name: string) {
+    return this.authService.generateApiKey(userId, name);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('api-keys')
+  async listApiKeys(@CurrentUser('id') userId: string) {
+    return this.authService.listApiKeys(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('api-keys/:id')
+  @HttpCode(HttpStatus.OK)
+  async revokeApiKey(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.authService.revokeApiKey(userId, id);
+  }
+
+  // ==================== IMPERSONATION (FR-AUTH-041-071) ====================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('impersonate/:userId')
+  @HttpCode(HttpStatus.OK)
+  async impersonate(
+    @CurrentUser('id') adminId: string,
+    @Param('userId') targetUserId: string,
+  ): Promise<AuthResponseDto> {
+    return this.authService.impersonateUser(adminId, targetUserId);
+  }
 }
 

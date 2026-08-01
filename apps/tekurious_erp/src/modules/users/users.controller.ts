@@ -889,4 +889,70 @@ export class UsersController {
   generateClassmateRecommendations(@Request() req) {
     return this.usersService.generateClassmateRecommendations(req.user.userId);
   }
+
+  // ==================== PUBLISHER PROFILE (FR-USER-033) ====================
+  @Post('publisher/profile')
+  @ApiOperation({ summary: 'Create publisher profile (FR-USER-033)' })
+  createPublisherProfile(@Request() req, @Body() dto: any) {
+    return this.usersService.createPublisherProfile(req.user.userId, dto);
+  }
+
+  @Get('publisher/profile')
+  @ApiOperation({ summary: 'Get publisher profile (FR-USER-033)' })
+  getPublisherProfile(@Request() req) {
+    return this.usersService.getPublisherProfile(req.user.userId);
+  }
+
+  // ==================== CREATOR PROFILE (FR-USER-034) ====================
+  @Post('creator/profile')
+  @ApiOperation({ summary: 'Create creator profile (FR-USER-034)' })
+  createCreatorProfile(@Request() req, @Body() dto: any) {
+    return this.usersService.createCreatorProfile(req.user.userId, dto);
+  }
+
+  @Get('creator/profile')
+  @ApiOperation({ summary: 'Get creator profile (FR-USER-034)' })
+  getCreatorProfile(@Request() req) {
+    return this.usersService.getCreatorProfile(req.user.userId);
+  }
+
+  // ==================== VERIFICATION (FR-USER-035) ====================
+  @Post('profile/verification')
+  @ApiOperation({ summary: 'Submit publisher/creator verification (FR-USER-035)' })
+  submitVerification(@Request() req, @Body() dto: { type: 'PUBLISHER' | 'CREATOR'; documents: string[] }) {
+    return this.usersService.submitVerification(req.user.userId, dto.type, dto.documents);
+  }
+
+  @Put('admin/profile/verification/:id')
+  @ApiOperation({ summary: 'Review publisher/creator verification (Admin)' })
+  reviewVerification(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: { status: 'APPROVED' | 'REJECTED'; remarks?: string },
+  ) {
+    return this.usersService.reviewVerification(req.user.userId, id, dto.status, dto.remarks);
+  }
+
+  // ==================== CREATOR SUPPORT SYSTEM (FR-USER-038) ====================
+  @Post('support/tickets')
+  @ApiOperation({ summary: 'Create support ticket (FR-USER-038)' })
+  createSupportTicket(@Request() req, @Body() dto: any) {
+    return this.usersService.createSupportTicket(req.user.userId, dto);
+  }
+
+  @Get('support/tickets')
+  @ApiOperation({ summary: 'List support tickets (FR-USER-038)' })
+  listSupportTickets(@Request() req) {
+    return this.usersService.listSupportTickets(req.user.userId);
+  }
+
+  @Post('admin/support/tickets/:id/respond')
+  @ApiOperation({ summary: 'Respond to support ticket (Admin)' })
+  respondToTicket(
+    @Request() req,
+    @Param('id') id: string,
+    @Body('responseText') responseText: string,
+  ) {
+    return this.usersService.respondToTicket(req.user.userId, id, responseText);
+  }
 }

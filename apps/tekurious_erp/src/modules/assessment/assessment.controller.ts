@@ -322,4 +322,100 @@ export class AssessmentController {
   generateExamAnalyticsReport(@Param('examId') examId: string) {
     return this.assessmentService.generateExamAnalyticsReport(examId);
   }
+
+  // ==================== ADVANCED ANALYTICS REPORTS (FR-REPORT-004-005) ====================
+
+  @Post('reports/comparison')
+  @ApiOperation({ summary: 'Get exam comparison report (FR-REPORT-004)' })
+  getExamComparisonReport(@Body('examIds') examIds: string[]) {
+    return this.assessmentService.getExamComparisonReport(examIds);
+  }
+
+  @Get('exams/:examId/question-analysis')
+  @ApiOperation({ summary: 'Get question analysis report (FR-REPORT-005)' })
+  getQuestionAnalysisReport(@Param('examId') examId: string) {
+    return this.assessmentService.getQuestionAnalysisReport(examId);
+  }
+
+  // ==================== LEADERBOARDS & RANKINGS (FR-RANK-001-008) ====================
+
+  @Get('leaderboards/global')
+  @ApiOperation({ summary: 'Get global leaderboard (FR-RANK-001)' })
+  getLeaderboard(@Query('limit') limit?: string) {
+    return this.assessmentService.getLeaderboard(limit ? parseInt(limit) : 50);
+  }
+
+  @Get('leaderboards/subject/:subjectId')
+  @ApiOperation({ summary: 'Get subject leaderboard (FR-RANK-002)' })
+  getSubjectLeaderboard(@Param('subjectId') subjectId: string, @Query('limit') limit?: string) {
+    return this.assessmentService.getSubjectLeaderboard(subjectId, limit ? parseInt(limit) : 20);
+  }
+
+  @Get('leaderboards/class/:sectionId')
+  @ApiOperation({ summary: 'Get class/section leaderboard (FR-RANK-003)' })
+  getClassLeaderboard(@Param('sectionId') sectionId: string, @Query('limit') limit?: string) {
+    return this.assessmentService.getClassLeaderboard(sectionId, limit ? parseInt(limit) : 20);
+  }
+
+  @Get('leaderboards/academic-year/:academicYearId')
+  @ApiOperation({ summary: 'Get academic year leaderboard (FR-RANK-004)' })
+  getAcademicYearLeaderboard(@Param('academicYearId') academicYearId: string, @Query('limit') limit?: string) {
+    return this.assessmentService.getAcademicYearLeaderboard(academicYearId, limit ? parseInt(limit) : 50);
+  }
+
+  @Get('leaderboards/students/:studentId/history')
+  @ApiOperation({ summary: 'Get student rank history (FR-RANK-005)' })
+  getStudentRankHistory(@Param('studentId') studentId: string) {
+    return this.assessmentService.getStudentRankHistory(studentId);
+  }
+
+  @Get('leaderboards/top-performers')
+  @ApiOperation({ summary: 'Get top performers (FR-RANK-006)' })
+  getTopPerformers(@Query('limit') limit?: string) {
+    return this.assessmentService.getTopPerformers(limit ? parseInt(limit) : 10);
+  }
+
+  @Get('leaderboards/most-improved')
+  @ApiOperation({ summary: 'Get most improved leaderboard (FR-RANK-007)' })
+  getImprovementLeaderboard(@Query('limit') limit?: string) {
+    return this.assessmentService.getImprovementLeaderboard(limit ? parseInt(limit) : 20);
+  }
+
+  @Get('leaderboards/attendance')
+  @ApiOperation({ summary: 'Get attendance leaderboard (FR-RANK-008)' })
+  getAttendanceLeaderboard(@Query('schoolId') schoolId?: string, @Query('limit') limit?: string) {
+    return this.assessmentService.getAttendanceLeaderboard(schoolId, limit ? parseInt(limit) : 20);
+  }
+
+  // ==================== EXTENDED ASSESSMENT FEATURES (FR-QUEST-007, 008, 010, FR-EXAM-009, 010) ====================
+
+  @Get('question-bank/:id/difficulty-analysis')
+  @ApiOperation({ summary: 'Analyze question difficulty (FR-QUEST-007)' })
+  analyzeQuestionDifficulty(@Param('id') id: string) {
+    return this.assessmentService.analyzeQuestionDifficulty(id);
+  }
+
+  @Get('question-bank/:id/usage-analytics')
+  @ApiOperation({ summary: 'Get question usage analytics (FR-QUEST-008)' })
+  getQuestionUsageAnalytics(@Param('id') id: string) {
+    return this.assessmentService.getQuestionUsageAnalytics(id);
+  }
+
+  @Post('exams/:id/randomize-questions')
+  @ApiOperation({ summary: 'Randomize exam questions (FR-QUEST-010)' })
+  randomizeExamQuestions(@Param('id') id: string) {
+    return this.assessmentService.randomizeExamQuestions(id);
+  }
+
+  @Post('exams/:id/clone')
+  @ApiOperation({ summary: 'Clone exam (FR-EXAM-009)' })
+  cloneExam(@Param('id') id: string, @Body('title') title: string) {
+    return this.assessmentService.cloneExam(id, title);
+  }
+
+  @Post('attempts/:attemptId/adaptive-next')
+  @ApiOperation({ summary: 'Get next adaptive exam question (FR-EXAM-010)' })
+  getNextAdaptiveQuestion(@Param('attemptId') attemptId: string, @Body('currentScore') currentScore: number) {
+    return this.assessmentService.getNextAdaptiveQuestion(attemptId, currentScore);
+  }
 }

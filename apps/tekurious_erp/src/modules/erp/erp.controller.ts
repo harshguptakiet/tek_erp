@@ -914,4 +914,90 @@ export class ErpController {
   deleteSupplier(@Request() req, @Param('supplierId') supplierId: string) {
     return this.service.deleteSupplier(supplierId, req.user.userId);
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // FR-TIME-001–012: TIMETABLE MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+
+  @Post('timetable/time-slots')
+  @ApiOperation({ summary: 'Create time slot (FR-TIME-001)' })
+  createTimeSlot(@Request() req, @Body() dto: any) {
+    return this.service.createTimeSlot(req.user.userId, dto);
+  }
+
+  @Get('timetable/time-slots')
+  @ApiOperation({ summary: 'List time slots for school (FR-TIME-001)' })
+  listTimeSlots(@Query('schoolId') schoolId: string) {
+    return this.service.listTimeSlots(schoolId);
+  }
+
+  @Post('timetable/entries')
+  @ApiOperation({ summary: 'Create timetable entry (FR-TIME-002)' })
+  createTimetableEntry(@Request() req, @Body() dto: any) {
+    return this.service.createTimetableEntry(req.user.userId, dto);
+  }
+
+  @Get('timetable/section/:sectionId')
+  @ApiOperation({ summary: 'Get section timetable (FR-TIME-004)' })
+  getSectionTimetable(@Param('sectionId') sectionId: string) {
+    return this.service.getSectionTimetable(sectionId);
+  }
+
+  @Get('timetable/teacher/:teacherId')
+  @ApiOperation({ summary: 'Get teacher timetable (FR-TIME-004)' })
+  getTeacherTimetable(@Param('teacherId') teacherId: string) {
+    return this.service.getTeacherTimetable(teacherId);
+  }
+
+  @Get('timetable/room/:roomId')
+  @ApiOperation({ summary: 'Get room schedule (FR-TIME-012)' })
+  getRoomSchedule(@Param('roomId') roomId: string) {
+    return this.service.getRoomSchedule(roomId);
+  }
+
+  @Put('timetable/entries/:id')
+  @ApiOperation({ summary: 'Update timetable entry (FR-TIME-005)' })
+  updateTimetableEntry(@Param('id') id: string, @Body() dto: any) {
+    return this.service.updateTimetableEntry(id, dto);
+  }
+
+  @Delete('timetable/entries/:id')
+  @ApiOperation({ summary: 'Delete timetable entry (FR-TIME-006)' })
+  deleteTimetableEntry(@Param('id') id: string) {
+    return this.service.deleteTimetableEntry(id);
+  }
+
+  @Post('timetable/conflicts/check')
+  @ApiOperation({ summary: 'Check timetable conflicts (FR-TIME-007)' })
+  checkTimetableConflicts(@Body() dto: any) {
+    return this.service.checkTimetableConflicts(dto);
+  }
+
+  @Post('timetable/auto-generate')
+  @ApiOperation({ summary: 'Auto-generate timetable (FR-TIME-008)' })
+  autoGenerateTimetable(@Body() dto: any) {
+    return this.service.autoGenerateTimetable(dto);
+  }
+
+  @Post('timetable/entries/:id/substitute')
+  @ApiOperation({ summary: 'Assign substitute teacher to period (FR-TIME-009)' })
+  assignTimetableSubstitute(
+    @Param('id') id: string,
+    @Body('substituteTeacherId') substituteTeacherId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.service.assignTimetableSubstitute(id, substituteTeacherId, reason);
+  }
+
+  @Post('timetable/swap')
+  @ApiOperation({ summary: 'Swap two timetable periods (FR-TIME-010)' })
+  swapTimetablePeriods(@Body('entryId1') entryId1: string, @Body('entryId2') entryId2: string) {
+    return this.service.swapTimetablePeriods(entryId1, entryId2);
+  }
+
+  @Get('timetable/teacher/:teacherId/workload')
+  @ApiOperation({ summary: 'Get teacher timetable workload (FR-TIME-011)' })
+  getTimetableTeacherWorkload(@Param('teacherId') teacherId: string) {
+    return this.service.getTimetableTeacherWorkload(teacherId);
+  }
 }

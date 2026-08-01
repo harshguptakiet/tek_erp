@@ -993,9 +993,9 @@ export class AnalyticsService {
     }, {} as Record<string, number>);
 
     const byClass = attendanceRecords.reduce((acc, r) => {
-      const classId = r.section.classId;
-      if (!acc[classId]) acc[classId] = { present: 0, absent: 0, late: 0, excused: 0 };
-      acc[classId][r.status.toLowerCase()] = (acc[classId][r.status.toLowerCase()] || 0) + 1;
+      const sectionId = r.sectionId || 'unknown';
+      if (!acc[sectionId]) acc[sectionId] = { present: 0, absent: 0, late: 0, excused: 0 };
+      acc[sectionId][r.status.toLowerCase()] = (acc[sectionId][r.status.toLowerCase()] || 0) + 1;
       return acc;
     }, {} as Record<string, any>);
 
@@ -1040,8 +1040,9 @@ export class AnalyticsService {
     const avgPercentage = totalPossible > 0 ? (totalMarks / totalPossible) * 100 : 0;
 
     const gradeDistribution = examResults.reduce((acc, r) => {
-      const grade = r.grade || 'N/A';
-      acc[grade] = (acc[grade] || 0) + 1;
+      const pct = Number(r.percentage || 0);
+      const gradeLetter = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
+      acc[gradeLetter] = (acc[gradeLetter] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -1053,7 +1054,7 @@ export class AnalyticsService {
       totalExams: examResults.length,
       averagePercentage: avgPercentage.toFixed(2),
       gradeDistribution,
-      passRate: examResults.filter(r => r.status === 'PASS').length / examResults.length * 100,
+      passRate: examResults.length > 0 ? examResults.filter(r => r.isPassed).length / examResults.length * 100 : 0,
     };
   }
 
@@ -1070,7 +1071,7 @@ export class AnalyticsService {
           this.prisma.liveClass.count({ where: { teacherId: teacher.id } }),
           this.prisma.teacherAnalytics.aggregate({
             where: { teacherId: teacher.id },
-            _avg: { rating: true },
+            _avg: { studentSatisfaction: true },
           }),
         ]);
 
@@ -1079,7 +1080,7 @@ export class AnalyticsService {
           userId: teacher.userId,
           assignedSections,
           liveClassCount,
-          avgRating: avgRating._avg.rating || 0,
+          avgRating: Number(avgRating._avg.studentSatisfaction || 0),
         };
       })
     );
@@ -1116,8 +1117,8 @@ export class AnalyticsService {
     const [examResults, assignments, attendance] = await Promise.all([
       this.prisma.examAttempt.findMany({
         where,
-        include: { exam: { select: { title: true, subjectId: true, scheduledAt: true } } },
-        orderBy: { exam: { scheduledAt: 'asc' } },
+        include: { exam: { select: { title: true, subjectId: true, startTime: true } } },
+        orderBy: { exam: { startTime: 'asc' } },
       }),
       this.prisma.assignmentSubmission.findMany({
         where: { studentId },
@@ -1131,15 +1132,15 @@ export class AnalyticsService {
       }),
     ]);
 
-    const progressOverTime = examResults.map((r) => ({
-      date: r.exam.scheduledAt,
+    const progressOverTime = (examResults as any[]).map((r) => ({
+      date: r.exam?.startTime,
       percentage: r.percentage,
-      subject: r.exam.subjectId,
+      subject: r.exam?.subjectId,
     }));
 
     const assignmentProgress = assignments.map((a) => ({
       date: a.submittedAt,
-      score: a.score,
+      score: a.marksObtained,
       status: a.status,
     }));
 
@@ -1174,21 +1175,22 @@ export class AnalyticsService {
         exam: { subjectId },
       },
       include: {
-        exam: { select: { title: true, topics: true } },
+        exam: { select: { title: true, blueprint: true } },
       },
     });
 
     // Identify struggling students (below 50%)
-    const strugglingStudents = examResults.filter(r => (r.percentage || 0) < 50);
+    const strugglingStudents = examResults.filter(r => Number(r.percentage || 0) < 50);
     
-    // Identify common weak topics
+    // Identify common weak topics from exam blueprint
     const topicPerformance: Record<string, { total: number; weak: number }> = {};
     examResults.forEach((r) => {
-      const topics = (r.exam.topics as string[]) || [];
+      const blueprint = r.exam.blueprint as any;
+      const topics: string[] = Array.isArray(blueprint) ? blueprint.map((b: any) => b.topic || b.chapter || '').filter(Boolean) : [];
       topics.forEach((topic) => {
         if (!topicPerformance[topic]) topicPerformance[topic] = { total: 0, weak: 0 };
         topicPerformance[topic].total++;
-        if ((r.percentage || 0) < 50) topicPerformance[topic].weak++;
+        if (Number(r.percentage || 0) < 50) topicPerformance[topic].weak++;
       });
     });
 
@@ -1223,7 +1225,7 @@ export class AnalyticsService {
     const [examResults, attendance, assignments] = await Promise.all([
       this.prisma.examAttempt.findMany({
         where: { studentId },
-        orderBy: { exam: { scheduledAt: 'desc' } },
+        orderBy: { exam: { startTime: 'desc' } },
         take: 10,
         include: { exam: { select: { subjectId: true } } },
       }),
@@ -1241,7 +1243,7 @@ export class AnalyticsService {
 
     // Simple prediction based on trends
     const recentExamAvg = examResults.length > 0
-      ? examResults.reduce((sum, r) => sum + (r.percentage || 0), 0) / examResults.length
+      ? examResults.reduce((sum, r) => sum + Number(r.percentage || 0), 0) / examResults.length
       : 0;
 
     const attendanceRate = attendance.length > 0

@@ -104,4 +104,41 @@ export class AssignmentsController {
   studentReport(@Param('studentId') studentId: string) {
     return this.service.getStudentAssignmentReport(studentId);
   }
+
+  // Dashboard & Workload Management (FR-MANAGE-001-005)
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Assignment management dashboard (FR-MANAGE-001)' })
+  dashboard(
+    @Query('teacherId') teacherId?: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    return this.service.getAssignmentDashboard(teacherId, sectionId);
+  }
+
+  @Get('teacher/:teacherId/workload')
+  @ApiOperation({ summary: 'Teacher assignment workload (FR-MANAGE-002)' })
+  teacherWorkload(@Param('teacherId') teacherId: string) {
+    return this.service.getTeacherAssignmentWorkload(teacherId);
+  }
+
+  @Get('students/:studentId/progress')
+  @ApiOperation({ summary: 'Student assignment progress (FR-MANAGE-003)' })
+  studentProgress(@Param('studentId') studentId: string) {
+    return this.service.getStudentAssignmentProgress(studentId);
+  }
+
+  @Get('overdue')
+  @ApiOperation({ summary: 'Get overdue assignments (FR-MANAGE-004)' })
+  overdue(
+    @Request() req,
+    @Query('teacherId') teacherId?: string,
+  ) {
+    return this.service.getOverdueAssignments(req.user.userId, teacherId);
+  }
+
+  @Get('trends')
+  @ApiOperation({ summary: 'Assignment completion trends (FR-MANAGE-005)' })
+  trends(@Query('sectionId') sectionId?: string) {
+    return this.service.getAssignmentCompletionTrends(sectionId);
+  }
 }

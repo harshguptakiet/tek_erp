@@ -211,4 +211,30 @@ export class MessagingController {
       limit ? parseInt(limit) : 50,
     );
   }
+
+  // ==================== EXTENDED NOTIFICATIONS (FR-EMAIL-006, FR-SMS-002) ====================
+
+  @Post('email/campaigns')
+  @ApiOperation({ summary: 'Create email campaign (FR-EMAIL-006)' })
+  createEmailCampaign(@Request() req, @Body() dto: any) {
+    return this.service.createEmailCampaign(req.user.userId, dto);
+  }
+
+  @Post('email/campaigns/:id/send')
+  @ApiOperation({ summary: 'Send email campaign (FR-EMAIL-006)' })
+  sendCampaign(@Param('id') id: string) {
+    return this.service.sendCampaign(id);
+  }
+
+  @Post('sms/templates')
+  @ApiOperation({ summary: 'Create SMS template (FR-SMS-002)' })
+  createSmsTemplate(@Body() dto: { name: string; templateText: string }) {
+    return this.service.createSmsTemplate(dto);
+  }
+
+  @Post('sms/send-personalized')
+  @ApiOperation({ summary: 'Send personalized SMS (FR-SMS-002)' })
+  sendPersonalizedSms(@Body() dto: { phone: string; templateId: string; variables: Record<string, string> }) {
+    return this.service.sendPersonalizedSms(dto.phone, dto.templateId, dto.variables);
+  }
 }
