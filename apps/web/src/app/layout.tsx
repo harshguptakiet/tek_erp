@@ -1,6 +1,7 @@
 import './global.css';
 import { QueryProvider } from '../providers/query-provider';
 import { AuthProvider } from '../providers/auth-provider';
+import { Toaster } from '../components/ui/toast';
 
 export const metadata = {
   title: 'Tekurious ERP - Education Management System',
@@ -18,6 +19,7 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             {children}
+            <Toaster />
           </AuthProvider>
         </QueryProvider>
       </body>
