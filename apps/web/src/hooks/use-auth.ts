@@ -108,17 +108,17 @@ export function usePermissions() {
 
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
-    return user.permissions.includes(permission);
+    return user.permissions?.includes(permission) ?? false;
   };
 
   const hasAnyPermission = (permissions: string[]): boolean => {
     if (!user) return false;
-    return permissions.some((p) => user.permissions.includes(p));
+    return permissions.some((p) => user.permissions?.includes(p) ?? false);
   };
 
   const hasAllPermissions = (permissions: string[]): boolean => {
     if (!user) return false;
-    return permissions.every((p) => user.permissions.includes(p));
+    return permissions.every((p) => user.permissions?.includes(p) ?? false);
   };
 
   const hasRole = (role: string): boolean => {

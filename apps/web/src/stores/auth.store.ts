@@ -5,15 +5,22 @@ import { setAccessToken } from '../lib/axios';
 export interface User {
   id: string;
   email: string;
+  emailVerified?: boolean;
+  phone?: string;
+  phoneVerified?: boolean;
   firstName: string;
   lastName: string;
+  fullName?: string;
   role: string;
-  permissions: string[];
+  roles?: string[];
+  permissions?: string[];
   organizationId?: string;
   schoolId?: string;
   profilePicture?: string;
-  phone?: string;
   status: string;
+  twoFactorEnabled?: boolean;
+  lastLogin?: Date | string;
+  isSuperAdmin?: boolean;
 }
 
 interface AuthState {
@@ -23,8 +30,10 @@ interface AuthState {
   
   // Actions
   setUser: (user: User | null) => void;
-  setAccessToken: (token: string) => void;
+  setAccessToken: (token: string | null) => void;
+  setTokens: (tokens: { accessToken: string; refreshToken?: string }) => void;
   logout: () => void;
+  clearAuth: () => void;
   setLoading: (loading: boolean) => void;
 }
 
@@ -44,6 +53,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     setAccessToken(token);
   },
 
+  setTokens: (tokens) => {
+    setAccessToken(tokens.accessToken);
+  },
+
   logout: () => {
     setAccessToken(null);
     set({
@@ -52,7 +65,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       isLoading: false,
     });
 
-    // Clear TanStack Query cache
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
+  },
+
+  clearAuth: () => {
+    setAccessToken(null);
+    set({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('auth:logout'));
     }

@@ -35,6 +35,16 @@ export interface PaginatedResponse<T> {
   };
 }
 
+/** Extract items from a paginated API response */
+export function getPaginatedItems<T>(response?: PaginatedResponse<T>): T[] {
+  return response?.data ?? [];
+}
+
+/** Extract total count from a paginated API response */
+export function getPaginatedTotal(response?: PaginatedResponse<unknown>): number {
+  return response?.meta.total ?? 0;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;

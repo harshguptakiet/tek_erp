@@ -1,9 +1,28 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import type { AddressInfo } from '@/types/user.types';
+
 /**
- * Merge Tailwind CSS classes with clsx
+ * Format an address object or string for display
  */
+export function formatAddress(address?: AddressInfo | string): string {
+  if (!address) return '-';
+  if (typeof address === 'string') return address;
+  return [address.street, address.city, address.state, address.postalCode, address.country]
+    .filter(Boolean)
+    .join(', ') || '-';
+}
+
+/**
+ * Resolve a display name from profile fields
+ */
+export function getDisplayName(
+  profile: { fullName?: string; firstName?: string; lastName?: string }
+): string {
+  return profile.fullName || [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'User';
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
