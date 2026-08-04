@@ -16,54 +16,28 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { examService } from '@/services/exam.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ExamsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Mock data
-  const { data: exams, isLoading } = useQuery({
-    queryKey: ['exams', searchQuery, statusFilter],
-    queryFn: async () => [
-      {
-        id: '1',
-        name: 'Mid-Term Examination',
-        type: 'MID_TERM',
-        academicYear: '2024-2025',
-        startDate: '2024-10-15',
-        endDate: '2024-10-25',
-        status: 'UPCOMING',
-        classes: ['Class 9', 'Class 10', 'Class 11', 'Class 12'],
-        totalSubjects: 8,
-        totalStudents: 500,
-      },
-      {
-        id: '2',
-        name: 'Unit Test 1',
-        type: 'UNIT_TEST',
-        academicYear: '2024-2025',
-        startDate: '2024-09-10',
-        endDate: '2024-09-15',
-        status: 'COMPLETED',
-        classes: ['Class 9', 'Class 10'],
-        totalSubjects: 6,
-        totalStudents: 240,
-      },
-      {
-        id: '3',
-        name: 'Final Examination',
-        type: 'FINAL',
-        academicYear: '2024-2025',
-        startDate: '2025-03-01',
-        endDate: '2025-03-15',
-        status: 'SCHEDULED',
-        classes: ['Class 10', 'Class 12'],
-        totalSubjects: 10,
-        totalStudents: 300,
-      },
-    ],
+  // Real API integration
+  const { data: examsResponse, isLoading } = useQuery({
+    queryKey: ['exams', user?.schoolId, statusFilter],
+    queryFn: () => examService.listExams({
+      subjectId: undefined,
+      sectionId: undefined,
+      examType: statusFilter !== 'all' ? statusFilter : undefined,
+    }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data to match UI expectations
+  const exams = Array.isArray(examsResponse) ? examsResponse : examsResponse?.data || [];
 
   if (isLoading) {
     return (
@@ -110,7 +84,7 @@ export default function ExamsPage() {
             <div className="text-center">
               <p className="text-sm font-medium text-gray-600">Upcoming</p>
               <p className="text-3xl font-bold text-blue-600 mt-1">
-                {exams?.filter((e: any) => e.status === 'UPCOMING').length || 0}
+                {exams?.filter((e: any) => e.status === 'UPCOMING' || e.status === 'SCHEDULED').length || 0}
               </p>
             </div>
           </CardContent>
@@ -120,7 +94,7 @@ export default function ExamsPage() {
             <div className="text-center">
               <p className="text-sm font-medium text-gray-600">In Progress</p>
               <p className="text-3xl font-bold text-green-600 mt-1">
-                {exams?.filter((e: any) => e.status === 'IN_PROGRESS').length || 0}
+                {exams?.filter((e: any) => e.status === 'IN_PROGRESS' || e.status === 'ONGOING').length || 0}
               </p>
             </div>
           </CardContent>
@@ -130,7 +104,7 @@ export default function ExamsPage() {
             <div className="text-center">
               <p className="text-sm font-medium text-gray-600">Completed</p>
               <p className="text-3xl font-bold text-purple-600 mt-1">
-                {exams?.filter((e: any) => e.status === 'COMPLETED').length || 0}
+                {exams?.filter((e: any) => e.status === 'COMPLETED' || e.status === 'GRADED').length || 0}
               </p>
             </div>
           </CardContent>
@@ -178,70 +152,105 @@ export default function ExamsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {exams?.map((exam: any) => (
-              <TableRow key={exam.id} className="cursor-pointer hover:bg-gray-50">
-                <TableCell>
-                  <p className="font-medium text-gray-900">{exam.name}</p>
-                  <p className="text-sm text-gray-500">{exam.academicYear}</p>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="info">{exam.type.replace('_', ' ')}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    <p>{new Date(exam.startDate).toLocaleDateString()}</p>
-                    <p className="text-gray-500">to</p>
-                    <p>{new Date(exam.endDate).toLocaleDateString()}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {exam.classes.slice(0, 2).map((cls: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {cls}
+            {exams && exams.length > 0 ? (
+              exams.map((exam: any) => {
+                const examDate = exam.date || exam.startDate;
+                const examEndDate = exam.endDate;
+                return (
+                  <TableRow key={exam.id} className="cursor-pointer hover:bg-gray-50">
+                    <TableCell>
+                      <p className="font-medium text-gray-900">{exam.title || exam.name}</p>
+                      <p className="text-sm text-gray-500">{exam.academicYear?.name || 'N/A'}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="info">{(exam.examType || exam.type || 'EXAM').replace('_', ' ')}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {examDate && <p>{new Date(examDate).toLocaleDateString()}</p>}
+                        {examEndDate && (
+                          <>
+                            <p className="text-gray-500">to</p>
+                            <p>{new Date(examEndDate).toLocaleDateString()}</p>
+                          </>
+                        )}
+                        {exam.duration && <p className="text-gray-500">{exam.duration} min</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {exam.section?.class?.name ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {exam.section.class.name}
+                        </Badge>
+                      ) : exam.classes && exam.classes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {exam.classes.slice(0, 2).map((cls: any, idx: number) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {typeof cls === 'string' ? cls : cls.name}
+                            </Badge>
+                          ))}
+                          {exam.classes.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{exam.classes.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{exam.subject?.name || exam.totalSubjects || '-'}</TableCell>
+                    <TableCell>{exam.totalStudents || exam.section?.studentCount || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        exam.status === 'UPCOMING' || exam.status === 'SCHEDULED' ? 'info' :
+                        exam.status === 'IN_PROGRESS' || exam.status === 'ONGOING' ? 'warning' :
+                        exam.status === 'COMPLETED' || exam.status === 'GRADED' ? 'success' :
+                        'secondary'
+                      }>
+                        {exam.status || 'SCHEDULED'}
                       </Badge>
-                    ))}
-                    {exam.classes.length > 2 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{exam.classes.length - 2}
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>{exam.totalSubjects}</TableCell>
-                <TableCell>{exam.totalStudents}</TableCell>
-                <TableCell>
-                  <Badge variant={
-                    exam.status === 'UPCOMING' ? 'info' :
-                    exam.status === 'IN_PROGRESS' ? 'warning' :
-                    exam.status === 'COMPLETED' ? 'success' :
-                    'secondary'
-                  }>
-                    {exam.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => router.push(`/exams/${exam.id}`)}
-                    >
-                      View
-                    </Button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => router.push(`/exams/${exam.id}`)}
+                        >
+                          View
+                        </Button>
+                        <Can permission={PERMISSIONS.EXAMS_MANAGE}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.push(`/exams/${exam.id}/schedule`)}
+                          >
+                            Schedule
+                          </Button>
+                        </Can>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12">
+                  <div className="text-gray-500">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="mt-2">No exams found</p>
                     <Can permission={PERMISSIONS.EXAMS_MANAGE}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => router.push(`/exams/${exam.id}/schedule`)}
-                      >
-                        Schedule
+                      <Button className="mt-4" onClick={() => router.push('/exams/create')}>
+                        Create First Exam
                       </Button>
                     </Can>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </Card>

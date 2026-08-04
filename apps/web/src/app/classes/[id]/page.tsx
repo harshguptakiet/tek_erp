@@ -15,24 +15,21 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ClassDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'subjects' | 'timetable' | 'performance'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: classData, isLoading } = useQuery({
     queryKey: ['class', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      name: 'Class 10',
-      section: 'A',
-      academicYear: '2024-2025',
-      classTeacher: {
-        id: 't1',
-        name: 'Mrs. Priya Sharma',
-        employeeId: 'TCH001',
+    queryFn: () => academicService.getClass(params.id),
+    enabled: !!params.id,
+  });
         phone: '+91 9876543210',
         email: 'priya.sharma@school.com',
       },

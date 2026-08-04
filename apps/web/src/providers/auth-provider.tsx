@@ -3,14 +3,19 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../stores/auth.store';
-import { apiClient } from '../lib/axios';
+import { authService } from '../services/auth.service';
 
-const PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/auth/forgot-password'];
+const PUBLIC_ROUTES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/test/api',
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { setUser, setLoading, logout } = useAuthStore();
+  const { setUser, setLoading, setAccessToken, logout } = useAuthStore();
 
   useEffect(() => {
     // Check authentication status on mount
@@ -18,14 +23,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setLoading(true);
 
-        // Call /auth/me to get current user (uses refresh cookie)
-        const response = await apiClient.get('/auth/me');
+        // Check if there's a token in localStorage (client-side persistence)
+        const storedToken = localStorage.getItem('accessToken');
+        
+        if (!storedToken) {
+          // No token, not authenticated
+          setUser(null);
+          if (!PUBLIC_ROUTES.includes(pathname)) {
+            router.push('/auth/login');
+          }
+          return;
+        }
 
-        setUser(response.data.user);
-        useAuthStore.getState().setAccessToken(response.data.accessToken);
+        // Set the token
+        setAccessToken(storedToken);
+
+        // Verify token by calling /auth/me
+        const response = await authService.getMe();
+        
+        setUser(response.user);
+        setAccessToken(response.accessToken);
+        
+        // Store new token if refreshed
+        localStorage.setItem('accessToken', response.accessToken);
+
       } catch (error) {
-        // Not authenticated
+        // Token invalid or expired
+        console.error('Auth check failed:', error);
         setUser(null);
+        setAccessToken(null);
+        localStorage.removeItem('accessToken');
 
         // Redirect to login if not on public route
         if (!PUBLIC_ROUTES.includes(pathname)) {
@@ -41,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for logout events
     const handleLogout = () => {
       logout();
+      localStorage.removeItem('accessToken');
       router.push('/auth/login');
     };
 
@@ -49,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('auth:logout', handleLogout);
     };
-  }, [pathname, router, setUser, setLoading, logout]);
+  }, [pathname, router, setUser, setLoading, setAccessToken, logout]);
 
   return <>{children}</>;
 }

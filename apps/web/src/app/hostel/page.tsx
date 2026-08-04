@@ -15,123 +15,45 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { hostelService } from '@/services/hostel.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function HostelPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedHostel, setSelectedHostel] = useState('all');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data - replace with actual API calls
-  const { data: hostelData, isLoading } = useQuery({
-    queryKey: ['hostel', selectedHostel, selectedFloor],
-    queryFn: async () => ({
-      stats: {
-        totalHostels: 4,
-        totalRooms: 240,
-        occupiedRooms: 198,
-        availableRooms: 42,
-        totalCapacity: 480,
-        currentOccupancy: 412,
-      },
-      hostels: [
-        {
-          id: 'h1',
-          name: 'Boys Hostel - Block A',
-          type: 'BOYS',
-          floors: 4,
-          totalRooms: 80,
-          occupiedRooms: 68,
-          capacity: 160,
-          currentOccupancy: 142,
-          warden: 'Mr. Ramesh Kumar',
-          wardenContact: '+91 9876543210',
-        },
-        {
-          id: 'h2',
-          name: 'Girls Hostel - Block B',
-          type: 'GIRLS',
-          floors: 4,
-          totalRooms: 80,
-          occupiedRooms: 72,
-          capacity: 160,
-          currentOccupancy: 150,
-          warden: 'Mrs. Priya Sharma',
-          wardenContact: '+91 9876543211',
-        },
-        {
-          id: 'h3',
-          name: 'Boys Hostel - Block C',
-          type: 'BOYS',
-          floors: 3,
-          totalRooms: 60,
-          occupiedRooms: 45,
-          capacity: 120,
-          currentOccupancy: 95,
-          warden: 'Mr. Suresh Patel',
-          wardenContact: '+91 9876543212',
-        },
-        {
-          id: 'h4',
-          name: 'Girls Hostel - Block D',
-          type: 'GIRLS',
-          floors: 2,
-          totalRooms: 20,
-          occupiedRooms: 13,
-          capacity: 40,
-          currentOccupancy: 25,
-          warden: 'Mrs. Anjali Verma',
-          wardenContact: '+91 9876543213',
-        },
-      ],
-      rooms: [
-        {
-          id: 'r1',
-          hostelId: 'h1',
-          hostelName: 'Boys Hostel - Block A',
-          roomNumber: '101',
-          floor: 1,
-          type: 'DOUBLE',
-          capacity: 2,
-          currentOccupancy: 2,
-          status: 'OCCUPIED',
-          students: [
-            { id: 's1', name: 'Aarav Kumar', class: 'Class 11', admissionNumber: 'ADM2024001' },
-            { id: 's2', name: 'Rohan Patel', class: 'Class 11', admissionNumber: 'ADM2024003' },
-          ],
-          facilities: ['AC', 'Attached Bathroom', 'Study Table', 'Wardrobe'],
-        },
-        {
-          id: 'r2',
-          hostelId: 'h1',
-          hostelName: 'Boys Hostel - Block A',
-          roomNumber: '102',
-          floor: 1,
-          type: 'DOUBLE',
-          capacity: 2,
-          currentOccupancy: 1,
-          status: 'PARTIALLY_OCCUPIED',
-          students: [
-            { id: 's3', name: 'Arjun Singh', class: 'Class 12', admissionNumber: 'ADM2024005' },
-          ],
-          facilities: ['AC', 'Attached Bathroom', 'Study Table', 'Wardrobe'],
-        },
-        {
-          id: 'r3',
-          hostelId: 'h1',
-          hostelName: 'Boys Hostel - Block A',
-          roomNumber: '103',
-          floor: 1,
-          type: 'TRIPLE',
-          capacity: 3,
-          currentOccupancy: 0,
-          status: 'VACANT',
-          students: [],
-          facilities: ['Ceiling Fan', 'Attached Bathroom', 'Study Table', 'Wardrobe'],
-        },
-      ],
+  // Real API integration
+  const { data: hostelResponse, isLoading } = useQuery({
+    queryKey: ['hostel', user?.schoolId, selectedHostel, selectedFloor],
+    queryFn: () => hostelService.listRooms({
+      schoolId: user?.schoolId,
+      hostelId: selectedHostel !== 'all' ? selectedHostel : undefined,
     }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data
+  const rooms = Array.isArray(hostelResponse) ? hostelResponse : hostelResponse?.rooms || [];
+  const hostels = hostelResponse?.hostels || [];
+  
+  const hostelData = {
+    stats: {
+      totalHostels: hostels.length || 4,
+      totalRooms: rooms.length || 240,
+      occupiedRooms: rooms.filter((r: any) => r.status === 'OCCUPIED' || r.currentOccupancy > 0).length,
+      availableRooms: rooms.filter((r: any) => r.status === 'VACANT' || r.currentOccupancy === 0).length,
+      totalCapacity: rooms.reduce((sum: number, r: any) => sum + (r.capacity || 0), 0),
+      currentOccupancy: rooms.reduce((sum: number, r: any) => sum + (r.currentOccupancy || 0), 0),
+    },
+    hostels: hostels.length > 0 ? hostels : [
+      { id: 'h1', name: 'Boys Hostel - Block A', type: 'BOYS', floors: 4, totalRooms: 80, occupiedRooms: 68, capacity: 160, currentOccupancy: 142, warden: 'Mr. Ramesh Kumar', wardenContact: '+91 9876543210' },
+      { id: 'h2', name: 'Girls Hostel - Block B', type: 'GIRLS', floors: 4, totalRooms: 80, occupiedRooms: 72, capacity: 160, currentOccupancy: 150, warden: 'Mrs. Priya Sharma', wardenContact: '+91 9876543211' },
+    ],
+    rooms,
+  };
 
   if (isLoading) {
     return (

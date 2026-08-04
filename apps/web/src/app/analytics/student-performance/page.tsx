@@ -15,102 +15,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { analyticsService } from '@/services/analytics.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function StudentPerformanceAnalyticsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data - replace with actual API call
-  const { data: performanceData, isLoading } = useQuery({
-    queryKey: ['student-performance', selectedClass, selectedSubject],
-    queryFn: async () => ({
-      summary: {
-        totalStudents: 45,
-        averageGrade: 78.5,
-        topPerformer: 'Aarav Kumar',
-        lowestPerformer: 'Raj Malhotra',
-        improvementRate: 12.3,
-      },
-      students: [
-        {
-          id: 's1',
-          name: 'Aarav Kumar',
-          admissionNumber: 'ADM2024001',
-          class: 'Class 10',
-          section: 'A',
-          overallGrade: 92.5,
-          trend: 'up',
-          subjects: [
-            { name: 'Mathematics', grade: 95, trend: 'up' },
-            { name: 'Science', grade: 93, trend: 'stable' },
-            { name: 'English', grade: 90, trend: 'up' },
-            { name: 'Social Studies', grade: 91, trend: 'up' },
-          ],
-          attendance: 96.5,
-          assignmentsSubmitted: 28,
-          assignmentsTotal: 30,
-          rank: 1,
-        },
-        {
-          id: 's2',
-          name: 'Diya Sharma',
-          admissionNumber: 'ADM2024002',
-          class: 'Class 10',
-          section: 'A',
-          overallGrade: 88.3,
-          trend: 'up',
-          subjects: [
-            { name: 'Mathematics', grade: 90, trend: 'up' },
-            { name: 'Science', grade: 92, trend: 'up' },
-            { name: 'English', grade: 85, trend: 'stable' },
-            { name: 'Social Studies', grade: 86, trend: 'up' },
-          ],
-          attendance: 92.0,
-          assignmentsSubmitted: 29,
-          assignmentsTotal: 30,
-          rank: 2,
-        },
-        {
-          id: 's3',
-          name: 'Rohan Patel',
-          admissionNumber: 'ADM2024003',
-          class: 'Class 10',
-          section: 'A',
-          overallGrade: 85.7,
-          trend: 'stable',
-          subjects: [
-            { name: 'Mathematics', grade: 88, trend: 'stable' },
-            { name: 'Science', grade: 87, trend: 'up' },
-            { name: 'English', grade: 82, trend: 'down' },
-            { name: 'Social Studies', grade: 85, trend: 'stable' },
-          ],
-          attendance: 89.5,
-          assignmentsSubmitted: 27,
-          assignmentsTotal: 30,
-          rank: 3,
-        },
-      ],
-      insights: [
-        {
-          type: 'success',
-          message: '15 students showing consistent improvement',
-          icon: '📈',
-        },
-        {
-          type: 'warning',
-          message: '3 students need attention - declining performance',
-          icon: '⚠️',
-        },
-        {
-          type: 'info',
-          message: 'Mathematics has highest average (85.2%)',
-          icon: 'ℹ️',
-        },
-      ],
+  // Real API integration
+  const { data: performanceResponse, isLoading } = useQuery({
+    queryKey: ['student-performance', user?.schoolId, selectedClass, selectedSubject],
+    queryFn: () => analyticsService.getStudentPerformance(user?.schoolId || '', {
+      classId: selectedClass !== 'all' ? selectedClass : undefined,
+      subjectId: selectedSubject !== 'all' ? selectedSubject : undefined,
     }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API response
+  const performanceData = performanceResponse || {
+    summary: {
+      totalStudents: 0,
+      averageGrade: 0,
+      topPerformer: '',
+      lowestPerformer: '',
+      improvementRate: 0,
+    },
+    students: [],
+    insights: [],
+  };
 
   const filteredStudents = performanceData?.students.filter((student: any) => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

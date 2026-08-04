@@ -1,0 +1,8 @@
+node_modules
+dist
+.nx
+coverage
+*.log
+*.lock
+package-lock.json
+yarn.lock

@@ -16,17 +16,25 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { messageService } from '@/services/message.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function MessagesPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data - replace with actual API calls
-  const { data: conversationsData, isLoading } = useQuery({
-    queryKey: ['conversations', searchTerm],
-    queryFn: async () => [
+  // Real API integration
+  const { data: conversationsResponse, isLoading } = useQuery({
+    queryKey: ['conversations', user?.id, searchTerm],
+    queryFn: () => messageService.getConversations(),
+    enabled: !!user?.id,
+  });
+
+  // Transform API data
+  const conversationsData = Array.isArray(conversationsResponse) ? conversationsResponse : conversationsResponse?.conversations || [];
       {
         id: 'conv1',
         type: 'DIRECT',

@@ -5,8 +5,13 @@ export class AuthResponseDto {
     email: string;
     firstName: string;
     lastName: string;
-    tenantId?: string;
+    role?: string;
     roles?: string[];
+    permissions?: string[];
+    tenantId?: string;
+    organizationId?: string;
+    schoolId?: string;
+    status?: string;
   };
 }
 

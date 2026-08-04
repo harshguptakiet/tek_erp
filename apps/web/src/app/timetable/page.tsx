@@ -14,40 +14,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const TIME_SLOTS = [
-  { id: '1', start: '08:00', end: '08:45', label: '8:00 - 8:45 AM' },
-  { id: '2', start: '08:45', end: '09:30', label: '8:45 - 9:30 AM' },
-  { id: '3', start: '09:30', end: '10:15', label: '9:30 - 10:15 AM' },
-  { id: '4', start: '10:15', end: '10:30', label: 'Break', isBreak: true },
-  { id: '5', start: '10:30', end: '11:15', label: '10:30 - 11:15 AM' },
-  { id: '6', start: '11:15', end: '12:00', label: '11:15 - 12:00 PM' },
-  { id: '7', start: '12:00', end: '12:45', label: '12:00 - 12:45 PM' },
-  { id: '8', start: '12:45', end: '13:30', label: 'Lunch Break', isBreak: true },
-  { id: '9', start: '13:30', end: '14:15', label: '1:30 - 2:15 PM' },
-  { id: '10', start: '14:15', end: '15:00', label: '2:15 - 3:00 PM' },
-];
 
 export default function TimetablePage() {
   const router = useRouter();
-  const [selectedClass, setSelectedClass] = useState('10-a');
+  const { user } = useAuthStore();
+  const [selectedClass, setSelectedClass] = useState('');
   const [selectedView, setSelectedView] = useState<'class' | 'teacher'>('class');
 
-  // Mock data - replace with actual API call
+  // Real API integration - Get available classes first
+  const { data: classStructure } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
+  });
+
+  // Get timetable for selected class
   const { data: timetable, isLoading } = useQuery({
-    queryKey: ['timetable', selectedClass, selectedView],
-    queryFn: async () => ({
-      class: 'Class 10',
-      section: 'A',
-      academicYear: '2024-2025',
-      schedule: {
-        Monday: [
-          { slot: '1', subject: 'Mathematics', teacher: 'Mr. Kumar', room: '201', type: 'LECTURE' },
-          { slot: '2', subject: 'Mathematics', teacher: 'Mr. Kumar', room: '201', type: 'LECTURE' },
-          { slot: '3', subject: 'Science', teacher: 'Dr. Verma', room: '301', type: 'LAB' },
-          { slot: '5', subject: 'English', teacher: 'Mrs. Singh', room: '105', type: 'LECTURE' },
-          { slot: '6', subject: 'English', teacher: 'Mrs. Singh', room: '105', type: 'LECTURE' },
+    queryKey: ['timetable', selectedClass],
+    queryFn: () => academicService.getSyllabusProgress(selectedClass),
+    enabled: !!selectedClass,
+  });
           { slot: '7', subject: 'Physical Education', teacher: 'Mr. Reddy', room: 'Ground', type: 'PRACTICAL' },
           { slot: '9', subject: 'Hindi', teacher: 'Mrs. Patel', room: '203', type: 'LECTURE' },
           { slot: '10', subject: 'Social Studies', teacher: 'Mr. Sharma', room: '204', type: 'LECTURE' },

@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { userService } from '@/services/user.service';
 
 // Validation schema
 const parentEditSchema = z.object({
@@ -54,36 +55,11 @@ export default function ParentEditPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: parent, isLoading } = useQuery({
     queryKey: ['parent', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      firstName: 'Rajesh',
-      lastName: 'Kumar',
-      middleName: '',
-      email: 'rajesh.kumar@email.com',
-      phone: '+91 9876543210',
-      alternatePhone: '+91 9876543211',
-      gender: 'MALE' as const,
-      occupation: 'Software Engineer',
-      employer: 'Tech Solutions Pvt Ltd',
-      workPhone: '+91 2212345678',
-      address: {
-        street: '123 MG Road',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        country: 'India',
-        postalCode: '400001',
-      },
-      preferredCommunication: 'APP' as const,
-      emergencyContact: {
-        name: 'Sunita Kumar',
-        relationship: 'Spouse',
-        phone: '+91 9876543212',
-      },
-      notes: 'Prefers evening communication after 6 PM',
-    }),
+    queryFn: () => userService.getParent(params.id),
+    enabled: !!params.id,
   });
 
   const {
@@ -123,11 +99,7 @@ export default function ParentEditPage({ params }: { params: { id: string } }) {
   }, [hasUnsavedChanges]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: ParentEditForm) => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      return data;
-    },
+    mutationFn: (data: ParentEditForm) => userService.updateParent(params.id, data),
     onSuccess: () => {
       toast.success('Parent profile updated successfully');
       setHasUnsavedChanges(false);

@@ -20,6 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { contentService } from '@/services/content.service';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const contentSchema = z.object({
@@ -43,6 +46,7 @@ type ContentForm = z.infer<typeof contentSchema>;
 
 export default function CreateContentPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -66,27 +70,22 @@ export default function CreateContentPage() {
 
   const contentType = watch('contentType');
 
-  // Mock data - replace with actual API calls
-  const { data: subjectsData } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: async () => [
-      { id: 'sub1', name: 'Mathematics', code: 'MATH' },
-      { id: 'sub2', name: 'Physics', code: 'PHY' },
-      { id: 'sub3', name: 'Chemistry', code: 'CHEM' },
-      { id: 'sub4', name: 'English', code: 'ENG' },
-      { id: 'sub5', name: 'Biology', code: 'BIO' },
-    ],
+  // Real API integration
+  const { data: subjectsResponse } = useQuery({
+    queryKey: ['subjects', user?.schoolId],
+    queryFn: () => academicService.getSubjects(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
-  const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: async () => [
-      { id: 'c1', name: 'Class 9' },
-      { id: 'c2', name: 'Class 10' },
-      { id: 'c3', name: 'Class 11' },
-      { id: 'c4', name: 'Class 12' },
-    ],
+  const { data: classesResponse } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data
+  const subjectsData = Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse?.subjects || [];
+  const classesData = Array.isArray(classesResponse) ? classesResponse : classesResponse?.classes || [];
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,11 +111,23 @@ export default function CreateContentPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async (data: ContentForm) => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return { id: 'new-content-id', ...data };
-    },
+    mutationFn: (data: ContentForm) => contentService.createContent({
+      title: data.title,
+      contentType: data.contentType,
+      description: data.description,
+      url: data.fileUrl || data.externalUrl,
+      metadata: {
+        subjectId: data.subjectId,
+        classId: data.classId,
+        topicId: data.topicId,
+        tags: data.tags?.split(',').map(t => t.trim()),
+        duration: data.duration,
+        difficulty: data.difficulty,
+        language: data.language,
+        isPublic: data.isPublic,
+        allowDownload: data.allowDownload,
+      },
+    }),
     onSuccess: (data) => {
       toast.success('Content created successfully');
       router.push(`/content/${data.id}`);

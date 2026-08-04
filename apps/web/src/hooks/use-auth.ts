@@ -16,6 +16,12 @@ export function useAuth() {
     onSuccess: (data) => {
       setUser(data.user);
       setAccessToken(data.accessToken);
+      
+      // Store token in localStorage for persistence
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('accessToken', data.accessToken);
+      }
+      
       addNotification({
         type: 'success',
         title: 'Welcome back!',
@@ -23,11 +29,11 @@ export function useAuth() {
       });
       router.push('/dashboard');
     },
-    onError: () => {
+    onError: (error: any) => {
       addNotification({
         type: 'error',
         title: 'Login failed',
-        message: 'Invalid email or password',
+        message: error.message || 'Invalid email or password',
       });
     },
   });
@@ -59,6 +65,12 @@ export function useAuth() {
     mutationFn: authService.logout,
     onSuccess: () => {
       storeLogout();
+      
+      // Remove token from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+      }
+      
       addNotification({
         type: 'success',
         title: 'Logged out',

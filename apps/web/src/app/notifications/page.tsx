@@ -13,16 +13,27 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { notificationService } from '@/services/notification.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  // Mock data - replace with actual API call
-  const { data: notifications, isLoading, refetch } = useQuery({
-    queryKey: ['notifications', filter, typeFilter],
-    queryFn: async () => [
+  // Real API integration
+  const { data: notificationsResponse, isLoading, refetch } = useQuery({
+    queryKey: ['notifications', user?.id, filter, typeFilter],
+    queryFn: () => notificationService.getNotifications({
+      status: filter === 'unread' ? 'UNREAD' : filter === 'read' ? 'READ' : undefined,
+      priority: typeFilter !== 'all' ? typeFilter : undefined,
+    }),
+    enabled: !!user?.id,
+  });
+
+  // Transform API data
+  const notifications = Array.isArray(notificationsResponse) ? notificationsResponse : notificationsResponse?.notifications || [];
       {
         id: '1',
         type: 'ASSIGNMENT',

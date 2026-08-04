@@ -1,232 +1,411 @@
 /**
- * Module 17: System Settings - Account Settings
- * FR-SYSTEM-002: Manage account preferences and credentials
+ * Module 02: User Management - Account Settings
+ * FR-USER-003: Manage account preferences
  */
 
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { userService } from '@/services/user.service';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/form';
-import { z } from 'zod';
+import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Mail, Phone, Loader2 } from 'lucide-react';
 
-const accountSchema = z.object({
-  displayName: z.string().min(2, 'Display name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().optional(),
-  language: z.string(),
-  timezone: z.string(),
-  dateFormat: z.string(),
-  emailNotifications: z.boolean(),
-  smsNotifications: z.boolean(),
-  marketingEmails: z.boolean(),
+const emailSchema = z.object({
+  newEmail: z.string().email('Invalid email address'),
 });
 
-type AccountForm = z.infer<typeof accountSchema>;
+const phoneSchema = z.object({
+  countryCode: z.string().min(1, 'Country code required'),
+  phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits'),
+});
+
+const languageSchema = z.object({
+  language: z.string().min(1, 'Please select a language'),
+  timezone: z.string().min(1, 'Please select a timezone'),
+});
+
+type EmailFormData = z.infer<typeof emailSchema>;
+type PhoneFormData = z.infer<typeof phoneSchema>;
+type LanguageFormData = z.infer<typeof languageSchema>;
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState<'general' | 'contact' | 'preferences'>('general');
+  const queryClient = useQueryClient();
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty },
-  } = useForm<AccountForm>({
-    resolver: formResolver(accountSchema),
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => userService.getProfile(),
+  });
+
+  const emailForm = useForm<EmailFormData>({
+    resolver: formResolver(emailSchema),
+  });
+
+  const phoneForm = useForm<PhoneFormData>({
+    resolver: formResolver(phoneSchema),
     defaultValues: {
-      displayName: 'John Doe',
-      email: 'john.doe@school.edu',
-      phone: '+91 98765 43210',
-      language: 'en',
-      timezone: 'Asia/Kolkata',
-      dateFormat: 'DD/MM/YYYY',
-      emailNotifications: true,
-      smsNotifications: false,
-      marketingEmails: false,
+      countryCode: '+91',
+      phoneNumber: profile?.phone || '',
     },
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: AccountForm) => {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      return data;
+  const languageForm = useForm<LanguageFormData>({
+    resolver: formResolver(languageSchema),
+    defaultValues: {
+      language: profile?.language || 'en',
+      timezone: profile?.timezone || 'Asia/Kolkata',
     },
-    onSuccess: () => toast.success('Account settings saved successfully!'),
-    onError: () => toast.error('Failed to save settings.'),
   });
 
-  const onSubmit = (data: AccountForm) => saveMutation.mutate(data);
+  const updateEmailMutation = useMutation({
+    mutationFn: (data: EmailFormData) => userService.updateEmail(data.newEmail),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast.success('Email update initiated. Please check your new email for verification.');
+      setEditingEmail(false);
+      emailForm.reset();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update email');
+    },
+  });
 
-  const sections = [
-    { id: 'general' as const, label: 'General' },
-    { id: 'contact' as const, label: 'Contact Info' },
-    { id: 'preferences' as const, label: 'Preferences' },
-  ];
+  const updatePhoneMutation = useMutation({
+    mutationFn: (data: PhoneFormData) => 
+      userService.updateProfile({ phone: `${data.countryCode}${data.phoneNumber}` }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast.success('Phone number updated successfully');
+      setEditingPhone(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update phone');
+    },
+  });
+
+  const updateLanguageMutation = useMutation({
+    mutationFn: (data: LanguageFormData) => 
+      userService.updateProfile({ 
+        language: data.language,
+        timezone: data.timezone,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast.success('Preferences updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update preferences');
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: () => userService.resendVerificationEmail(),
+    onSuccess: () => {
+      toast.success('Verification email sent');
+    },
+    onError: () => {
+      toast.error('Failed to send verification email');
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <Button variant="outline" onClick={() => router.push('/settings')} className="mb-4">
-        ← Back to Settings
-      </Button>
-
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')}>
+          ← Back to settings
+        </Button>
+        <h1 className="mt-2 text-3xl font-bold text-gray-900">Account Settings</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Manage your account information and preferences
+          Manage your email, phone number, and account preferences
         </p>
       </div>
 
-      {/* Account Status */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-gray-900">Account Status</p>
-              <p className="text-sm text-gray-500">Member since January 2024</p>
-            </div>
-            <Badge variant="success">Active</Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Section Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeSection === section.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {section.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {activeSection === 'general' && (
-          <Card>
-            <CardHeader><CardTitle>General Information</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-                <Input {...register('displayName')} />
-                {errors.displayName && <p className="text-red-500 text-sm mt-1">{errors.displayName.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
-                <Input value="USR-2024-001234" disabled />
-                <p className="text-xs text-gray-500 mt-1">User ID cannot be changed</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <Input value="Teacher" disabled />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeSection === 'contact' && (
-          <Card>
-            <CardHeader><CardTitle>Contact Information</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <div className="flex gap-2">
-                  <Input {...register('email')} className="flex-1" />
-                  <Badge variant="success">Verified</Badge>
+      <div className="space-y-6">
+        {/* Email Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Address
+            </CardTitle>
+            <CardDescription>
+              Your email is used for login and important notifications
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!editingEmail ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{profile?.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {profile?.emailVerified ? (
+                      <Badge variant="success">Verified</Badge>
+                    ) : (
+                      <>
+                        <Badge variant="warning">Not Verified</Badge>
+                        <Button
+                          size="sm"
+                          variant="link"
+                          onClick={() => resendVerificationMutation.mutate()}
+                          disabled={resendVerificationMutation.isPending}
+                        >
+                          {resendVerificationMutation.isPending ? 'Sending...' : 'Resend verification'}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <div className="flex gap-2">
-                  <Input {...register('phone')} className="flex-1" />
-                  <Badge variant="success">Verified</Badge>
-                </div>
-              </div>
-              <div className="pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => router.push('/account/security/change-password')}>
-                  Change Password
+                <Button variant="outline" onClick={() => setEditingEmail(true)}>
+                  Change Email
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeSection === 'preferences' && (
-          <Card>
-            <CardHeader><CardTitle>Preferences</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            ) : (
+              <form onSubmit={emailForm.handleSubmit((data) => updateEmailMutation.mutate(data))} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
-                  <Select {...register('language')}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Email Address
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="new.email@example.com"
+                    {...emailForm.register('newEmail')}
+                    error={emailForm.formState.errors.newEmail?.message}
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    You'll need to verify your new email address
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    type="submit" 
+                    disabled={updateEmailMutation.isPending}
+                  >
+                    {updateEmailMutation.isPending ? 'Updating...' : 'Update Email'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingEmail(false);
+                      emailForm.reset();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Phone Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5" />
+              Phone Number
+            </CardTitle>
+            <CardDescription>
+              Used for SMS notifications and two-factor authentication
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!editingPhone ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{profile?.phone || 'Not set'}</p>
+                  {profile?.phoneVerified && (
+                    <Badge variant="success" className="mt-1">Verified</Badge>
+                  )}
+                </div>
+                <Button variant="outline" onClick={() => setEditingPhone(true)}>
+                  {profile?.phone ? 'Change' : 'Add'} Phone
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={phoneForm.handleSubmit((data) => updatePhoneMutation.mutate(data))} className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country Code
+                    </label>
+                    <Select
+                      {...phoneForm.register('countryCode')}
+                      error={phoneForm.formState.errors.countryCode?.message}
+                    >
+                      <option value="+91">+91 (India)</option>
+                      <option value="+1">+1 (US/Canada)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+86">+86 (China)</option>
+                      <option value="+81">+81 (Japan)</option>
+                      <option value="+61">+61 (Australia)</option>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number
+                    </label>
+                    <Input
+                      type="tel"
+                      placeholder="9876543210"
+                      {...phoneForm.register('phoneNumber')}
+                      error={phoneForm.formState.errors.phoneNumber?.message}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    type="submit" 
+                    disabled={updatePhoneMutation.isPending}
+                  >
+                    {updatePhoneMutation.isPending ? 'Updating...' : 'Update Phone'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingPhone(false);
+                      phoneForm.reset();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Language & Timezone */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Language & Region</CardTitle>
+            <CardDescription>
+              Set your preferred language and timezone
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form 
+              onSubmit={languageForm.handleSubmit((data) => updateLanguageMutation.mutate(data))} 
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Language
+                  </label>
+                  <Select
+                    {...languageForm.register('language')}
+                    error={languageForm.formState.errors.language?.message}
+                  >
                     <option value="en">English</option>
-                    <option value="hi">Hindi</option>
-                    <option value="ta">Tamil</option>
-                    <option value="te">Telugu</option>
+                    <option value="hi">हिंदी (Hindi)</option>
+                    <option value="mr">मराठी (Marathi)</option>
+                    <option value="bn">বাংলা (Bengali)</option>
+                    <option value="te">తెలుగు (Telugu)</option>
+                    <option value="ta">தமிழ் (Tamil)</option>
+                    <option value="gu">ગુજરાતી (Gujarati)</option>
+                    <option value="kn">ಕನ್ನಡ (Kannada)</option>
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-                  <Select {...register('timezone')}>
-                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                    <option value="America/New_York">America/New_York (EST)</option>
-                    <option value="Europe/London">Europe/London (GMT)</option>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Timezone
+                  </label>
+                  <Select
+                    {...languageForm.register('timezone')}
+                    error={languageForm.formState.errors.timezone?.message}
+                  >
+                    <option value="Asia/Kolkata">IST (UTC+5:30) - India</option>
+                    <option value="America/New_York">EST (UTC-5) - New York</option>
+                    <option value="America/Los_Angeles">PST (UTC-8) - Los Angeles</option>
+                    <option value="Europe/London">GMT (UTC+0) - London</option>
+                    <option value="Asia/Dubai">GST (UTC+4) - Dubai</option>
+                    <option value="Asia/Tokyo">JST (UTC+9) - Tokyo</option>
+                    <option value="Australia/Sydney">AEDT (UTC+11) - Sydney</option>
                   </Select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date Format</label>
-                <Select {...register('dateFormat')}>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </Select>
-              </div>
-              <div className="pt-4 border-t space-y-3">
-                <p className="font-medium text-gray-900">Communication Preferences</p>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" {...register('emailNotifications')} className="rounded" />
-                  <span className="text-sm text-gray-700">Email notifications for important updates</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" {...register('smsNotifications')} className="rounded" />
-                  <span className="text-sm text-gray-700">SMS notifications for urgent alerts</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" {...register('marketingEmails')} className="rounded" />
-                  <span className="text-sm text-gray-700">Receive product updates and newsletters</span>
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              <Button 
+                type="submit" 
+                disabled={updateLanguageMutation.isPending || !languageForm.formState.isDirty}
+              >
+                {updateLanguageMutation.isPending ? 'Saving...' : 'Save Preferences'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <Button type="button" variant="outline" onClick={() => router.push('/settings')}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saveMutation.isPending || !isDirty}>
-            {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </div>
-      </form>
+        {/* Username (Read-only for now) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Username</CardTitle>
+            <CardDescription>
+              Your unique identifier on the platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono font-medium text-gray-900">
+                  @{profile?.username || profile?.email?.split('@')[0]}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Username changes are not currently supported
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Account ID */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account ID</CardTitle>
+            <CardDescription>
+              Your unique account identifier for support requests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <code className="flex-1 px-3 py-2 bg-gray-100 rounded font-mono text-sm">
+                {profile?.id}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(profile?.id || '');
+                  toast.success('Account ID copied to clipboard');
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

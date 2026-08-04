@@ -1,368 +1,450 @@
 /**
- * Module 05: Content - Create Learning Path
- * FR-CONTENT-011: Build structured learning paths with content sequencing
+ * Module 39: Learning Paths - Create Learning Path
+ * FR-LEARNING-003: Create new learning path with modules
  */
 
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
-import { formResolver } from '@/lib/form';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Can } from '@/components/auth/can';
-import { PERMISSIONS } from '@/config/permissions';
-import { toast } from 'sonner';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
+import toast from 'react-hot-toast';
 
-const pathSchema = z.object({
+const learningPathSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
   subjectId: z.string().min(1, 'Subject is required'),
-  grade: z.string().min(1, 'Grade is required'),
-  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
-  estimatedHours: z.coerce.number().min(1, 'Estimated hours must be at least 1'),
-  targetAudience: z.string().optional(),
-  tags: z.string().optional(),
-  isAdaptive: z.boolean(),
-  certificateOnCompletion: z.boolean(),
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']),
+  modules: z.array(
+    z.object({
+      title: z.string().min(3, 'Module title required'),
+      description: z.string().min(10, 'Module description required'),
+      duration: z.number().min(1, 'Duration must be at least 1 hour'),
+      isRequired: z.boolean().default(true),
+      order: z.number(),
+    })
+  ).min(1, 'At least one module is required'),
 });
 
-type PathForm = z.infer<typeof pathSchema>;
-
-interface PathStep {
-  id: string;
-  contentId: string;
-  contentTitle: string;
-  contentType: string;
-  duration: string;
-  isRequired: boolean;
-  hasPrerequisite: boolean;
-}
+type LearningPathFormData = z.infer<typeof learningPathSchema>;
 
 export default function CreateLearningPathPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [pathSteps, setPathSteps] = useState<PathStep[]>([]);
-  const [selectedContentId, setSelectedContentId] = useState('');
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   const {
     register,
+    control,
     handleSubmit,
-    formState: { errors },
     watch,
-    setValue,
-    trigger,
-  } = useForm<PathForm>({
-    resolver: formResolver(pathSchema),
+    formState: { errors },
+  } = useForm<LearningPathFormData>({
+    resolver: zodResolver(learningPathSchema),
     defaultValues: {
-      difficulty: 'INTERMEDIATE',
-      isAdaptive: false,
-      certificateOnCompletion: true,
+      title: '',
+      description: '',
+      subjectId: '',
+      difficulty: 'intermediate',
+      modules: [
+        { title: '', description: '', duration: 1, isRequired: true, order: 1 },
+      ],
     },
   });
 
-  const isAdaptive = watch('isAdaptive');
+  const { fields, append, remove, move } = useFieldArray({
+    control,
+    name: 'modules',
+  });
 
-  const { data: subjectsData } = useQuery({
+  // Real API integration
+  const { data: subjectsResponse } = useQuery({
     queryKey: ['subjects'],
-    queryFn: async () => [
-      { id: 'sub1', name: 'Mathematics', code: 'MATH' },
-      { id: 'sub2', name: 'Physics', code: 'PHY' },
-      { id: 'sub3', name: 'Chemistry', code: 'CHEM' },
-      { id: 'sub4', name: 'English', code: 'ENG' },
-      { id: 'sub5', name: 'Biology', code: 'BIO' },
-    ],
+    queryFn: () => academicService.listSubjects(),
   });
 
-  const { data: contentLibrary } = useQuery({
-    queryKey: ['content-library'],
-    queryFn: async () => [
-      { id: 'c1', title: 'Introduction to Algebra', type: 'VIDEO', duration: '45 min' },
-      { id: 'c2', title: 'Linear Equations Practice', type: 'QUIZ', duration: '20 min' },
-      { id: 'c3', title: 'Quadratic Equations Notes', type: 'DOCUMENT', duration: '15 pages' },
-      { id: 'c4', title: 'Polynomial Functions Lab', type: 'LAB', duration: '60 min' },
-      { id: 'c5', title: 'Board Exam Mock Test', type: 'QUIZ', duration: '180 min' },
-    ],
-  });
+  const subjects = Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse?.data || [];
 
+  // Create learning path mutation
   const createMutation = useMutation({
-    mutationFn: async (data: PathForm & { steps: PathStep[] }) => {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      return { id: 'lp-new', ...data };
-    },
-    onSuccess: () => {
+    mutationFn: (data: LearningPathFormData) =>
+      academicService.createLearningPath(user?.schoolId || '', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['learning-paths'] });
       toast.success('Learning path created successfully!');
-      router.push('/learning-paths');
+      router.push(`/learning-paths/${data.id || ''}`);
     },
-    onError: () => toast.error('Failed to create learning path.'),
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create learning path');
+    },
   });
 
-  const addStep = () => {
-    const content = contentLibrary?.find((c) => c.id === selectedContentId);
-    if (!content) {
-      toast.error('Please select content to add');
-      return;
-    }
-    if (pathSteps.some((s) => s.contentId === content.id)) {
-      toast.error('Content already added to path');
-      return;
-    }
-    setPathSteps([
-      ...pathSteps,
-      {
-        id: `step-${Date.now()}`,
-        contentId: content.id,
-        contentTitle: content.title,
-        contentType: content.type,
-        duration: content.duration,
-        isRequired: true,
-        hasPrerequisite: pathSteps.length > 0,
-      },
-    ]);
-    setSelectedContentId('');
+  const onSubmit = (data: LearningPathFormData) => {
+    // Reorder modules based on array index
+    const orderedModules = data.modules.map((module, index) => ({
+      ...module,
+      order: index + 1,
+    }));
+
+    createMutation.mutate({
+      ...data,
+      modules: orderedModules,
+    });
   };
 
-  const removeStep = (stepId: string) => {
-    setPathSteps(pathSteps.filter((s) => s.id !== stepId));
-  };
+  const watchedModules = watch('modules');
+  const totalDuration = watchedModules.reduce((sum, m) => sum + (Number(m.duration) || 0), 0);
 
-  const moveStep = (index: number, direction: 'up' | 'down') => {
-    const newSteps = [...pathSteps];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newSteps.length) return;
-    [newSteps[index], newSteps[targetIndex]] = [newSteps[targetIndex], newSteps[index]];
-    setPathSteps(newSteps);
-  };
-
-  const onSubmit = (data: PathForm) => {
-    if (pathSteps.length === 0) {
-      toast.error('Add at least one content step to the path');
-      return;
-    }
-    createMutation.mutate({ ...data, steps: pathSteps });
-  };
-
-  const nextStep = async () => {
-    const fields: (keyof PathForm)[] =
-      step === 1 ? ['title', 'description', 'subjectId', 'grade', 'difficulty', 'estimatedHours'] : [];
-    if (fields.length > 0) {
-      const valid = await trigger(fields);
-      if (!valid) return;
-    }
-    if (step === 2 && pathSteps.length === 0) {
-      toast.error('Add at least one content step');
-      return;
-    }
-    setStep(step + 1);
-  };
+  const steps = [
+    { number: 1, title: 'Basic Information', description: 'Path details and settings' },
+    { number: 2, title: 'Add Modules', description: 'Create learning modules' },
+    { number: 3, title: 'Review & Create', description: 'Confirm and publish' },
+  ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Button variant="outline" onClick={() => router.back()} className="mb-4">
-          ← Back
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/learning-paths')}>
+          ← Back to Learning Paths
         </Button>
-        <h1 className="text-3xl font-bold text-gray-900">Create Learning Path</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mt-2">Create Learning Path</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Build a structured learning journey with sequenced content and prerequisites
+          Design a personalized learning journey for your students
         </p>
       </div>
 
-      {/* Progress Steps */}
-      <div className="flex items-center mb-8">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className="flex items-center flex-1">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step >= s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {s}
+      {/* Stepper */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          {steps.map((step, index) => (
+            <div key={step.number} className="flex items-center flex-1">
+              <div className="flex flex-col items-center flex-1">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    currentStep >= step.number
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-500'
+                  }`}
+                >
+                  {step.number}
+                </div>
+                <p
+                  className={`text-sm font-medium mt-2 ${
+                    currentStep >= step.number ? 'text-indigo-600' : 'text-gray-500'
+                  }`}
+                >
+                  {step.title}
+                </p>
+                <p className="text-xs text-gray-500">{step.description}</p>
+              </div>
+              {index < steps.length - 1 && (
+                <div
+                  className={`h-1 flex-1 mx-4 ${
+                    currentStep > step.number ? 'bg-indigo-600' : 'bg-gray-200'
+                  }`}
+                />
+              )}
             </div>
-            <span className={`ml-2 text-sm ${step >= s ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-              {s === 1 ? 'Basic Info' : s === 2 ? 'Content Sequence' : 'Review'}
-            </span>
-            {s < 3 && <div className={`flex-1 h-0.5 mx-4 ${step > s ? 'bg-blue-600' : 'bg-gray-200'}`} />}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <Can permission={PERMISSIONS.CONTENT_CREATE}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {step === 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Path Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                  <Input {...register('title')} placeholder="e.g., Complete Mathematics Mastery" />
-                  {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-                  <Textarea {...register('description')} rows={3} placeholder="Describe the learning path goals..." />
-                  {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject *</label>
-                    <Select {...register('subjectId')}>
-                      <option value="">Select subject</option>
-                      {subjectsData?.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </Select>
-                    {errors.subjectId && <p className="text-red-500 text-sm mt-1">{errors.subjectId.message}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Grade *</label>
-                    <Select {...register('grade')}>
-                      <option value="">Select grade</option>
-                      {['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'].map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                    </Select>
-                    {errors.grade && <p className="text-red-500 text-sm mt-1">{errors.grade.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty *</label>
-                    <Select {...register('difficulty')}>
-                      <option value="BEGINNER">Beginner</option>
-                      <option value="INTERMEDIATE">Intermediate</option>
-                      <option value="ADVANCED">Advanced</option>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours *</label>
-                    <Input type="number" {...register('estimatedHours')} min={1} />
-                    {errors.estimatedHours && <p className="text-red-500 text-sm mt-1">{errors.estimatedHours.message}</p>}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
-                  <Input {...register('tags')} placeholder="CBSE, Board Exam, Algebra" />
-                </div>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" {...register('isAdaptive')} className="rounded" />
-                    <span className="text-sm text-gray-700">Enable adaptive path (adjust based on performance)</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" {...register('certificateOnCompletion')} className="rounded" />
-                    <span className="text-sm text-gray-700">Certificate on completion</span>
-                  </label>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+      <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Step 1: Basic Information */}
+        {currentStep === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Path Title *
+                </label>
+                <Input
+                  {...register('title')}
+                  placeholder="e.g., Advanced Mathematics Mastery"
+                />
+                {errors.title && (
+                  <p className="text-sm text-red-600 mt-1">{errors.title.message}</p>
+                )}
+              </div>
 
-          {step === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Content Sequence</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Select value={selectedContentId} onChange={(e) => setSelectedContentId(e.target.value)} className="flex-1">
-                    <option value="">Select content to add...</option>
-                    {contentLibrary?.map((c) => (
-                      <option key={c.id} value={c.id}>{c.title} ({c.type})</option>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description *
+                </label>
+                <Textarea
+                  {...register('description')}
+                  placeholder="Describe the learning objectives and what students will achieve..."
+                  rows={4}
+                />
+                {errors.description && (
+                  <p className="text-sm text-red-600 mt-1">{errors.description.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject *
+                  </label>
+                  <Select {...register('subjectId')}>
+                    <option value="">Select subject...</option>
+                    {subjects.map((subject: any) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </option>
                     ))}
                   </Select>
-                  <Button type="button" onClick={addStep}>Add Step</Button>
+                  {errors.subjectId && (
+                    <p className="text-sm text-red-600 mt-1">{errors.subjectId.message}</p>
+                  )}
                 </div>
 
-                {pathSteps.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
-                    Add content items to build your learning path sequence
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Difficulty Level *
+                  </label>
+                  <Select {...register('difficulty')}>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button type="button" onClick={() => setCurrentStep(2)}>
+                  Next: Add Modules →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Add Modules */}
+        {currentStep === 2 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Learning Modules</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    append({
+                      title: '',
+                      description: '',
+                      duration: 1,
+                      isRequired: true,
+                      order: fields.length + 1,
+                    })
+                  }
+                >
+                  + Add Module
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-start justify-between mb-3">
+                    <Badge variant="secondary">Module {index + 1}</Badge>
+                    <div className="flex items-center gap-2">
+                      {index > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => move(index, index - 1)}
+                        >
+                          ↑
+                        </Button>
+                      )}
+                      {index < fields.length - 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => move(index, index + 1)}
+                        >
+                          ↓
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                      >
+                        ✕
+                      </Button>
+                    </div>
                   </div>
-                ) : (
+
+                  <div className="space-y-3">
+                    <div>
+                      <Input
+                        {...register(`modules.${index}.title`)}
+                        placeholder="Module title"
+                      />
+                      {errors.modules?.[index]?.title && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.modules[index]?.title?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Textarea
+                        {...register(`modules.${index}.description`)}
+                        placeholder="Module description"
+                        rows={2}
+                      />
+                      {errors.modules?.[index]?.description && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.modules[index]?.description?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-600 mb-1">Duration (hours)</label>
+                        <Input
+                          type="number"
+                          {...register(`modules.${index}.duration`, { valueAsNumber: true })}
+                          min="1"
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 pt-5">
+                        <Checkbox {...register(`modules.${index}.isRequired`)} />
+                        <label className="text-sm text-gray-700">Required module</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {errors.modules && (
+                <p className="text-sm text-red-600">{errors.modules.message}</p>
+              )}
+
+              <div className="border-t pt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Total Duration:</span> {totalDuration} hours
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
+                    ← Back
+                  </Button>
+                  <Button type="button" onClick={() => setCurrentStep(3)}>
+                    Next: Review →
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 3: Review & Create */}
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Review Learning Path</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg text-gray-900 mb-2">{watch('title')}</h3>
+                  <p className="text-gray-600">{watch('description')}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 py-4 border-y">
+                  <div>
+                    <p className="text-sm text-gray-600">Subject</p>
+                    <p className="font-medium">
+                      {subjects.find((s: any) => s.id === watch('subjectId'))?.name || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Difficulty</p>
+                    <Badge
+                      variant={
+                        watch('difficulty') === 'beginner'
+                          ? 'success'
+                          : watch('difficulty') === 'intermediate'
+                          ? 'warning'
+                          : 'error'
+                      }
+                    >
+                      {watch('difficulty')}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Modules</p>
+                    <p className="font-medium">{watchedModules.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Duration</p>
+                    <p className="font-medium">{totalDuration} hours</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Modules</h4>
                   <div className="space-y-2">
-                    {pathSteps.map((pathStep, index) => (
-                      <div key={pathStep.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                        <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                          {index + 1}
-                        </span>
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{pathStep.contentTitle}</p>
-                          <div className="flex gap-2 mt-1">
-                            <Badge variant="secondary">{pathStep.contentType}</Badge>
-                            <span className="text-sm text-gray-500">{pathStep.duration}</span>
-                            {pathStep.hasPrerequisite && (
-                              <Badge variant="warning">Requires previous step</Badge>
-                            )}
+                    {watchedModules.map((module, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-sm font-medium text-indigo-600">
+                            {index + 1}
+                          </span>
+                          <div>
+                            <p className="font-medium text-gray-900">{module.title}</p>
+                            <p className="text-sm text-gray-600">{module.description}</p>
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button type="button" variant="outline" size="sm" onClick={() => moveStep(index, 'up')} disabled={index === 0}>↑</Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => moveStep(index, 'down')} disabled={index === pathSteps.length - 1}>↓</Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => removeStep(pathStep.id)}>✕</Button>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{module.duration}h</Badge>
+                          {module.isRequired && <Badge variant="error" className="text-xs">Required</Badge>}
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-
-                <p className="text-sm text-gray-500">
-                  Content is locked until the previous step is completed. {isAdaptive && 'Adaptive mode will suggest alternate content based on quiz performance.'}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {step === 3 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Review & Publish</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <p><strong>Title:</strong> {watch('title')}</p>
-                  <p><strong>Subject:</strong> {subjectsData?.find((s) => s.id === watch('subjectId'))?.name}</p>
-                  <p><strong>Grade:</strong> {watch('grade')}</p>
-                  <p><strong>Difficulty:</strong> {watch('difficulty')}</p>
-                  <p><strong>Estimated Hours:</strong> {watch('estimatedHours')}h</p>
-                  <p><strong>Steps:</strong> {pathSteps.length} content items</p>
-                  {watch('isAdaptive') && <Badge variant="info">Adaptive Path Enabled</Badge>}
-                  {watch('certificateOnCompletion') && <Badge variant="success">Certificate on Completion</Badge>}
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">Content Sequence Preview</h4>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
-                    {pathSteps.map((s) => (
-                      <li key={s.id}>{s.contentTitle} ({s.contentType})</li>
-                    ))}
-                  </ol>
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          <div className="flex justify-between mt-6">
-            <Button type="button" variant="outline" onClick={() => (step > 1 ? setStep(step - 1) : router.back())}>
-              {step > 1 ? 'Previous' : 'Cancel'}
-            </Button>
-            {step < 3 ? (
-              <Button type="button" onClick={nextStep}>Next</Button>
-            ) : (
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" onClick={() => setCurrentStep(2)}>
+                ← Back to Edit
+              </Button>
               <Button type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Creating...' : 'Create Learning Path'}
               </Button>
-            )}
+            </div>
           </div>
-        </form>
-      </Can>
+        )}
+      </form>
     </div>
   );
 }

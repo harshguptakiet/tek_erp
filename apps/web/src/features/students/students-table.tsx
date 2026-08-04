@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStudents } from './use-students';
 import type { StudentFilters } from '../../services/student.service';
 import { Button } from '../../components/ui/button';
@@ -8,13 +9,14 @@ import { Input } from '../../components/ui/input';
 import { formatDate } from '../../lib/utils';
 
 export function StudentsTable() {
+  const router = useRouter();
   const [filters, setFilters] = useState<StudentFilters>({
     page: 1,
     limit: 50,
     search: '',
   });
 
-  const { data, isLoading, isError } = useStudents(filters);
+  const { data, isLoading, isError, error } = useStudents(filters);
 
   const handleSearch = (value: string) => {
     setFilters((prev) => ({ ...prev, search: value, page: 1 }));
@@ -24,10 +26,17 @@ export function StudentsTable() {
     setFilters((prev) => ({ ...prev, page }));
   };
 
+  const handleViewStudent = (id: string) => {
+    router.push(`/dashboard/students/${id}`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading students...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="text-muted-foreground">Loading students...</div>
+        </div>
       </div>
     );
   }
@@ -35,7 +44,15 @@ export function StudentsTable() {
   if (isError) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-destructive">Failed to load students</div>
+        <div className="text-center space-y-4">
+          <div className="text-destructive text-lg font-medium">Failed to load students</div>
+          <p className="text-sm text-muted-foreground">
+            {error?.message || 'An error occurred while fetching students'}
+          </p>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -53,7 +70,9 @@ export function StudentsTable() {
             Manage student information and records
           </p>
         </div>
-        <Button>Add Student</Button>
+        <Button onClick={() => router.push('/dashboard/students/new')}>
+          Add Student
+        </Button>
       </div>
 
       {/* Filters */}
@@ -84,7 +103,7 @@ export function StudentsTable() {
             {students.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                  No students found
+                  {filters.search ? 'No students found matching your search' : 'No students found'}
                 </td>
               </tr>
             ) : (
@@ -115,7 +134,11 @@ export function StudentsTable() {
                   </td>
                   <td className="p-4 text-sm">{formatDate(student.enrollmentDate)}</td>
                   <td className="p-4 text-right">
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleViewStudent(student.id)}
+                    >
                       View
                     </Button>
                   </td>
@@ -142,6 +165,9 @@ export function StudentsTable() {
             >
               Previous
             </Button>
+            <div className="flex items-center px-4 text-sm">
+              Page {meta.page} of {meta.totalPages}
+            </div>
             <Button
               variant="outline"
               size="sm"

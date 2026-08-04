@@ -16,119 +16,28 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { liveClassService } from '@/services/live-class.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function LiveClassesPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('upcoming');
 
-  // Mock data - replace with actual API call
-  const { data: classes, isLoading } = useQuery({
-    queryKey: ['live-classes', searchQuery, statusFilter, dateFilter],
-    queryFn: async () => [
-      {
-        id: '1',
-        title: 'Mathematics - Trigonometry Chapter Review',
-        subject: 'Mathematics',
-        class: 'Class 10',
-        section: 'A',
-        teacher: {
-          id: 't1',
-          name: 'Mr. Kumar',
-          profilePicture: null,
-        },
-        scheduledDate: '2024-09-20',
-        startTime: '10:00',
-        endTime: '11:00',
-        duration: 60,
-        status: 'SCHEDULED',
-        platform: 'ZOOM',
-        meetingLink: 'https://zoom.us/j/123456789',
-        maxParticipants: 50,
-        enrolled: 45,
-        joined: 0,
-        recordingEnabled: true,
-        recordingUrl: null,
-        description: 'Comprehensive review of trigonometry concepts covered this semester',
-      },
-      {
-        id: '2',
-        title: 'Science - Photosynthesis Lab Demonstration',
-        subject: 'Science',
-        class: 'Class 9',
-        section: 'B',
-        teacher: {
-          id: 't2',
-          name: 'Dr. Verma',
-          profilePicture: null,
-        },
-        scheduledDate: '2024-09-19',
-        startTime: '14:00',
-        endTime: '15:30',
-        duration: 90,
-        status: 'LIVE',
-        platform: 'GOOGLE_MEET',
-        meetingLink: 'https://meet.google.com/xyz-abc-def',
-        maxParticipants: 45,
-        enrolled: 42,
-        joined: 38,
-        recordingEnabled: true,
-        recordingUrl: null,
-        description: 'Live demonstration of photosynthesis process with Q&A session',
-      },
-      {
-        id: '3',
-        title: 'English - Poetry Analysis Workshop',
-        subject: 'English',
-        class: 'Class 11',
-        section: 'A',
-        teacher: {
-          id: 't3',
-          name: 'Mrs. Singh',
-          profilePicture: null,
-        },
-        scheduledDate: '2024-09-18',
-        startTime: '11:00',
-        endTime: '12:00',
-        duration: 60,
-        status: 'COMPLETED',
-        platform: 'MS_TEAMS',
-        meetingLink: 'https://teams.microsoft.com/l/meetup-join/...',
-        maxParticipants: 40,
-        enrolled: 38,
-        joined: 35,
-        recordingEnabled: true,
-        recordingUrl: 'https://recordings.example.com/english-poetry-analysis.mp4',
-        description: 'Interactive workshop analyzing modern poetry techniques',
-      },
-      {
-        id: '4',
-        title: 'Physics - Electromagnetism Lecture',
-        subject: 'Physics',
-        class: 'Class 12',
-        section: 'A',
-        teacher: {
-          id: 't4',
-          name: 'Mr. Reddy',
-          profilePicture: null,
-        },
-        scheduledDate: '2024-09-17',
-        startTime: '09:00',
-        endTime: '10:00',
-        duration: 60,
-        status: 'CANCELLED',
-        platform: 'ZOOM',
-        meetingLink: null,
-        maxParticipants: 48,
-        enrolled: 48,
-        joined: 0,
-        recordingEnabled: false,
-        recordingUrl: null,
-        description: 'Introduction to electromagnetic fields and applications',
-      },
-    ],
+  // Real API integration
+  const { data: classesResponse, isLoading } = useQuery({
+    queryKey: ['live-classes', user?.schoolId, statusFilter, dateFilter],
+    queryFn: () => liveClassService.listLiveClasses({
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      date: dateFilter === 'today' ? new Date().toISOString().split('T')[0] : undefined,
+    }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data
+  const classes = Array.isArray(classesResponse) ? classesResponse : classesResponse?.classes || [];
 
   const stats = {
     total: classes?.length || 0,

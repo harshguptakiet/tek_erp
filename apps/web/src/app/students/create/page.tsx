@@ -20,6 +20,10 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { studentService } from '@/services/student.service';
+import { academicService } from '@/services/academic.service';
+import { userService } from '@/services/user.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const studentSchema = z.object({
@@ -73,6 +77,7 @@ type StudentForm = z.infer<typeof studentSchema>;
 
 export default function CreateStudentPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
 
   const {
@@ -92,33 +97,25 @@ export default function CreateStudentPage() {
     },
   });
 
-
-  // Mock classes data
-  const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: async () => [
-      { id: 'c1', name: 'Class 9', sections: ['A', 'B', 'C'] },
-      { id: 'c2', name: 'Class 10', sections: ['A', 'B', 'C', 'D'] },
-      { id: 'c3', name: 'Class 11', sections: ['A', 'B'] },
-      { id: 'c4', name: 'Class 12', sections: ['A', 'B'] },
-    ],
+  // Real API integration
+  const { data: classesResponse } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
-  // Mock parents data
-  const { data: parentsData } = useQuery({
-    queryKey: ['parents'],
-    queryFn: async () => [
-      { id: 'p1', name: 'Mr. Rajesh Kumar', phone: '9876543210' },
-      { id: 'p2', name: 'Mrs. Priya Sharma', phone: '9876543211' },
-      { id: 'p3', name: 'Mr. Suresh Verma', phone: '9876543212' },
-    ],
+  const { data: parentsResponse } = useQuery({
+    queryKey: ['parents', user?.schoolId],
+    queryFn: () => userService.listParents(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data
+  const classesData = Array.isArray(classesResponse) ? classesResponse : classesResponse?.classes || [];
+  const parentsData = Array.isArray(parentsResponse) ? parentsResponse : parentsResponse?.data || [];
 
   const createMutation = useMutation({
-    mutationFn: async (data: StudentForm) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return { id: 'new-student-id', ...data };
-    },
+    mutationFn: (data: StudentForm) => studentService.createStudent(user?.schoolId || '', data),
     onSuccess: (data) => {
       toast.success('Student enrolled successfully');
       router.push(`/students/${data.id}`);

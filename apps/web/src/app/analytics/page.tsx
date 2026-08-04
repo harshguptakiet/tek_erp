@@ -14,30 +14,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { analyticsService } from '@/services/analytics.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function AnalyticsDashboardPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState('THIS_MONTH');
   const [selectedMetric, setSelectedMetric] = useState('OVERVIEW');
 
-  // Mock data - replace with actual API call
-  const { data: analyticsData, isLoading } = useQuery({
-    queryKey: ['analytics', selectedPeriod],
-    queryFn: async () => ({
-      period: selectedPeriod,
-      overview: {
-        totalStudents: 1250,
-        activeStudents: 1198,
-        totalTeachers: 85,
-        activeTeachers: 82,
-        totalClasses: 45,
-        averageAttendance: 89.5,
-        averageGrade: 78.3,
-        pendingAssignments: 234,
-      },
-      attendance: {
-        overall: 89.5,
-        trend: '+2.3%',
+  // Real API integration
+  const { data: analyticsResponse, isLoading } = useQuery({
+    queryKey: ['analytics', user?.schoolId, selectedPeriod],
+    queryFn: () => analyticsService.getOverviewDashboard(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
+  });
+
+  // Transform API data
+  const analyticsData = analyticsResponse || {
+    period: selectedPeriod,
+    overview: {},
+    attendance: {},
+    academic: {},
+    engagement: {},
+    finance: {},
+  };
         byClass: [
           { class: 'Class 12', percentage: 93.2, students: 180, present: 168 },
           { class: 'Class 11', percentage: 91.5, students: 195, present: 178 },

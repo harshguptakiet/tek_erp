@@ -15,29 +15,31 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { feeService } from '@/services/fee.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function FeesPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2024-2025');
   const [selectedClass, setSelectedClass] = useState('all');
 
-  // Mock data - replace with actual API call
-  const { data: feeData, isLoading } = useQuery({
-    queryKey: ['fees', selectedAcademicYear, selectedClass],
-    queryFn: async () => ({
-      academicYear: selectedAcademicYear,
-      feeStructures: [
-        {
-          id: '1',
-          class: 'Class 9',
-          term: 'QUARTERLY',
-          components: [
-            { name: 'Tuition Fee', amount: 15000, mandatory: true },
-            { name: 'Lab Fee', amount: 2000, mandatory: true },
-            { name: 'Library Fee', amount: 1000, mandatory: true },
-            { name: 'Sports Fee', amount: 1500, mandatory: false },
-            { name: 'Activity Fee', amount: 1000, mandatory: false },
-          ],
+  // Real API integration
+  const { data: feeResponse, isLoading } = useQuery({
+    queryKey: ['fees', user?.schoolId, selectedAcademicYear, selectedClass],
+    queryFn: () => feeService.listFeeStructures({
+      schoolId: user?.schoolId,
+      classId: selectedClass !== 'all' ? selectedClass : undefined,
+    }),
+    enabled: !!user?.schoolId,
+  });
+
+  // Transform API data
+  const feeStructures = Array.isArray(feeResponse) ? feeResponse : feeResponse?.feeStructures || [];
+  const feeData = {
+    academicYear: selectedAcademicYear,
+    feeStructures,
+  };
           totalMandatory: 18000,
           totalOptional: 2500,
           total: 20500,

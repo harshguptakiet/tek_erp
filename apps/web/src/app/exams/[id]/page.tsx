@@ -14,79 +14,29 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { examService } from '@/services/exam.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ExamDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'grades' | 'analytics'>('overview');
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: exam, isLoading } = useQuery({
     queryKey: ['exam', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      name: 'Mid-Term Examination',
-      type: 'MID_TERM',
-      academicYear: '2024-2025',
-      description: 'First semester mid-term examination covering all subjects',
-      startDate: '2024-10-15',
-      endDate: '2024-10-25',
-      status: 'UPCOMING',
-      totalMarks: 800,
-      passingMarks: 320,
-      gradeScale: 'CBSE',
-      classes: [
-        { id: '1', name: 'Class 9', section: 'A', totalStudents: 45, enrolled: 45 },
-        { id: '2', name: 'Class 9', section: 'B', totalStudents: 42, enrolled: 40 },
-        { id: '3', name: 'Class 10', section: 'A', totalStudents: 48, enrolled: 48 },
-      ],
-      schedule: [
-        {
-          id: '1',
-          subject: 'Mathematics',
-          date: '2024-10-15',
-          startTime: '09:00',
-          endTime: '12:00',
-          duration: 180,
-          totalMarks: 100,
-          room: 'Hall A',
-          supervisor: 'Mr. Kumar',
-        },
-        {
-          id: '2',
-          subject: 'Science',
-          date: '2024-10-17',
-          startTime: '09:00',
-          endTime: '12:00',
-          duration: 180,
-          totalMarks: 100,
-          room: 'Hall B',
-          supervisor: 'Dr. Sharma',
-        },
-        {
-          id: '3',
-          subject: 'English',
-          date: '2024-10-19',
-          startTime: '09:00',
-          endTime: '12:00',
-          duration: 180,
-          totalMarks: 100,
-          room: 'Hall A',
-          supervisor: 'Mrs. Gupta',
-        },
-      ],
-      statistics: {
-        totalStudents: 135,
-        enrolled: 133,
-        appeared: 0,
-        submitted: 0,
-        graded: 0,
-        averageScore: 0,
-        passPercentage: 0,
-      },
-      createdBy: 'Admin User',
-      createdAt: '2024-08-01',
-    }),
+    queryFn: () => examService.getExam(params.id),
+    enabled: !!params.id,
   });
+
+  const { data: resultsResponse } = useQuery({
+    queryKey: ['exam-results', params.id],
+    queryFn: () => examService.getExamResults(params.id),
+    enabled: !!params.id && activeTab === 'grades',
+  });
+
+  // Transform API data
+  const results = Array.isArray(resultsResponse) ? resultsResponse : resultsResponse?.results || [];
 
   if (isLoading) {
     return (

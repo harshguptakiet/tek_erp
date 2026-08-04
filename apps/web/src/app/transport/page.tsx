@@ -15,164 +15,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { transportService } from '@/services/transport.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function TransportPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedRoute, setSelectedRoute] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'buses' | 'routes' | 'students'>('buses');
 
-  // Mock data - replace with actual API calls
-  const { data: transportData, isLoading } = useQuery({
-    queryKey: ['transport', selectedRoute],
-    queryFn: async () => ({
-      stats: {
-        totalBuses: 25,
-        activeBuses: 23,
-        totalRoutes: 15,
-        totalStudents: 850,
-        averageCapacity: 85,
-      },
-      buses: [
-        {
-          id: 'bus1',
-          busNumber: 'DL-01-AB-1234',
-          routeId: 'r1',
-          routeName: 'Route 1 - North Delhi',
-          capacity: 50,
-          currentOccupancy: 45,
-          driver: {
-            name: 'Ramesh Kumar',
-            phone: '+91 9876543210',
-            license: 'DL1234567890',
-          },
-          attendant: {
-            name: 'Priya Sharma',
-            phone: '+91 9876543211',
-          },
-          status: 'ACTIVE',
-          lastMaintenance: '2024-07-15',
-          nextMaintenance: '2024-09-15',
-          gpsEnabled: true,
-        },
-        {
-          id: 'bus2',
-          busNumber: 'DL-01-AB-5678',
-          routeId: 'r2',
-          routeName: 'Route 2 - South Delhi',
-          capacity: 45,
-          currentOccupancy: 42,
-          driver: {
-            name: 'Suresh Patel',
-            phone: '+91 9876543212',
-            license: 'DL2345678901',
-          },
-          attendant: {
-            name: 'Anjali Verma',
-            phone: '+91 9876543213',
-          },
-          status: 'ACTIVE',
-          lastMaintenance: '2024-07-20',
-          nextMaintenance: '2024-09-20',
-          gpsEnabled: true,
-        },
-        {
-          id: 'bus3',
-          busNumber: 'DL-01-AB-9012',
-          routeId: 'r3',
-          routeName: 'Route 3 - East Delhi',
-          capacity: 40,
-          currentOccupancy: 0,
-          driver: {
-            name: 'Vijay Singh',
-            phone: '+91 9876543214',
-            license: 'DL3456789012',
-          },
-          attendant: null,
-          status: 'MAINTENANCE',
-          lastMaintenance: '2024-08-01',
-          nextMaintenance: '2024-08-05',
-          gpsEnabled: true,
-        },
-      ],
-      routes: [
-        {
-          id: 'r1',
-          name: 'Route 1 - North Delhi',
-          code: 'RT-001',
-          area: 'North Delhi',
-          distance: 18.5,
-          estimatedTime: 45,
-          totalStops: 12,
-          assignedBuses: 2,
-          totalStudents: 95,
-          stops: [
-            { id: 'st1', name: 'Main Gate', time: '07:00', sequence: 1 },
-            { id: 'st2', name: 'Model Town', time: '07:10', sequence: 2 },
-            { id: 'st3', name: 'GTB Nagar', time: '07:20', sequence: 3 },
-            { id: 'st4', name: 'School', time: '07:45', sequence: 12 },
-          ],
-          morningStartTime: '07:00',
-          morningEndTime: '07:45',
-          eveningStartTime: '14:00',
-          eveningEndTime: '15:00',
-        },
-        {
-          id: 'r2',
-          name: 'Route 2 - South Delhi',
-          code: 'RT-002',
-          area: 'South Delhi',
-          distance: 22.3,
-          estimatedTime: 55,
-          totalStops: 15,
-          assignedBuses: 2,
-          totalStudents: 88,
-          stops: [
-            { id: 'st5', name: 'Hauz Khas', time: '06:50', sequence: 1 },
-            { id: 'st6', name: 'IIT Gate', time: '07:00', sequence: 2 },
-            { id: 'st7', name: 'Safdarjung', time: '07:15', sequence: 3 },
-            { id: 'st8', name: 'School', time: '07:45', sequence: 15 },
-          ],
-          morningStartTime: '06:50',
-          morningEndTime: '07:45',
-          eveningStartTime: '14:00',
-          eveningEndTime: '15:10',
-        },
-      ],
-      students: [
-        {
-          id: 's1',
-          name: 'Aarav Kumar',
-          class: 'Class 10',
-          admissionNumber: 'ADM2024001',
-          routeId: 'r1',
-          routeName: 'Route 1 - North Delhi',
-          busNumber: 'DL-01-AB-1234',
-          stopId: 'st2',
-          stopName: 'Model Town',
-          pickupTime: '07:10',
-          dropTime: '14:10',
-          parentContact: '+91 9876543220',
-          address: 'Model Town, North Delhi',
-        },
-        {
-          id: 's2',
-          name: 'Diya Sharma',
-          class: 'Class 9',
-          admissionNumber: 'ADM2024002',
-          routeId: 'r2',
-          routeName: 'Route 2 - South Delhi',
-          busNumber: 'DL-01-AB-5678',
-          stopId: 'st5',
-          stopName: 'Hauz Khas',
-          pickupTime: '06:50',
-          dropTime: '14:00',
-          parentContact: '+91 9876543221',
-          address: 'Hauz Khas, South Delhi',
-        },
-      ],
-    }),
+  // Real API integration
+  const { data: busesResponse, isLoading } = useQuery({
+    queryKey: ['transport-buses', user?.schoolId],
+    queryFn: () => transportService.listBuses(user?.schoolId),
+    enabled: !!user?.schoolId,
   });
+
+  const { data: routesResponse } = useQuery({
+    queryKey: ['transport-routes', user?.schoolId],
+    queryFn: () => transportService.listRoutes(user?.schoolId),
+    enabled: !!user?.schoolId,
+  });
+
+  // Transform API data
+  const buses = Array.isArray(busesResponse) ? busesResponse : busesResponse?.buses || [];
+  const routes = Array.isArray(routesResponse) ? routesResponse : routesResponse?.routes || [];
+  
+  const transportData = {
+    stats: {
+      totalBuses: buses.length,
+      activeBuses: buses.filter((b: any) => b.status === 'ACTIVE').length,
+      totalRoutes: routes.length,
+      totalStudents: buses.reduce((sum: number, b: any) => sum + (b.currentOccupancy || 0), 0),
+      averageCapacity: buses.length > 0 
+        ? Math.round((buses.reduce((sum: number, b: any) => sum + (b.currentOccupancy || 0), 0) / 
+            buses.reduce((sum: number, b: any) => sum + (b.capacity || 0), 0)) * 100)
+        : 0,
+    },
+    buses,
+    routes,
+    students: [], // Will be loaded separately when needed
+  };
 
   if (isLoading) {
     return (

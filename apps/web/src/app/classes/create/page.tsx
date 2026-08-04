@@ -20,6 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { academicService } from '@/services/academic.service';
+import { userService } from '@/services/user.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const classSchema = z.object({
@@ -39,6 +42,7 @@ type ClassForm = z.infer<typeof classSchema>;
 
 export default function CreateClassPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [sections, setSections] = useState([
     { name: 'A', capacity: 40, classTeacherId: '', roomNumber: '' },
   ]);
@@ -57,22 +61,17 @@ export default function CreateClassPage() {
     },
   });
 
-  // Mock teachers data
-  const { data: teachersData } = useQuery({
-    queryKey: ['teachers'],
-    queryFn: async () => [
-      { id: 't1', name: 'Dr. Rajesh Kumar', department: 'Mathematics' },
-      { id: 't2', name: 'Prof. Priya Singh', department: 'Physics' },
-      { id: 't3', name: 'Ms. Anjali Sharma', department: 'Chemistry' },
-      { id: 't4', name: 'Mr. Suresh Verma', department: 'English' },
-    ],
+  // Real API integration
+  const { data: teachersResponse } = useQuery({
+    queryKey: ['teachers', user?.schoolId],
+    queryFn: () => userService.listTeachers(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
+  const teachersData = Array.isArray(teachersResponse) ? teachersResponse : teachersResponse?.data || [];
+
   const createMutation = useMutation({
-    mutationFn: async (data: ClassForm) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return { id: 'new-class-id', ...data };
-    },
+    mutationFn: (data: ClassForm) => academicService.createClass(user?.schoolId || '', data),
     onSuccess: (data) => {
       toast.success('Class created successfully');
       router.push(`/classes/${data.id}`);

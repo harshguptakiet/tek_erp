@@ -15,6 +15,9 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { academicService } from '@/services/academic.service';
+import { userService } from '@/services/user.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface Period {
   id: string;
@@ -28,57 +31,43 @@ interface Period {
 
 export default function TimetableCreatePage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
   const [academicYear, setAcademicYear] = useState('2024-2025');
   const [periods, setPeriods] = useState<Period[]>([]);
 
-  // Mock data - replace with actual API calls
-  const { data: classData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: async () => [
-      { id: 'c1', name: 'Class 9', sections: ['A', 'B', 'C'] },
-      { id: 'c2', name: 'Class 10', sections: ['A', 'B'] },
-      { id: 'c3', name: 'Class 11', sections: ['A', 'B'] },
-      { id: 'c4', name: 'Class 12', sections: ['A'] },
-    ],
+  // Real API integration
+  const { data: classResponse } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
-  const { data: subjectsData } = useQuery({
-    queryKey: ['subjects', selectedClass],
-    queryFn: async () => [
-      { id: 'sub1', name: 'Mathematics', code: 'MATH', color: 'bg-blue-100 text-blue-800' },
-      { id: 'sub2', name: 'Physics', code: 'PHY', color: 'bg-purple-100 text-purple-800' },
-      { id: 'sub3', name: 'Chemistry', code: 'CHEM', color: 'bg-green-100 text-green-800' },
-      { id: 'sub4', name: 'English', code: 'ENG', color: 'bg-yellow-100 text-yellow-800' },
-      { id: 'sub5', name: 'Biology', code: 'BIO', color: 'bg-pink-100 text-pink-800' },
-      { id: 'sub6', name: 'Computer Science', code: 'CS', color: 'bg-indigo-100 text-indigo-800' },
-      { id: 'sub7', name: 'Physical Education', code: 'PE', color: 'bg-orange-100 text-orange-800' },
-    ],
-    enabled: !!selectedClass,
+  const { data: subjectsResponse } = useQuery({
+    queryKey: ['subjects', user?.schoolId, selectedClass],
+    queryFn: () => academicService.getSubjects(user?.schoolId || '', selectedClass),
+    enabled: !!user?.schoolId && !!selectedClass,
   });
 
-  const { data: teachersData } = useQuery({
-    queryKey: ['teachers'],
-    queryFn: async () => [
-      { id: 't1', name: 'Dr. Rajesh Kumar', subject: 'Mathematics' },
-      { id: 't2', name: 'Prof. Priya Singh', subject: 'Physics' },
-      { id: 't3', name: 'Ms. Anjali Sharma', subject: 'Chemistry' },
-      { id: 't4', name: 'Mr. Suresh Verma', subject: 'English' },
-      { id: 't5', name: 'Dr. Meera Patel', subject: 'Biology' },
-    ],
+  const { data: teachersResponse } = useQuery({
+    queryKey: ['teachers', user?.schoolId],
+    queryFn: () => userService.listTeachers(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
-  const { data: roomsData } = useQuery({
-    queryKey: ['rooms'],
-    queryFn: async () => [
-      { id: 'r1', name: 'Room 101', type: 'Classroom', capacity: 40 },
-      { id: 'r2', name: 'Room 102', type: 'Classroom', capacity: 40 },
-      { id: 'r3', name: 'Lab 201', type: 'Laboratory', capacity: 30 },
-      { id: 'r4', name: 'Lab 202', type: 'Laboratory', capacity: 30 },
-      { id: 'r5', name: 'Auditorium', type: 'Hall', capacity: 200 },
-    ],
+  // Transform API data
+  const classData = Array.isArray(classResponse) ? classResponse : classResponse?.classes || [];
+  const subjectsData = Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse?.subjects || [];
+  const teachersData = Array.isArray(teachersResponse) ? teachersResponse : teachersResponse?.data || [];
+
+  const { data: roomsResponse } = useQuery({
+    queryKey: ['rooms', user?.schoolId],
+    queryFn: () => academicService.getRooms(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
+
+  const roomsData = Array.isArray(roomsResponse) ? roomsResponse : roomsResponse?.rooms || [];
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const timeSlots = [
@@ -127,11 +116,12 @@ export default function TimetableCreatePage() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      return { success: true };
-    },
+    mutationFn: () => academicService.createTimetable(user?.schoolId || '', {
+      classId: selectedClass,
+      section: selectedSection,
+      academicYear,
+      periods: periods.filter(p => p.subjectId), // Only save assigned periods
+    }),
     onSuccess: () => {
       toast.success('Timetable created successfully');
       router.push('/timetable');

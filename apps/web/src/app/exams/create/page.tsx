@@ -20,6 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { academicService } from '@/services/academic.service';
+import { examService } from '@/services/exam.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const examSchema = z.object({
@@ -48,6 +51,7 @@ type ExamForm = z.infer<typeof examSchema>;
 
 export default function CreateExamPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [subjects, setSubjects] = useState([
     {
       subjectId: '',
@@ -76,30 +80,23 @@ export default function CreateExamPage() {
     },
   });
 
-  // Mock data
-  const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: async () => [
-      { id: 'c1', name: 'Class 9' },
-      { id: 'c2', name: 'Class 10' },
-      { id: 'c3', name: 'Class 11' },
-      { id: 'c4', name: 'Class 12' },
-    ],
+  // Real API integration
+  const { data: classStructure } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
   const { data: subjectsData } = useQuery({
     queryKey: ['subjects'],
-    queryFn: async () => [
-      { id: 's1', name: 'Mathematics', code: 'MATH' },
-      { id: 's2', name: 'Physics', code: 'PHY' },
-      { id: 's3', name: 'Chemistry', code: 'CHEM' },
-      { id: 's4', name: 'Biology', code: 'BIO' },
-      { id: 's5', name: 'English', code: 'ENG' },
-      { id: 's6', name: 'Hindi', code: 'HIN' },
-      { id: 's7', name: 'Social Science', code: 'SST' },
-      { id: 's8', name: 'Computer Science', code: 'CS' },
-    ],
+    queryFn: () => academicService.listSubjects(),
   });
+
+  // Transform class data
+  const classesData = classStructure?.classes?.map((cls: any) => ({
+    id: cls.id,
+    name: cls.name,
+  }));
 
   const createMutation = useMutation({
     mutationFn: async (data: ExamForm) => {

@@ -1,274 +1,359 @@
 /**
- * Module 06: AR/VR Learning - Experience Viewer
- * FR-CONTENT-026: Launch and interact with AR/VR educational experiences
+ * Module 14: AR/VR Learning - AR/VR Module Detail & Launcher
+ * FR-ARVR-002: Launch and experience AR/VR module
  */
 
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { use } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Can } from '@/components/auth/can';
-import { PERMISSIONS } from '@/config/permissions';
-import { toast } from 'sonner';
+import { contentService } from '@/services/content.service';
+import { useAuthStore } from '@/stores/auth.store';
+import toast from 'react-hot-toast';
 
-interface ExperienceDetail {
-  id: string;
-  title: string;
-  description: string;
-  type: 'AR' | 'VR' | '3D_MODEL' | 'SIMULATION' | 'VIRTUAL_LAB';
-  subject: string;
-  grade: string;
-  duration: string;
-  difficulty: string;
-  rating: number;
-  views: number;
-  author: string;
-  isWebXR: boolean;
-  deviceSupport: string[];
-  learningObjectives: string[];
-  prerequisites: string[];
-  tags: string[];
-  instructions: string[];
-}
+type TabId = 'overview' | 'requirements' | 'reviews' | 'analytics';
 
-export default function ArVrExperiencePage() {
+export default function ARVRModuleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
-  const params = useParams();
-  const experienceId = params.id as string;
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isLaunching, setIsLaunching] = useState(false);
-  const [activeTab, setActiveTab] = useState<'viewer' | 'details' | 'analytics'>('viewer');
 
-  const { data: experience, isLoading } = useQuery({
-    queryKey: ['ar-vr-experience', experienceId],
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      return {
-        id: experienceId,
-        title: 'Virtual Chemistry Lab',
-        description: 'Perform chemistry experiments safely in a fully immersive VR environment. Practice titration, observe chemical reactions, and learn lab safety protocols without physical materials.',
-        type: 'VR' as const,
-        subject: 'Chemistry',
-        grade: 'Class 10',
-        duration: '45 min',
-        difficulty: 'INTERMEDIATE',
-        rating: 4.8,
-        views: 2890,
-        author: 'Dr. Vikram Patel',
-        isWebXR: true,
-        deviceSupport: ['VR Headset', 'Desktop Browser'],
-        learningObjectives: [
-          'Understand titration procedures and calculations',
-          'Observe acid-base neutralization reactions',
-          'Follow proper laboratory safety protocols',
-          'Identify common laboratory equipment',
-          'Record and analyze experimental data',
-        ],
-        prerequisites: [
-          'Basic understanding of acids and bases',
-          'Class 9 Chemistry fundamentals',
-        ],
-        tags: ['Lab', 'Experiments', 'Safety', 'Titration'],
-        instructions: [
-          'Ensure your VR headset is connected and calibrated',
-          'Use the controllers to interact with lab equipment',
-          'Follow on-screen safety instructions before each experiment',
-          'Complete the pre-lab quiz before starting experiments',
-          'Save your results to track progress',
-        ],
-      } as ExperienceDetail;
-    },
+  // Real API integration
+  const { data: moduleResponse, isLoading } = useQuery({
+    queryKey: ['arvr-module', id],
+    queryFn: () => contentService.getContent(id),
+    enabled: !!id,
   });
 
-  const launchMutation = useMutation({
-    mutationFn: async () => {
-      setIsLaunching(true);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    },
-    onSuccess: () => {
-      toast.success('Experience launched! Put on your VR headset.');
+  const module = moduleResponse;
+
+  const handleLaunch = () => {
+    setIsLaunching(true);
+    toast.success('Launching AR/VR experience...');
+    
+    // In real implementation, this would:
+    // 1. Check device compatibility
+    // 2. Request necessary permissions (camera, sensors, etc.)
+    // 3. Launch the AR/VR experience in appropriate mode
+    // 4. Track usage analytics
+    
+    setTimeout(() => {
       setIsLaunching(false);
-    },
-    onError: () => {
-      toast.error('Failed to launch experience. Check device compatibility.');
-      setIsLaunching(false);
-    },
-  });
+      // Simulate opening AR/VR experience
+      // window.open(`/ar-vr/${id}/experience`, '_blank');
+    }, 2000);
+  };
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-2/3 mb-4" />
-        <div className="h-96 bg-gray-200 rounded" />
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-96 bg-gray-200 rounded"></div>
+        </div>
       </div>
     );
   }
 
-  if (!experience) return null;
+  if (!module) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <p className="text-gray-600">AR/VR module not found</p>
+          <Button className="mt-4" onClick={() => router.push('/ar-vr')}>
+            Back to AR/VR Modules
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const tabs: { id: TabId; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'requirements', label: 'Requirements' },
+    { id: 'reviews', label: 'Reviews' },
+    { id: 'analytics', label: 'Analytics' },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <Button variant="outline" onClick={() => router.push('/ar-vr')} className="mb-4">
-        ← Back to AR/VR Catalog
-      </Button>
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/ar-vr')}>
+          ← Back
+        </Button>
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Preview & Launch */}
+          <div className="lg:col-span-2">
+            {/* Preview Image/Video */}
+            <div className="relative h-96 bg-gradient-to-br from-purple-400 via-pink-500 to-blue-500 rounded-xl overflow-hidden mb-6">
+              {module.thumbnail ? (
+                <img
+                  src={module.thumbnail}
+                  alt={module.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <span className="text-9xl">
+                    {module.experienceType === 'AR' ? '🔍' : module.experienceType === 'VR' ? '🥽' : '🌐'}
+                  </span>
+                </div>
+              )}
+              <div className="absolute top-4 right-4">
+                <Badge variant="info" className="bg-white text-gray-900 text-lg px-4 py-2">
+                  {module.experienceType || 'AR'}
+                </Badge>
+              </div>
+            </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <h1 className="text-3xl font-bold text-gray-900">{experience.title}</h1>
-        <Badge variant="success">{experience.type}</Badge>
-        {experience.isWebXR && <Badge variant="info">WebXR</Badge>}
-        <Badge variant="warning">{experience.difficulty}</Badge>
-      </div>
-      <p className="text-gray-600 mb-4">{experience.description}</p>
+            {/* Launch Button */}
+            <Card className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">Ready to Experience?</h3>
+                    <p className="text-indigo-100">
+                      Launch the {module.experienceType === 'AR' ? 'augmented' : 'virtual'} reality module now
+                    </p>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-white text-indigo-600 hover:bg-gray-100"
+                    onClick={handleLaunch}
+                    disabled={isLaunching}
+                  >
+                    {isLaunching ? (
+                      <>
+                        <span className="animate-spin mr-2">⏳</span>
+                        Launching...
+                      </>
+                    ) : (
+                      <>
+                        🚀 Launch Experience
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-      <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
-        <span>{experience.subject} · {experience.grade}</span>
-        <span>By {experience.author}</span>
-        <span>{experience.duration}</span>
-        <span>⭐ {experience.rating} ({experience.views.toLocaleString()} views)</span>
+          {/* Right: Module Info */}
+          <div>
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                    {module.title || 'Untitled Module'}
+                  </h1>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="secondary">{module.subjectName || 'General'}</Badge>
+                    <Badge variant={module.experienceType === 'AR' ? 'info' : 'success'}>
+                      {module.experienceType || 'AR'}
+                    </Badge>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    {module.description || 'No description available'}
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Duration</span>
+                    <span className="font-medium">{module.duration || 15} minutes</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Users</span>
+                    <span className="font-medium">{module.usersCount || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Rating</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      <span className="font-medium">{(module.rating || 0).toFixed(1)}</span>
+                      <span className="text-xs text-gray-500">
+                        ({module.reviewCount || 0} reviews)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Supported Devices</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(module.supportedDevices || ['mobile', 'tablet']).map((device: string) => (
+                      <Badge key={device} variant="secondary">
+                        {device}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Created By</p>
+                  <p className="text-sm text-gray-600">{module.createdBy || 'Unknown'}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {module.createdAt ? new Date(module.createdAt).toLocaleDateString() : '-'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          {(['viewer', 'details', 'analytics'] as const).map((tab) => (
+        <nav className="flex gap-6">
+          {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm capitalize ${
-                activeTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'viewer' ? 'Experience Viewer' : tab}
+              {tab.label}
             </button>
           ))}
         </nav>
       </div>
 
-      {activeTab === 'viewer' && (
-        <Can permission={PERMISSIONS.CONTENT_VIEW}>
-          <Card className="mb-6">
-            <CardContent className="p-0">
-              <div className="relative h-96 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 rounded-lg flex flex-col items-center justify-center text-white">
-                {isLaunching ? (
-                  <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-lg font-medium">Launching VR Experience...</p>
-                    <p className="text-sm text-indigo-200 mt-2">Initializing WebXR session</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <div className="text-8xl mb-4">🥽</div>
-                    <p className="text-xl font-medium mb-2">Virtual Chemistry Lab</p>
-                    <p className="text-indigo-200 mb-6">Click Launch to start the immersive experience</p>
-                    <Button
-                      size="lg"
-                      onClick={() => launchMutation.mutate()}
-                      disabled={launchMutation.isPending}
-                      className="bg-white text-indigo-900 hover:bg-indigo-50"
-                    >
-                      Launch Experience
-                    </Button>
-                  </div>
-                )}
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>About This Experience</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                {module.description || 'No detailed description available.'}
+              </p>
+              
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-900">Learning Objectives:</h4>
+                <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <li>Understand core concepts through immersive visualization</li>
+                  <li>Interact with 3D models and simulations</li>
+                  <li>Apply knowledge in realistic scenarios</li>
+                  <li>Complete assessments within the experience</li>
+                </ul>
               </div>
-            </CardContent>
-          </Card>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Device Compatibility</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {experience.deviceSupport.map((device) => (
-                    <div key={device} className="flex items-center gap-2">
-                      <span className="text-green-500">✓</span>
-                      <span className="text-sm">{device}</span>
-                    </div>
-                  ))}
+              {module.tags && module.tags.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-semibold text-gray-900 mb-2">Tags:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {module.tags.map((tag: string) => (
+                      <Badge key={tag} variant="secondary">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                {experience.isWebXR && (
-                  <p className="text-sm text-blue-600 mt-3">
-                    WebXR supported — works in compatible browsers without app install
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Instructions</CardTitle></CardHeader>
-              <CardContent>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-                  {experience.instructions.map((instruction, i) => (
-                    <li key={i}>{instruction}</li>
-                  ))}
-                </ol>
-              </CardContent>
-            </Card>
-          </div>
-        </Can>
-      )}
-
-      {activeTab === 'details' && (
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader><CardTitle>Learning Objectives</CardTitle></CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {experience.learningObjectives.map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    {obj}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Prerequisites</CardTitle></CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {experience.prerequisites.map((pre, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="text-blue-500 mt-0.5">•</span>
-                    {pre}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {experience.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">{tag}</Badge>
-                ))}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
       )}
 
+      {activeTab === 'requirements' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>System Requirements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Device Requirements</h4>
+                <ul className="space-y-2 text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Modern smartphone or tablet with AR/VR capabilities</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Camera access for AR experiences</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Gyroscope and accelerometer sensors</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Stable internet connection (minimum 5 Mbps)</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Software Requirements</h4>
+                <ul className="space-y-2 text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Latest version of Chrome, Safari, or Firefox</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>WebXR API support enabled</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-1">✓</span>
+                    <span>Location services (optional for some features)</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> VR headsets (Oculus Quest, HTC Vive, etc.) provide the best experience
+                  but are not required. Most modules work on standard mobile devices.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'reviews' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>User Reviews</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12 text-gray-500">
+              <p>Reviews will be displayed here</p>
+              <p className="text-sm mt-2">Rate this experience after completing it</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {activeTab === 'analytics' && (
-        <Can permission={PERMISSIONS.CONTENT_VIEW}>
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-3xl font-bold text-blue-600">{experience.views.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">Total Views</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-3xl font-bold text-green-600">78%</p>
-                <p className="text-sm text-gray-500">Completion Rate</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <p className="text-3xl font-bold text-purple-600">{experience.rating}</p>
-                <p className="text-sm text-gray-500">Average Rating</p>
-              </CardContent>
-            </Card>
-          </div>
-        </Can>
+        <Card>
+          <CardHeader>
+            <CardTitle>Usage Analytics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12 text-gray-500">
+              <p>Analytics and usage statistics will be displayed here</p>
+              <p className="text-sm mt-2">Track completion rates and engagement metrics</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

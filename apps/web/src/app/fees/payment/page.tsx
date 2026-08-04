@@ -19,6 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { feeService } from '@/services/fee.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const paymentSchema = z.object({
@@ -35,41 +37,38 @@ type PaymentForm = z.infer<typeof paymentSchema>;
 
 export default function PaymentProcessingPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [step, setStep] = useState<'review' | 'payment' | 'confirmation'>('review');
   const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
 
-  // Mock data - replace with actual API call
-  const { data: pendingData, isLoading } = useQuery({
-    queryKey: ['pending-payment'],
-    queryFn: async () => ({
-      student: {
-        id: 's1',
-        name: 'Aarav Kumar',
-        class: 'Class 10',
-        section: 'A',
-        admissionNumber: 'ADM2024001',
-      },
-      academicYear: '2024-2025',
-      pendingPayment: {
-        term: 'Q4 (Jan-Mar 2025)',
-        dueDate: '2025-01-01',
-        components: [
-          { id: 'c1', name: 'Tuition Fee', amount: 16000, mandatory: true, selected: true },
-          { id: 'c2', name: 'Lab Fee', amount: 2500, mandatory: true, selected: true },
-          { id: 'c3', name: 'Library Fee', amount: 1000, mandatory: true, selected: true },
-          { id: 'c4', name: 'Exam Fee', amount: 2000, mandatory: true, selected: true },
-          { id: 'c5', name: 'Sports Fee', amount: 1500, mandatory: false, selected: true },
-          { id: 'c6', name: 'Activity Fee', amount: 1000, mandatory: false, selected: true },
-        ],
-        totalAmount: 24000,
-        minimumAmount: 21500, // Mandatory fees
-        discount: 0,
-        lateFee: 0,
-      },
-    }),
+  // Real API integration
+  const { data: pendingResponse, isLoading } = useQuery({
+    queryKey: ['pending-payment', user?.id],
+    queryFn: () => feeService.getPendingPayments(user?.id || ''),
+    enabled: !!user?.id,
   });
 
-  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+  // Transform API response
+  const pendingData = pendingResponse || {
+    student: {
+      id: user?.id || '',
+      name: user?.name || '',
+      class: '',
+      section: '',
+      admissionNumber: '',
+    },
+    academicYear: '2024-2025',
+    pendingPayment: {
+      term: '',
+      dueDate: '',
+      components: [],
+      totalAmount: 0,
+      minimumAmount: 0,
+      discount: 0,
+      lateFee: 0,
+    },
+  };
 
   const {
     register,
@@ -87,17 +86,10 @@ export default function PaymentProcessingPage() {
   const paymentMethod = watch('paymentMethod');
 
   const paymentMutation = useMutation({
-    mutationFn: async (data: PaymentForm) => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      return {
-        receiptNumber: `RCP${Date.now()}`,
-        transactionId: data.transactionId || `TXN${Date.now()}`,
-        amount: data.amount,
-        date: new Date().toISOString(),
-        status: 'SUCCESS',
-      };
-    },
+    mutationFn: (data: PaymentForm) => feeService.processPayment(user?.id || '', {
+      ...data,
+      components: selectedComponents,
+    }),
     onSuccess: (result) => {
       setPaymentResult(result);
       setStep('confirmation');

@@ -12,119 +12,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { userService } from '@/services/user.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ParentDashboardPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
 
-  // Mock data - replace with actual API call
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['parent-dashboard'],
-    queryFn: async () => ({
-      parent: {
-        id: 'parent1',
-        name: 'Rajesh Kumar',
-        email: 'rajesh.kumar@example.com',
-        phone: '+91 9876543210',
-      },
-      children: [
-        {
-          id: 's1',
-          name: 'Aarav Kumar',
-          class: 'Class 10',
-          section: 'A',
-          admissionNumber: 'ADM2024001',
-          attendance: {
-            present: 92,
-            total: 100,
-            percentage: 92,
-          },
-          recentGrades: [
-            { subject: 'Mathematics', grade: 'A+', marks: 95, total: 100 },
-            { subject: 'Physics', grade: 'A', marks: 88, total: 100 },
-            { subject: 'Chemistry', grade: 'A', marks: 90, total: 100 },
-          ],
-          upcomingExams: [
-            { subject: 'Biology', date: '2024-08-10', type: 'Unit Test' },
-            { subject: 'English', date: '2024-08-12', type: 'Mid-Term' },
-          ],
-          pendingAssignments: 2,
-          feeStatus: {
-            totalFee: 96000,
-            paid: 72000,
-            pending: 24000,
-            nextDueDate: '2024-12-31',
-          },
-        },
-        {
-          id: 's2',
-          name: 'Diya Kumar',
-          class: 'Class 8',
-          section: 'B',
-          admissionNumber: 'ADM2024002',
-          attendance: {
-            present: 88,
-            total: 100,
-            percentage: 88,
-          },
-          recentGrades: [
-            { subject: 'Mathematics', grade: 'A', marks: 90, total: 100 },
-            { subject: 'Science', grade: 'A+', marks: 95, total: 100 },
-            { subject: 'English', grade: 'B+', marks: 82, total: 100 },
-          ],
-          upcomingExams: [
-            { subject: 'Hindi', date: '2024-08-11', type: 'Unit Test' },
-          ],
-          pendingAssignments: 1,
-          feeStatus: {
-            totalFee: 80000,
-            paid: 80000,
-            pending: 0,
-            nextDueDate: null,
-          },
-        },
-      ],
-      recentNotifications: [
-        {
-          id: 'n1',
-          title: 'Parent-Teacher Meeting',
-          message: 'PTM scheduled for Aug 15, 2024 at 10:00 AM',
-          date: '2024-08-01T09:00:00Z',
-          type: 'EVENT',
-          isRead: false,
-        },
-        {
-          id: 'n2',
-          title: 'Fee Payment Reminder',
-          message: 'Q4 fee payment due by Dec 31, 2024',
-          date: '2024-07-30T08:00:00Z',
-          type: 'FEE',
-          isRead: true,
-        },
-        {
-          id: 'n3',
-          title: 'Assignment Submitted',
-          message: 'Aarav has submitted Mathematics assignment',
-          date: '2024-07-28T14:30:00Z',
-          type: 'ASSIGNMENT',
-          isRead: true,
-        },
-      ],
-      upcomingEvents: [
-        {
-          id: 'e1',
-          title: 'Annual Sports Day',
-          date: '2024-08-20',
-          type: 'SPORTS',
-        },
-        {
-          id: 'e2',
-          title: 'Science Exhibition',
-          date: '2024-08-25',
-          type: 'ACADEMIC',
-        },
-      ],
-    }),
+  // Real API integration
+  const { data: dashboardResponse, isLoading } = useQuery({
+    queryKey: ['parent-dashboard', user?.id],
+    queryFn: () => userService.getParentDashboard(user?.id || ''),
+    enabled: !!user?.id,
   });
+
+  // Transform API response
+  const dashboardData = dashboardResponse || {
+    parent: {
+      id: user?.id || '',
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+    },
+    children: [],
+    recentNotifications: [],
+    upcomingEvents: [],
+  };
 
   if (isLoading) {
     return (

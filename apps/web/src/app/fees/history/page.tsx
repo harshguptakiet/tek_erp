@@ -15,107 +15,43 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { feeService } from '@/services/fee.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function PaymentHistoryPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2024-2025');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [expandedPayment, setExpandedPayment] = useState<string | null>(null);
 
-  // Mock data - replace with actual API call
-  const { data: historyData, isLoading } = useQuery({
-    queryKey: ['payment-history', selectedAcademicYear, selectedStatus],
-    queryFn: async () => ({
+  // Real API integration
+  const { data: historyResponse, isLoading } = useQuery({
+    queryKey: ['payment-history', user?.id, selectedAcademicYear, selectedStatus],
+    queryFn: () => feeService.getPaymentHistory(user?.id || '', {
       academicYear: selectedAcademicYear,
-      student: {
-        name: 'Aarav Kumar',
-        class: 'Class 10',
-        section: 'A',
-        admissionNumber: 'ADM2024001',
-      },
-      summary: {
-        totalPaid: 72000,
-        totalPending: 24000,
-        totalRefunded: 0,
-        transactionCount: 3,
-      },
-      payments: [
-        {
-          id: 'p1',
-          receiptNumber: 'RCP20240401',
-          date: '2024-04-15T10:30:00Z',
-          term: 'Q1 (Apr-Jun 2024)',
-          amount: 24000,
-          method: 'ONLINE',
-          status: 'PAID',
-          transactionId: 'TXN20240415001',
-          components: [
-            { name: 'Tuition Fee', amount: 16000 },
-            { name: 'Lab Fee', amount: 2500 },
-            { name: 'Library Fee', amount: 1000 },
-            { name: 'Exam Fee', amount: 2000 },
-            { name: 'Sports Fee', amount: 1500 },
-            { name: 'Activity Fee', amount: 1000 },
-          ],
-        },
-        {
-          id: 'p2',
-          receiptNumber: 'RCP20240701',
-          date: '2024-07-10T14:20:00Z',
-          term: 'Q2 (Jul-Sep 2024)',
-          amount: 24000,
-          method: 'BANK_TRANSFER',
-          status: 'PAID',
-          transactionId: 'TXN20240710002',
-          components: [
-            { name: 'Tuition Fee', amount: 16000 },
-            { name: 'Lab Fee', amount: 2500 },
-            { name: 'Library Fee', amount: 1000 },
-            { name: 'Exam Fee', amount: 2000 },
-            { name: 'Sports Fee', amount: 1500 },
-            { name: 'Activity Fee', amount: 1000 },
-          ],
-        },
-        {
-          id: 'p3',
-          receiptNumber: 'RCP20241001',
-          date: '2024-10-05T09:15:00Z',
-          term: 'Q3 (Oct-Dec 2024)',
-          amount: 24000,
-          method: 'CASH',
-          status: 'PAID',
-          transactionId: 'TXN20241005003',
-          components: [
-            { name: 'Tuition Fee', amount: 16000 },
-            { name: 'Lab Fee', amount: 2500 },
-            { name: 'Library Fee', amount: 1000 },
-            { name: 'Exam Fee', amount: 2000 },
-            { name: 'Sports Fee', amount: 1500 },
-            { name: 'Activity Fee', amount: 1000 },
-          ],
-        },
-        {
-          id: 'p4',
-          receiptNumber: 'INV20250101',
-          date: '2025-01-01T00:00:00Z',
-          term: 'Q4 (Jan-Mar 2025)',
-          amount: 24000,
-          method: 'PENDING',
-          status: 'PENDING',
-          transactionId: null,
-          components: [
-            { name: 'Tuition Fee', amount: 16000 },
-            { name: 'Lab Fee', amount: 2500 },
-            { name: 'Library Fee', amount: 1000 },
-            { name: 'Exam Fee', amount: 2000 },
-            { name: 'Sports Fee', amount: 1500 },
-            { name: 'Activity Fee', amount: 1000 },
-          ],
-        },
-      ],
+      status: selectedStatus !== 'all' ? selectedStatus : undefined,
     }),
+    enabled: !!user?.id,
   });
 
-  const [expandedPayment, setExpandedPayment] = useState<string | null>(null);
+  // Transform API response
+  const historyData = historyResponse || {
+    academicYear: selectedAcademicYear,
+    student: {
+      name: user?.name || '',
+      class: '',
+      section: '',
+      admissionNumber: '',
+    },
+    summary: {
+      totalPaid: 0,
+      totalPending: 0,
+      totalRefunded: 0,
+      transactionCount: 0,
+    },
+    payments: [],
+  };
 
   if (isLoading) {
     return (

@@ -15,34 +15,17 @@ import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import Image from 'next/image';
 import { use } from 'react';
+import { userService } from '@/services/user.service';
 
 export default function ParentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: parent, isLoading } = useQuery({
     queryKey: ['parent', id],
-    queryFn: async () => ({
-      id,
-      firstName: 'Rajesh',
-      lastName: 'Kumar',
-      fullName: 'Rajesh Kumar',
-      email: 'rajesh.kumar@example.com',
-      phone: '+91-9876543210',
-      alternatePhone: '+91-9876543211',
-      address: '123 Parent Street, Delhi',
-      city: 'New Delhi',
-      state: 'Delhi',
-      occupation: 'Engineer',
-      employer: 'ABC Corp',
-      status: 'ACTIVE',
-      linkedStudents: [
-        { id: '1', name: 'Amit Kumar', class: '10', section: 'A', relationship: 'Father' },
-        { id: '2', name: 'Priya Kumar', class: '8', section: 'B', relationship: 'Father' },
-      ],
-      profilePicture: null,
-    }),
+    queryFn: () => userService.getParent(id),
+    enabled: !!id,
   });
 
   if (isLoading) {

@@ -15,40 +15,42 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { attendanceService } from '@/services/attendance.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function AttendanceReportsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [reportType, setReportType] = useState('daily');
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
-  // Mock data - replace with actual API call
-  const { data: reportData, isLoading } = useQuery({
-    queryKey: ['attendance-report', reportType, selectedClass, selectedSection, selectedMonth],
-    queryFn: async () => ({
-      summary: {
-        totalStudents: 120,
-        averageAttendance: 92.5,
-        presentToday: 110,
-        absentToday: 8,
-        lateToday: 2,
-        totalDays: 20,
-      },
-      students: [
-        { id: '1', name: 'Amit Kumar', rollNumber: '001', present: 18, absent: 2, late: 0, percentage: 90 },
-        { id: '2', name: 'Priya Sharma', rollNumber: '002', present: 20, absent: 0, late: 0, percentage: 100 },
-        { id: '3', name: 'Rahul Singh', rollNumber: '003', present: 17, absent: 3, late: 0, percentage: 85 },
-        { id: '4', name: 'Neha Patel', rollNumber: '004', present: 19, absent: 1, late: 0, percentage: 95 },
-        { id: '5', name: 'Vikram Reddy', rollNumber: '005', present: 16, absent: 3, late: 1, percentage: 80 },
-      ],
-      classSummary: [
-        { class: 'Class 10 A', totalStudents: 40, avgAttendance: 92, presentToday: 38 },
-        { class: 'Class 10 B', totalStudents: 40, avgAttendance: 89, presentToday: 36 },
-        { class: 'Class 10 C', totalStudents: 40, avgAttendance: 95, presentToday: 39 },
-      ],
+  // Real API integration
+  const { data: reportResponse, isLoading } = useQuery({
+    queryKey: ['attendance-report', user?.schoolId, reportType, selectedClass, selectedSection, selectedMonth],
+    queryFn: () => attendanceService.getAttendanceReports(user?.schoolId || '', {
+      reportType,
+      classId: selectedClass,
+      section: selectedSection,
+      month: selectedMonth,
     }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API response
+  const reportData = reportResponse || {
+    summary: {
+      totalStudents: 0,
+      averageAttendance: 0,
+      presentToday: 0,
+      absentToday: 0,
+      lateToday: 0,
+      totalDays: 0,
+    },
+    students: [],
+    classSummary: [],
+  };
 
   const handleExport = (format: 'pdf' | 'excel') => {
     // Implement export functionality

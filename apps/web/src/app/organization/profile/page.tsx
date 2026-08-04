@@ -17,39 +17,20 @@ import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
 import Image from 'next/image';
+import { userService } from '@/services/user.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function OrganizationProfilePage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: organization, isLoading } = useQuery({
-    queryKey: ['organization-profile'],
-    queryFn: async () => ({
-      id: '1',
-      name: 'Delhi Public School',
-      legalName: 'Delhi Public School Society',
-      type: 'SCHOOL',
-      status: 'ACTIVE',
-      logo: null,
-      website: 'https://dps.edu.in',
-      email: 'info@dps.edu.in',
-      phone: '+91-11-12345678',
-      address: '123 School Street, New Delhi',
-      city: 'New Delhi',
-      state: 'Delhi',
-      country: 'India',
-      pincode: '110001',
-      registrationNumber: 'REG123456',
-      establishedDate: '1990-01-01',
-      principalName: 'Dr. Rajesh Kumar',
-      principalEmail: 'principal@dps.edu.in',
-      totalStudents: 2500,
-      totalTeachers: 150,
-      totalStaff: 50,
-      about: 'Leading educational institution providing quality education.',
-    }),
+    queryKey: ['organization-profile', user?.schoolId],
+    queryFn: () => userService.getOrganizationProfile(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
   if (isLoading) {

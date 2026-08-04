@@ -16,100 +16,48 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { libraryService } from '@/services/library.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'catalog' | 'borrowed'>('catalog');
 
-  // Mock data - replace with actual API calls
-  const { data: libraryData, isLoading } = useQuery({
-    queryKey: ['library', searchTerm, selectedCategory, selectedStatus],
-    queryFn: async () => ({
-      stats: {
-        totalBooks: 5250,
-        availableBooks: 4180,
-        borrowedBooks: 1070,
-        overdueBooks: 45,
-      },
-      books: [
-        {
-          id: 'b1',
-          isbn: '978-0-13-468599-1',
-          title: 'Introduction to Algorithms',
-          author: 'Thomas H. Cormen',
-          category: 'COMPUTER_SCIENCE',
-          publisher: 'MIT Press',
-          year: 2009,
-          edition: '3rd',
-          totalCopies: 10,
-          availableCopies: 7,
-          location: 'Shelf A-101',
-          status: 'AVAILABLE',
-        },
-        {
-          id: 'b2',
-          isbn: '978-0-07-338187-5',
-          title: 'Physics: Principles with Applications',
-          author: 'Douglas C. Giancoli',
-          category: 'PHYSICS',
-          publisher: 'Pearson',
-          year: 2014,
-          edition: '7th',
-          totalCopies: 25,
-          availableCopies: 18,
-          location: 'Shelf B-205',
-          status: 'AVAILABLE',
-        },
-        {
-          id: 'b3',
-          isbn: '978-1-25-008459-3',
-          title: 'Pride and Prejudice',
-          author: 'Jane Austen',
-          category: 'LITERATURE',
-          publisher: 'Penguin Classics',
-          year: 2002,
-          edition: '1st',
-          totalCopies: 15,
-          availableCopies: 0,
-          location: 'Shelf C-310',
-          status: 'OUT_OF_STOCK',
-        },
-      ],
-      myBorrowedBooks: [
-        {
-          id: 'br1',
-          book: {
-            id: 'b1',
-            title: 'Introduction to Algorithms',
-            author: 'Thomas H. Cormen',
-            isbn: '978-0-13-468599-1',
-          },
-          borrowDate: '2024-07-15',
-          dueDate: '2024-08-15',
-          returnDate: null,
-          status: 'BORROWED',
-          daysRemaining: 13,
-        },
-        {
-          id: 'br2',
-          book: {
-            id: 'b4',
-            title: 'Clean Code',
-            author: 'Robert C. Martin',
-            isbn: '978-0-13-235088-4',
-          },
-          borrowDate: '2024-07-01',
-          dueDate: '2024-08-01',
-          returnDate: null,
-          status: 'OVERDUE',
-          daysOverdue: 1,
-        },
-      ],
+  // Real API integration
+  const { data: libraryResponse, isLoading } = useQuery({
+    queryKey: ['library', user?.schoolId, searchTerm, selectedCategory, selectedStatus],
+    queryFn: () => libraryService.listBooks({
+      searchQuery: searchTerm,
+      category: selectedCategory !== 'all' ? selectedCategory : undefined,
+      isAvailable: selectedStatus === 'AVAILABLE' ? true : selectedStatus === 'OUT_OF_STOCK' ? false : undefined,
     }),
+    enabled: !!user?.schoolId,
   });
+
+  const { data: borrowedResponse } = useQuery({
+    queryKey: ['borrowed-books', user?.id],
+    queryFn: () => libraryService.getBorrowedBooks(user?.id || ''),
+    enabled: !!user?.id && viewMode === 'borrowed',
+  });
+
+  // Transform API data
+  const books = Array.isArray(libraryResponse) ? libraryResponse : libraryResponse?.books || [];
+  const myBorrowedBooks = Array.isArray(borrowedResponse) ? borrowedResponse : borrowedResponse?.borrowed || [];
+  
+  const libraryData = {
+    stats: {
+      totalBooks: books.length,
+      availableBooks: books.filter((b: any) => b.availableCopies > 0 || b.isAvailable).length,
+      borrowedBooks: books.filter((b: any) => b.availableCopies === 0 || !b.isAvailable).length,
+      overdueBooks: myBorrowedBooks.filter((b: any) => b.status === 'OVERDUE').length,
+    },
+    books,
+    myBorrowedBooks,
+  };
 
   if (isLoading) {
     return (

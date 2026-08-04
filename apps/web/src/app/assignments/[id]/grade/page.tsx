@@ -16,48 +16,38 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { assignmentService } from '@/services/assignment.service';
 
 export default function AssignmentGradingPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [currentSubmissionIndex, setCurrentSubmissionIndex] = useState(0);
   const [grades, setGrades] = useState<Record<string, { score: number; feedback: string }>>({});
 
-  // Mock data - replace with actual API call
-  const { data: assignment, isLoading } = useQuery({
+  // Real API integration
+  const { data: assignmentResponse, isLoading } = useQuery({
     queryKey: ['assignment-grading', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      title: 'Photosynthesis Lab Report',
-      totalMarks: 50,
-      passingMarks: 20,
-      submissions: [
-        {
-          id: 's3',
-          student: {
-            id: '3',
-            name: 'Rohan Patel',
-            rollNumber: '3',
-            admissionNumber: 'ADM2024003',
-            profilePicture: null,
-          },
-          submittedAt: '2024-09-15T14:20:00Z',
-          status: 'SUBMITTED',
-          score: null,
-          feedback: null,
-          attachments: [
-            { id: '1', name: 'Rohan_Lab.pdf', size: '2.8 MB', url: '/files/rohan-lab.pdf' },
-          ],
-          lateSubmission: false,
-        },
-        {
-          id: 's4',
-          student: {
-            id: '4',
-            name: 'Priya Singh',
-            rollNumber: '4',
-            admissionNumber: 'ADM2024004',
-            profilePicture: null,
-          },
+    queryFn: () => assignmentService.getAssignment(params.id),
+    enabled: !!params.id,
+  });
+
+  const { data: submissionsResponse } = useQuery({
+    queryKey: ['ungraded-submissions', params.id],
+    queryFn: () => assignmentService.getSubmissions(params.id, { status: 'SUBMITTED' }),
+    enabled: !!params.id,
+  });
+
+  // Transform API data
+  const assignment = assignmentResponse || {
+    id: params.id,
+    title: '',
+    totalMarks: 0,
+    passingMarks: 0,
+    submissions: [],
+  };
+
+  const submissions = Array.isArray(submissionsResponse) 
+    ? submissionsResponse 
+    : submissionsResponse?.submissions?.filter((s: any) => s.status === 'SUBMITTED') || [];
           submittedAt: '2024-09-16T10:15:00Z',
           status: 'SUBMITTED',
           score: null,

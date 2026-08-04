@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,9 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { academicService } from '@/services/academic.service';
+import { attendanceService } from '@/services/attendance.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
 
@@ -30,6 +33,7 @@ interface Student {
 
 export default function MarkAttendancePage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const today = new Date().toISOString().split('T')[0];
   
   const [selectedDate, setSelectedDate] = useState(today);
@@ -40,54 +44,40 @@ export default function MarkAttendancePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bulkAction, setBulkAction] = useState<AttendanceStatus | ''>('');
 
-  // Mock data - replace with actual API
-  const { data: classesData } = useQuery({
-    queryKey: ['classes'],
-    queryFn: async () => [
-      { id: 'c1', name: 'Class 9', sections: ['A', 'B', 'C'] },
-      { id: 'c2', name: 'Class 10', sections: ['A', 'B', 'C', 'D'] },
-      { id: 'c3', name: 'Class 11', sections: ['A', 'B'] },
-      { id: 'c4', name: 'Class 12', sections: ['A', 'B'] },
-    ],
+  // Real API integration
+  const { data: classStructure } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
 
   const { data: subjectsData } = useQuery({
     queryKey: ['subjects'],
-    queryFn: async () => [
-      { id: 's1', name: 'Mathematics', code: 'MATH' },
-      { id: 's2', name: 'Physics', code: 'PHY' },
-      { id: 's3', name: 'Chemistry', code: 'CHEM' },
-      { id: 's4', name: 'English', code: 'ENG' },
-      { id: 's5', name: 'Hindi', code: 'HIN' },
-    ],
+    queryFn: () => academicService.listSubjects(),
   });
 
-  // Load students when class and section are selected
-  const { data: studentsData, isLoading: loadingStudents } = useQuery({
-    queryKey: ['students', selectedClass, selectedSection],
-    queryFn: async () => {
-      if (!selectedClass || !selectedSection) return [];
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      return [
-        { id: 's1', admissionNumber: 'ADM001', name: 'Aarav Kumar', rollNumber: '1' },
-        { id: 's2', admissionNumber: 'ADM002', name: 'Priya Sharma', rollNumber: '2' },
-        { id: 's3', admissionNumber: 'ADM003', name: 'Rahul Verma', rollNumber: '3' },
-        { id: 's4', admissionNumber: 'ADM004', name: 'Ananya Singh', rollNumber: '4' },
-        { id: 's5', admissionNumber: 'ADM005', name: 'Arjun Patel', rollNumber: '5' },
-        { id: 's6', admissionNumber: 'ADM006', name: 'Diya Reddy', rollNumber: '6' },
-        { id: 's7', admissionNumber: 'ADM007', name: 'Vivaan Gupta', rollNumber: '7' },
-        { id: 's8', admissionNumber: 'ADM008', name: 'Ishita Joshi', rollNumber: '8' },
-      ].map(s => ({ ...s, status: 'PRESENT' as AttendanceStatus }));
+  // Load section attendance when section is selected
+  const { data: attendanceData, isLoading: loadingStudents } = useQuery({
+    queryKey: ['section-attendance', selectedSection, selectedDate],
+    queryFn: () => attendanceService.getSectionAttendance(selectedSection, selectedDate),
+    enabled: !!selectedSection && !!selectedDate,
+  });
+
+  // Transform API data
+  const classesData = classStructure?.classes?.map((cls: any) => ({
+    id: cls.id,
+    name: cls.name,
+    sections: cls.sections?.map((s: any) => s.name) || [],
+  }));
     },
     enabled: !!selectedClass && !!selectedSection,
   });
 
-  // Initialize students when data loads
-  useState(() => {
+  useEffect(() => {
     if (studentsData) {
       setStudents(studentsData);
     }
-  });
+  }, [studentsData]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {

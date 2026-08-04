@@ -15,22 +15,30 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ClassesPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuthStore();
 
-  // Mock data - replace with actual API call
-  const { data: classes, isLoading } = useQuery({
-    queryKey: ['classes', searchQuery],
-    queryFn: async () => [
-      { id: '1', name: 'Class 10', sections: ['A', 'B', 'C'], totalStudents: 120, classTeacher: 'Ms. Sharma', status: 'ACTIVE' },
-      { id: '2', name: 'Class 9', sections: ['A', 'B', 'C', 'D'], totalStudents: 160, classTeacher: 'Mr. Kumar', status: 'ACTIVE' },
-      { id: '3', name: 'Class 8', sections: ['A', 'B'], totalStudents: 80, classTeacher: 'Ms. Patel', status: 'ACTIVE' },
-      { id: '4', name: 'Class 7', sections: ['A', 'B', 'C'], totalStudents: 120, classTeacher: 'Mr. Singh', status: 'ACTIVE' },
-      { id: '5', name: 'Class 6', sections: ['A', 'B'], totalStudents: 80, classTeacher: 'Ms. Gupta', status: 'ACTIVE' },
-    ],
+  // Real API integration - fetches from backend
+  const { data: classStructure, isLoading } = useQuery({
+    queryKey: ['classes', user?.schoolId],
+    queryFn: () => academicService.getClassStructure(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data to match UI format
+  const classes = classStructure?.classes?.map((cls: any) => ({
+    id: cls.id,
+    name: cls.name,
+    sections: cls.sections?.map((s: any) => s.name) || [],
+    totalStudents: cls.sections?.reduce((acc: number, s: any) => acc + (s.studentCount || 0), 0) || 0,
+    classTeacher: cls.sections?.[0]?.classTeacher?.name || 'Not Assigned',
+    status: 'ACTIVE',
+  })) || [];
 
   if (isLoading) {
     return (

@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { liveClassService } from '@/services/live-class.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface LiveClassDetailPageProps {
   params: {
@@ -24,15 +26,24 @@ interface LiveClassDetailPageProps {
 
 export default function LiveClassDetailPage({ params }: LiveClassDetailPageProps) {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'participants' | 'resources' | 'analytics'>('overview');
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: classData, isLoading } = useQuery({
     queryKey: ['live-class', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      title: 'Introduction to Quantum Physics',
-      description: 'Learn the fundamentals of quantum mechanics, wave-particle duality, and the uncertainty principle.',
+    queryFn: () => liveClassService.getLiveClass(params.id),
+    enabled: !!params.id,
+  });
+
+  const { data: participantsResponse } = useQuery({
+    queryKey: ['live-class-participants', params.id],
+    queryFn: () => liveClassService.getParticipants(params.id),
+    enabled: !!params.id && activeTab === 'participants',
+  });
+
+  // Transform API data
+  const participants = Array.isArray(participantsResponse) ? participantsResponse : participantsResponse?.participants || [];
       subject: 'Physics',
       class: 'Class 12',
       section: 'A',

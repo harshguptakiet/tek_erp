@@ -13,91 +13,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { contentService } from '@/services/content.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ContentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Mock data - replace with actual API call
+  // Real API integration
   const { data: content, isLoading } = useQuery({
     queryKey: ['content', params.id],
-    queryFn: async () => ({
-      id: params.id,
-      title: 'Introduction to Photosynthesis',
-      description: 'A comprehensive video explaining the process of photosynthesis in plants, including light and dark reactions, chlorophyll structure, and the Calvin cycle.',
-      type: 'VIDEO',
-      subject: 'Biology',
-      class: 'Class 10',
-      duration: 720, // seconds
-      status: 'PUBLISHED',
-      thumbnail: '/thumbnails/photosynthesis.jpg',
-      url: 'https://example.com/content/photosynthesis.mp4',
-      uploadedBy: {
-        id: 'u1',
-        name: 'Dr. Anjali Verma',
-        role: 'Teacher',
-      },
-      uploadedAt: '2024-09-15T10:30:00Z',
-      views: 1248,
-      likes: 342,
-      downloads: 89,
-      rating: 4.7,
-      totalRatings: 156,
-      size: 128.5, // MB
-      format: 'MP4',
-      language: 'English',
-      tags: ['Biology', 'Photosynthesis', 'Plants', 'Science', 'Class 10'],
-      relatedContent: [
-        {
-          id: 'c2',
-          title: 'Cellular Respiration',
-          type: 'VIDEO',
-          thumbnail: '/thumbnails/respiration.jpg',
-          duration: 600,
-          views: 980,
-        },
-        {
-          id: 'c3',
-          title: 'Plant Anatomy',
-          type: 'DOCUMENT',
-          thumbnail: '/thumbnails/plant-anatomy.jpg',
-          pages: 24,
-          views: 756,
-        },
-        {
-          id: 'c4',
-          title: '3D Plant Cell Model',
-          type: 'AR_VR',
-          thumbnail: '/thumbnails/plant-cell-3d.jpg',
-          views: 523,
-        },
-      ],
-      comments: [
-        {
-          id: 'cm1',
-          user: 'Rahul Kumar',
-          role: 'Student',
-          text: 'Very clear explanation! Helped me understand the concept easily.',
-          timestamp: '2024-09-16T14:20:00Z',
-          likes: 12,
-        },
-        {
-          id: 'cm2',
-          user: 'Priya Sharma',
-          role: 'Student',
-          text: 'Can you make a video on dark reactions in more detail?',
-          timestamp: '2024-09-17T09:15:00Z',
-          likes: 8,
-        },
-      ],
-      learningObjectives: [
-        'Understand the importance of photosynthesis',
-        'Explain the light and dark reactions',
-        'Identify the role of chlorophyll',
-        'Describe the Calvin cycle process',
-      ],
-      prerequisites: ['Basic cell structure', 'Plant biology fundamentals'],
-    }),
+    queryFn: () => contentService.getContent(params.id),
+    enabled: !!params.id,
   });
 
   if (isLoading) {
@@ -257,7 +185,7 @@ export default function ContentDetailPage({ params }: { params: { id: string } }
             <CardContent className="space-y-4">
               <p className="text-gray-700">{content.description}</p>
 
-              {content.learningObjectives.length > 0 && (
+              {content.learningObjectives && content.learningObjectives.length > 0 && (
                 <div>
                   <p className="font-semibold text-gray-900 mb-2">Learning Objectives:</p>
                   <ul className="list-disc list-inside space-y-1">
@@ -268,7 +196,7 @@ export default function ContentDetailPage({ params }: { params: { id: string } }
                 </div>
               )}
 
-              {content.prerequisites.length > 0 && (
+              {content.prerequisites && content.prerequisites.length > 0 && (
                 <div>
                   <p className="font-semibold text-gray-900 mb-2">Prerequisites:</p>
                   <div className="flex flex-wrap gap-2">
@@ -282,7 +210,7 @@ export default function ContentDetailPage({ params }: { params: { id: string } }
               <div>
                 <p className="font-semibold text-gray-900 mb-2">Tags:</p>
                 <div className="flex flex-wrap gap-2">
-                  {content.tags.map((tag, idx) => (
+                  {content.tags && content.tags.map((tag, idx) => (
                     <Badge key={idx} variant="secondary">{tag}</Badge>
                   ))}
                 </div>

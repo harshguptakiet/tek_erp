@@ -19,6 +19,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { userService } from '@/services/user.service';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 // Validation schema
 const teacherSchema = z.object({
@@ -59,6 +62,7 @@ type TeacherForm = z.infer<typeof teacherSchema>;
 
 export default function CreateTeacherPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [step, setStep] = useState(1);
 
   const {
@@ -80,24 +84,19 @@ export default function CreateTeacherPage() {
     },
   });
 
-  // Mock subjects data
-  const { data: subjectsData } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: async () => [
-      { id: 'sub1', name: 'Mathematics', code: 'MATH' },
-      { id: 'sub2', name: 'Physics', code: 'PHY' },
-      { id: 'sub3', name: 'Chemistry', code: 'CHEM' },
-      { id: 'sub4', name: 'English', code: 'ENG' },
-      { id: 'sub5', name: 'Biology', code: 'BIO' },
-      { id: 'sub6', name: 'Computer Science', code: 'CS' },
-    ],
+  // Real API integration
+  const { data: subjectsResponse } = useQuery({
+    queryKey: ['subjects', user?.schoolId],
+    queryFn: () => academicService.getSubjects(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
   });
+
+  const subjectsData = Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse?.subjects || [];
 
   const selectedSubjects = watch('subjectIds');
 
   const createMutation = useMutation({
-    mutationFn: async (data: TeacherForm) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    mutationFn: (data: TeacherForm) => userService.createTeacher(user?.schoolId || '', data),
       return { id: 'new-teacher-id', ...data };
     },
     onSuccess: (data) => {

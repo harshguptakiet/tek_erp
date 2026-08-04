@@ -18,6 +18,9 @@ import { Dialog } from '@/components/ui/dialog';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { toast } from 'sonner';
+import { assignmentService } from '@/services/assignment.service';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 type HomeworkStatus = 'PENDING' | 'SUBMITTED' | 'GRADED' | 'OVERDUE';
 
@@ -46,6 +49,7 @@ interface Homework {
 
 export default function HomeworkPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [filterSubject, setFilterSubject] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<HomeworkStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,31 +57,44 @@ export default function HomeworkPage() {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submissionRemarks, setSubmissionRemarks] = useState('');
 
-  // Mock data
-  const { data: homeworkData, isLoading } = useQuery({
-    queryKey: ['homework'],
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      return [
-        {
-          id: 'hw1',
-          subject: 'Mathematics',
-          title: 'Linear Equations Practice',
-          description: 'Solve all problems from Chapter 3, Exercise 3.2. Show complete working.',
-          assignedDate: '2024-07-28',
-          dueDate: '2024-08-05',
-          status: 'PENDING' as HomeworkStatus,
-          teacherName: 'Dr. Rajesh Kumar',
-          attachments: ['linear-equations.pdf'],
-        },
-        {
-          id: 'hw2',
-          subject: 'Physics',
-          title: 'Newton\'s Laws Report',
-          description: 'Write a detailed report on Newton\'s three laws with real-world examples.',
-          assignedDate: '2024-07-25',
-          dueDate: '2024-08-01',
-          status: 'SUBMITTED' as HomeworkStatus,
+  // Real API integration
+  const { data: homeworkResponse, isLoading } = useQuery({
+    queryKey: ['homework', user?.id, user?.schoolId, filterSubject, filterStatus],
+    queryFn: () => assignmentService.getAssignments(user?.schoolId || '', {
+      studentId: user?.id,
+      type: 'HOMEWORK',
+      subjectId: filterSubject !== 'ALL' ? filterSubject : undefined,
+      status: filterStatus !== 'ALL' ? filterStatus : undefined,
+    }),
+    enabled: !!user?.id && !!user?.schoolId,
+  });
+
+  const { data: subjectsResponse } = useQuery({
+    queryKey: ['subjects', user?.schoolId],
+    queryFn: () => academicService.getSubjects(user?.schoolId || ''),
+    enabled: !!user?.schoolId,
+  });
+
+  // Transform API data
+  const homeworkData = (Array.isArray(homeworkResponse) ? homeworkResponse : homeworkResponse?.data || []) as Homework[];
+  const subjectsData = Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse?.subjects || [];
+
+  const submitMutation = useMutation({
+    mutationFn: (data: { homeworkId: string; remarks: string; files: string[] }) => 
+      assignmentService.submitAssignment(data.homeworkId, {
+        remarks: data.remarks,
+        attachments: data.files,
+      }),
+    onSuccess: () => {
+      toast.success('Homework submitted successfully');
+      setShowSubmitDialog(false);
+      setSelectedHomework(null);
+      setSubmissionRemarks('');
+    },
+    onError: () => {
+      toast.error('Failed to submit homework');
+    },
+  });
           teacherName: 'Prof. Priya Singh',
           attachments: ['newtons-laws.pdf'],
           submission: {

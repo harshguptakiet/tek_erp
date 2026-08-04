@@ -14,89 +14,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { eventService } from '@/services/event.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function EventsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [selectedMonth, setSelectedMonth] = useState('2024-08');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
-  // Mock data - replace with actual API call
-  const { data: eventsData, isLoading } = useQuery({
-    queryKey: ['events', selectedMonth, selectedCategory],
-    queryFn: async () => ({
-      events: [
-        {
-          id: 'e1',
-          title: 'Parent-Teacher Meeting',
-          description: 'Quarterly PTM for all classes',
-          date: '2024-08-15',
-          startTime: '10:00',
-          endTime: '14:00',
-          category: 'MEETING',
-          location: 'School Auditorium',
-          organizer: 'Principal Office',
-          attendees: 250,
-          isAllDay: false,
-        },
-        {
-          id: 'e2',
-          title: 'Annual Sports Day',
-          description: 'Inter-house sports competition',
-          date: '2024-08-20',
-          startTime: '08:00',
-          endTime: '17:00',
-          category: 'SPORTS',
-          location: 'School Ground',
-          organizer: 'Sports Department',
-          attendees: 1200,
-          isAllDay: true,
-        },
-        {
-          id: 'e3',
-          title: 'Science Exhibition',
-          description: 'Student science projects showcase',
-          date: '2024-08-25',
-          startTime: '09:00',
-          endTime: '16:00',
-          category: 'ACADEMIC',
-          location: 'Science Block',
-          organizer: 'Science Department',
-          attendees: 800,
-          isAllDay: false,
-        },
-        {
-          id: 'e4',
-          title: 'Independence Day Celebration',
-          description: 'Flag hoisting and cultural program',
-          date: '2024-08-15',
-          startTime: '08:00',
-          endTime: '11:00',
-          category: 'CULTURAL',
-          location: 'School Ground',
-          organizer: 'Cultural Committee',
-          attendees: 1500,
-          isAllDay: false,
-        },
-        {
-          id: 'e5',
-          title: 'Mid-Term Examinations Begin',
-          description: 'Mid-term exams for all classes',
-          date: '2024-08-10',
-          startTime: '09:00',
-          endTime: '12:00',
-          category: 'EXAM',
-          location: 'All Classrooms',
-          organizer: 'Examination Cell',
-          attendees: 1250,
-          isAllDay: false,
-        },
-      ],
-      upcomingCount: 5,
-      todayCount: 0,
-      monthCount: 5,
+  // Real API integration
+  const { data: eventsResponse, isLoading } = useQuery({
+    queryKey: ['events', user?.schoolId, selectedMonth, selectedCategory],
+    queryFn: () => eventService.listEvents({
+      schoolId: user?.schoolId,
+      eventType: selectedCategory !== 'all' ? selectedCategory : undefined,
+      startDate: `${selectedMonth}-01`,
+      endDate: `${selectedMonth}-31`,
     }),
+    enabled: !!user?.schoolId,
   });
+
+  // Transform API data
+  const events = Array.isArray(eventsResponse) ? eventsResponse : eventsResponse?.events || [];
+  const eventsData = {
+    events,
+    upcomingCount: events.filter((e: any) => new Date(e.date || e.startDate) > new Date()).length,
+    todayCount: events.filter((e: any) => {
+      const eventDate = new Date(e.date || e.startDate).toDateString();
+      return eventDate === new Date().toDateString();
+    }).length,
+    monthCount: events.length,
+  };
 
   // Generate calendar days
   const generateCalendarDays = () => {

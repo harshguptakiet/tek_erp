@@ -16,17 +16,28 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { assignmentService } from '@/services/assignment.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function AssignmentsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
 
-  // Mock data - replace with actual API call
-  const { data: assignments, isLoading } = useQuery({
-    queryKey: ['assignments', searchQuery, statusFilter, subjectFilter],
-    queryFn: async () => [
+  // Real API integration
+  const { data: assignmentsResponse, isLoading } = useQuery({
+    queryKey: ['assignments', user?.schoolId, statusFilter, subjectFilter],
+    queryFn: () => assignmentService.listAssignments({
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      subjectId: subjectFilter !== 'all' ? subjectFilter : undefined,
+    }),
+    enabled: !!user?.schoolId,
+  });
+
+  // Transform API data
+  const assignments = Array.isArray(assignmentsResponse) ? assignmentsResponse : assignmentsResponse?.assignments || [];
       {
         id: '1',
         title: 'Photosynthesis Lab Report',

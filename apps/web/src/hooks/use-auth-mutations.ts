@@ -266,3 +266,15 @@ export function useVerifyEmail() {
     },
   });
 }
+
+export function useRequest2FARecovery() {
+  return useMutation({
+    mutationFn: (email: string) => authService.request2FARecovery(email),
+    onSuccess: (data) => {
+      toast.success(data.message || 'Recovery request submitted');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to submit recovery request');
+    },
+  });
+}

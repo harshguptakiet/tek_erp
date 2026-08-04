@@ -15,17 +15,31 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
+import { contentService } from '@/services/content.service';
+import { academicService } from '@/services/academic.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ContentPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [contentType, setContentType] = useState('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
 
-  // Mock data
+  // Real API integration
   const { data: contents, isLoading } = useQuery({
     queryKey: ['content', searchQuery, contentType, subjectFilter],
-    queryFn: async () => [
+    queryFn: () => contentService.searchContent({
+      query: searchQuery || undefined,
+      contentType: contentType !== 'all' ? contentType : undefined,
+      subjectId: subjectFilter !== 'all' ? subjectFilter : undefined,
+    }),
+  });
+
+  const { data: subjectsData } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => academicService.listSubjects(),
+  });
       {
         id: '1',
         title: 'Introduction to Algebra',
