@@ -4,7 +4,8 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { authService } from '../services/auth-complete.service';
+import { authService as simpleAuthService } from '../services/auth.service';
+import { authService as completeAuthService } from '../services/auth-complete.service';
 import { useAuthStore, type User as StoreUser } from '../stores/auth.store';
 import { toast } from 'sonner';
 import type {
@@ -15,35 +16,49 @@ import type {
   User as AuthUser,
 } from '../types/auth.types';
 
-function toStoreUser(user: AuthUser): StoreUser {
+function toStoreUser(user: any): StoreUser {
   const primaryRole = Array.isArray(user.role) ? user.role[0] ?? '' : String(user.role ?? '');
   return {
     id: user.id,
     email: user.email,
-    emailVerified: user.emailVerified,
+    emailVerified: user.emailVerified ?? false,
     phone: user.phone,
-    phoneVerified: user.phoneVerified,
+    phoneVerified: user.phoneVerified ?? false,
     firstName: user.firstName,
     lastName: user.lastName,
     fullName: [user.firstName, user.lastName].filter(Boolean).join(' '),
     role: primaryRole,
     roles: Array.isArray(user.role) ? user.role : [primaryRole],
-    permissions: [],
+    permissions: user.permissions ?? [],
     organizationId: user.organizationId,
     profilePicture: user.profilePicture,
     status: user.status,
-    twoFactorEnabled: user.twoFactorEnabled,
+    twoFactorEnabled: user.twoFactorEnabled ?? false,
     lastLogin: user.lastLogin,
   };
 }
 
 export function useRegister() {
   const queryClient = useQueryClient();
+  const { setUser, setTokens } = useAuthStore();
   
   return useMutation({
-    mutationFn: (data: RegisterRequest) => authService.registerWithEmail(data),
+    mutationFn: (data: RegisterRequest) => {
+      // Backend expects: email, password, firstName, lastName, phone?, tenantId?
+      // Frontend sends: email, password, firstName, lastName, middleName?, acceptTerms
+      return simpleAuthService.register({
+        email: data.email!,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+      });
+    },
     onSuccess: (data) => {
-      toast.success('Registration successful! Please verify your email.');
+      // Backend returns { accessToken, user }
+      setUser(toStoreUser(data.user));
+      setTokens({ accessToken: data.accessToken, refreshToken: '' });
+      toast.success('Registration successful! Welcome to Tekurious ERP.');
       queryClient.invalidateQueries({ queryKey: ['auth'] });
     },
     onError: (error: any) => {
@@ -56,17 +71,16 @@ export function useLogin() {
   const { setUser, setTokens } = useAuthStore();
   
   return useMutation({
-    mutationFn: (credentials: LoginRequest) => authService.loginWithEmail(credentials),
+    mutationFn: (credentials: LoginRequest) => simpleAuthService.login({
+      email: credentials.email!,
+      password: credentials.password,
+      rememberMe: credentials.rememberMe,
+    }),
     onSuccess: (data) => {
-      if (data.requiresTwoFactor) {
-        // Store temp token for 2FA verification
-        sessionStorage.setItem('2fa_token', data.twoFactorToken!);
-        toast.info('Please enter your 2FA code');
-      } else {
-        setUser(toStoreUser(data.user));
-        setTokens(data.tokens);
-        toast.success('Login successful!');
-      }
+      // Backend returns { accessToken, user }
+      setUser(toStoreUser(data.user));
+      setTokens({ accessToken: data.accessToken, refreshToken: '' });
+      toast.success('Login successful!');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Login failed');
@@ -141,7 +155,7 @@ export function useDisable2FA() {
 
 export function useRequestPasswordReset() {
   return useMutation({
-    mutationFn: (email: string) => authService.requestPasswordReset({ email }),
+    mutationFn: (email: string) => simpleAuthService.forgotPassword({ email }),
     onSuccess: () => {
       toast.success('Password reset email sent! Check your inbox.');
     },
@@ -153,7 +167,10 @@ export function useRequestPasswordReset() {
 
 export function useResetPassword() {
   return useMutation({
-    mutationFn: (data: PasswordResetConfirm) => authService.resetPassword(data),
+    mutationFn: (data: PasswordResetConfirm) => simpleAuthService.resetPassword({
+      token: data.token,
+      password: data.newPassword,
+    }),
     onSuccess: () => {
       toast.success('Password reset successfully! Please login.');
     },
@@ -167,7 +184,10 @@ export function useChangePassword() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (data: ChangePasswordRequest) => authService.changePassword(data),
+    mutationFn: (data: ChangePasswordRequest) => simpleAuthService.changePassword({
+      currentPassword: data.currentPassword,
+      newPassword: data.newPassword,
+    }),
     onSuccess: () => {
       toast.success('Password changed successfully');
       queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
@@ -183,7 +203,7 @@ export function useLogout() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: () => authService.logout(),
+    mutationFn: () => simpleAuthService.logout(),
     onSuccess: () => {
       clearAuth();
       queryClient.clear();
