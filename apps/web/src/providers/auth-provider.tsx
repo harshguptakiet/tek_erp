@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       } catch (error) {
         // Token invalid or expired
-        console.error('Auth check failed:', error);
+        console.warn('Auth check failed:', error);
         setUser(null);
         setAccessToken(null);
         localStorage.removeItem('accessToken');

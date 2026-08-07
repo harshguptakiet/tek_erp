@@ -23,8 +23,10 @@ import { SessionDto, LogoutDeviceDto, LogoutAllDto } from './dto/session.dto';
 import { JwtAuthGuard } from './guards';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { MicrosoftOAuthGuard } from './guards/microsoft-oauth.guard';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser, Public } from './decorators';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);

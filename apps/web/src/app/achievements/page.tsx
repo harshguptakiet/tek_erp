@@ -111,9 +111,8 @@ export default function AchievementsPage() {
             <div
               className="h-full bg-gradient-to-r from-green-400 to-blue-500"
               style={{
-                width: `${
-                  achievements.length > 0 ? (unlockedCount / achievements.length) * 100 : 0
-                }%`,
+                width: `${achievements.length > 0 ? (unlockedCount / achievements.length) * 100 : 0
+                  }%`,
               }}
             />
           </div>
@@ -162,18 +161,16 @@ export default function AchievementsPage() {
           {filteredAchievements.map((achievement: any) => (
             <Card
               key={achievement.id}
-              className={`hover:shadow-lg transition-all ${
-                achievement.unlocked ? 'border-yellow-300' : 'opacity-60'
-              }`}
+              className={`hover:shadow-lg transition-all ${achievement.unlocked ? 'border-yellow-300' : 'opacity-60'
+                }`}
             >
               <CardContent className="pt-6 text-center">
                 {/* Badge Icon */}
                 <div
-                  className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                    achievement.unlocked
+                  className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${achievement.unlocked
                       ? 'bg-gradient-to-br from-yellow-400 to-orange-500'
                       : 'bg-gray-200'
-                  }`}
+                    }`}
                 >
                   <span className="text-4xl">
                     {achievement.icon || (achievement.unlocked ? '🏆' : '🔒')}

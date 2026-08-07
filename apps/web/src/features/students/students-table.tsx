@@ -27,7 +27,7 @@ export function StudentsTable() {
   };
 
   const handleViewStudent = (id: string) => {
-    router.push(`/dashboard/students/${id}`);
+    router.push(`/students/${id}`);
   };
 
   if (isLoading) {
@@ -70,7 +70,7 @@ export function StudentsTable() {
             Manage student information and records
           </p>
         </div>
-        <Button onClick={() => router.push('/dashboard/students/new')}>
+        <Button onClick={() => router.push('/students/create')}>
           Add Student
         </Button>
       </div>

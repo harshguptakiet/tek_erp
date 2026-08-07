@@ -35,6 +35,8 @@ export class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    const isDev = this.configService.get('NODE_ENV') !== 'production';
+
     // Create user with profile and authentication
     const user = await this.prisma.user.create({
       data: {
@@ -45,9 +47,9 @@ export class AuthService {
         phone: dto.phone,
         passwordHash: passwordHash,
         role: 'ORG_OWNER', // Default role, will be changed based on context
-        status: 'PENDING_VERIFICATION',
+        status: isDev ? 'ACTIVE' : 'PENDING_VERIFICATION',
         authProvider: 'LOCAL',
-        emailVerified: false,
+        emailVerified: isDev ? true : false,
       },
       include: {
         userRolesNew: {

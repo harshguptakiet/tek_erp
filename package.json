@@ -3,11 +3,11 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "serve": "nx serve tekurious_erp",
+    "serve": "node start-backend.js",
     "build": "nx build tekurious_erp",
-    "start": "nx serve tekurious_erp",
-    "dev": "nx serve tekurious_erp",
-    "web": "nx serve web",
+    "start": "node start-backend.js",
+    "dev": "node start-backend.js",
+    "web": "node start-frontend.js",
     "test": "nx test",
     "lint": "nx lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
@@ -16,7 +16,8 @@
     "prisma:studio": "prisma studio",
     "prisma:reset": "prisma migrate reset",
     "prisma:seed": "tsx prisma/seed.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "openapi:generate": "npx ts-node -r tsconfig-paths/register -P apps/tekurious_erp/tsconfig.app.json scripts/generate-openapi.ts"
   },
   "private": true,
   "dependencies": {
@@ -40,7 +41,7 @@
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-local": "^1.0.38",
     "@types/ua-parser-js": "^0.7.39",
-    "axios": "^1.6.0",
+    "axios": "^1.19.0",
     "bcrypt": "^6.0.0",
     "bull": "^4.16.5",
     "class-transformer": "^0.5.1",
@@ -66,6 +67,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.84.0",
+    "react-hot-toast": "^2.6.0",
     "redis": "^6.1.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
@@ -99,6 +101,7 @@
     "@swc/cli": "~0.8.1",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/eslint-plugin-query": "^5.101.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -127,5 +130,12 @@
     "webpack": "^5.101.3",
     "webpack-cli": "^7.0.0",
     "webpack-dev-server": "^5.2.1"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.9",
+    "minimatch": "^10.0.3",
+    "cookie": "^0.7.0",
+    "axios": "^1.19.0",
+    "uuid": "^11.1.1"
   }
 }
