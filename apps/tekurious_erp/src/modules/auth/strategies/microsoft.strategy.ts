@@ -7,9 +7,9 @@ import { ConfigService } from '@nestjs/config';
 export class MicrosoftStrategy extends PassportStrategy(Strategy, 'microsoft') {
   constructor(private configService: ConfigService) {
     super({
-      clientID: configService.get('MICROSOFT_CLIENT_ID'),
-      clientSecret: configService.get('MICROSOFT_CLIENT_SECRET'),
-      callbackURL: configService.get('MICROSOFT_CALLBACK_URL'),
+      clientID: configService.get('MICROSOFT_CLIENT_ID') || 'placeholder-microsoft-client-id',
+      clientSecret: configService.get('MICROSOFT_CLIENT_SECRET') || 'placeholder-microsoft-client-secret',
+      callbackURL: configService.get('MICROSOFT_CALLBACK_URL') || 'http://localhost:3333/api/v1/auth/microsoft/callback',
       scope: ['user.read'],
       tenant: 'common', // Support both personal and organizational accounts
     });

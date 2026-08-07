@@ -4,6 +4,8 @@ import { AuthProvider } from '../providers/auth-provider';
 import { Toaster } from '../components/ui/toast';
 import { Toaster as SonnerToaster } from 'sonner';
 
+import { AppShell } from '../components/layout/app-shell';
+
 export const metadata = {
   title: 'Tekurious ERP - Education Management System',
   description: 'Comprehensive education management platform for schools and institutions',
@@ -19,7 +21,7 @@ export default function RootLayout({
       <body>
         <QueryProvider>
           <AuthProvider>
-            {children}
+            <AppShell>{children}</AppShell>
             <Toaster />
             <SonnerToaster position="top-right" richColors closeButton />
           </AuthProvider>

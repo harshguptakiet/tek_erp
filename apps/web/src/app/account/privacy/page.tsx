@@ -43,7 +43,7 @@ export default function PrivacyPage() {
   const [confirmText, setConfirmText] = useState('');
 
   const updatePrivacyMutation = useMutation({
-    mutationFn: (data: Partial<PrivacySettings>) => 
+    mutationFn: (data: Partial<PrivacySettings>) =>
       userService.updateProfile({ privacySettings: data }),
     onSuccess: () => {
       toast.success('Privacy settings updated');
@@ -137,8 +137,8 @@ export default function PrivacyPage() {
                     key={option.value}
                     className={`
                       flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                      ${settings.profileVisibility === option.value 
-                        ? 'border-blue-500 bg-blue-50' 
+                      ${settings.profileVisibility === option.value
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                       }
                     `}

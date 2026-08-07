@@ -35,7 +35,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => router.push('/dashboard/students')}
+          onClick={() => router.push('/students')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -50,7 +50,7 @@ export default function DashboardPage() {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => router.push('/dashboard/teachers')}
+          onClick={() => router.push('/teachers')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -65,7 +65,7 @@ export default function DashboardPage() {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => router.push('/dashboard/classes')}
+          onClick={() => router.push('/classes')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -80,7 +80,7 @@ export default function DashboardPage() {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => router.push('/dashboard/attendance')}
+          onClick={() => router.push('/attendance')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -104,7 +104,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/students')}
+              onClick={() => router.push('/students')}
             >
               <span className="text-2xl">👨‍🎓</span>
               <span>View Students</span>
@@ -112,7 +112,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/teachers')}
+              onClick={() => router.push('/teachers')}
             >
               <span className="text-2xl">👨‍🏫</span>
               <span>View Teachers</span>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/classes')}
+              onClick={() => router.push('/classes')}
             >
               <span className="text-2xl">🏫</span>
               <span>View Classes</span>
@@ -128,7 +128,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/attendance')}
+              onClick={() => router.push('/attendance')}
             >
               <span className="text-2xl">📊</span>
               <span>Take Attendance</span>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/subjects')}
+              onClick={() => router.push('/subjects')}
             >
               <span className="text-2xl">📚</span>
               <span>Subjects</span>
@@ -144,7 +144,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/exams')}
+              onClick={() => router.push('/exams')}
             >
               <span className="text-2xl">📝</span>
               <span>Exams</span>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/fees')}
+              onClick={() => router.push('/fees')}
             >
               <span className="text-2xl">💰</span>
               <span>Fees</span>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col gap-2"
-              onClick={() => router.push('/dashboard/settings')}
+              onClick={() => router.push('/settings')}
             >
               <span className="text-2xl">⚙️</span>
               <span>Settings</span>

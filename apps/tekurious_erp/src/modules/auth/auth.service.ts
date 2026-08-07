@@ -35,6 +35,8 @@ export class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    const isDev = this.configService.get('NODE_ENV') !== 'production';
+
     // Create user with profile and authentication
     // In development, auto-activate users for easier testing
     const userStatus = process.env.NODE_ENV === 'production' 

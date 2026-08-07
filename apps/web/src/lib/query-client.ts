@@ -13,7 +13,7 @@ const handleError = (error: unknown) => {
   if (isAppError(error)) {
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.error('Query Error:', error);
+      console.warn('[Query Error]:', error);
     }
 
     // Show toast notification (implement based on your toast library)

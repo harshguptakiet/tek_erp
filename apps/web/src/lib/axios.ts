@@ -41,8 +41,12 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // If 401 and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+                           originalRequest.url?.includes('/auth/register') ||
+                           originalRequest.url?.includes('/auth/refresh');
+
+    // If 401 and not already retried and not an auth endpoint
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {

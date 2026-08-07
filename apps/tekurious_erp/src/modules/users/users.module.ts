@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { StudentsController } from './students.controller';
+import { TeachersController } from './teachers.controller';
 import { StudentProfileService } from './services/student-profile.service';
 import { TeacherProfileService } from './services/teacher-profile.service';
 import { ParentProfileService } from './services/parent-profile.service';
@@ -12,7 +14,7 @@ import { UserPermissionsService } from './services/user-permissions.service';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [UsersController],
+  controllers: [UsersController, StudentsController, TeachersController],
   providers: [
     UsersService,
     StudentProfileService,
