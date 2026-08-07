@@ -60,3 +60,7 @@ logs/
 *.log
 coverage/
 .nyc_output/
+
+# Next.js
+.next
+out

@@ -40,7 +40,7 @@ async function bootstrap() {
 
   // CORS configuration
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -51,7 +51,7 @@ async function bootstrap() {
   app.setGlobalPrefix(globalPrefix);
 
   // Start the application
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3333;
   await app.listen(port);
 
   Logger.log(`🚀 Tekurious ERP is running on: http://localhost:${port}/${globalPrefix}`);

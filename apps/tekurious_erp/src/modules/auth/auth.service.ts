@@ -268,6 +268,32 @@ export class AuthService {
   }
 
   /**
+   * Get current user profile
+   */
+  async getCurrentUser(userId: string): Promise<AuthResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRolesNew: {
+          include: {
+            role: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.generateTokens(user);
+  }
+
+  /**
    * Generate JWT tokens
    */
   private generateTokens(user: any): AuthResponseDto {
@@ -289,8 +315,13 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        tenantId: user.tenantId,
+        role: user.role || roles[0] || 'USER',
         roles,
+        permissions: roles, // For now, use roles as permissions
+        tenantId: user.tenantId,
+        organizationId: user.organizationId,
+        schoolId: user.schoolId,
+        status: user.status || 'ACTIVE',
       },
     };
   }

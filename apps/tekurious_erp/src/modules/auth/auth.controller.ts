@@ -73,14 +73,9 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@CurrentUser() user: any) {
+  async getProfile(@CurrentUser() user: any): Promise<AuthResponseDto> {
     this.logger.log(`GET /auth/me - User ID: ${user.id}`);
-    return {
-      id: user.id,
-      email: user.email,
-      tenantId: user.tenantId,
-      roles: user.roles,
-    };
+    return this.authService.getCurrentUser(user.id);
   }
 
   /**
