@@ -69,7 +69,7 @@ export default function RegisterPage() {
       };
 
       await registerMutation.mutateAsync(requestData);
-      router.push('/auth/verify-email-sent');
+      router.push('/dashboard');
     } catch (error) {
       // Error handled by mutation hook
     }

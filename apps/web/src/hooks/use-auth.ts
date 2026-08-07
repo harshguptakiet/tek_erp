@@ -1,26 +1,21 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { authService, LoginDto, RegisterDto, ChangePasswordDto } from '../services/auth.service';
+import { authService, type LoginDto, type RegisterDto, type ChangePasswordDto } from '../services/auth.service';
 import { useAuthStore } from '../stores/auth.store';
 import { useUIStore } from '../stores/ui.store';
 import { queryKeys } from '../config/query-keys';
 
 export function useAuth() {
   const router = useRouter();
-  const { setUser, setAccessToken, logout: storeLogout } = useAuthStore();
+  const { setUser, setTokens, logout: storeLogout } = useAuthStore();
   const { addNotification } = useUIStore();
 
   // Login mutation
   const loginMutation = useMutation({
-    mutationFn: authService.login,
+    mutationFn: (credentials: LoginDto) => authService.login(credentials),
     onSuccess: (data) => {
-      setUser(data.user);
-      setAccessToken(data.accessToken);
-      
-      // Store token in localStorage for persistence
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('accessToken', data.accessToken);
-      }
+      setUser(data.user as any);
+      setTokens({ accessToken: data.accessToken, refreshToken: '' });
       
       addNotification({
         type: 'success',
@@ -33,17 +28,18 @@ export function useAuth() {
       addNotification({
         type: 'error',
         title: 'Login failed',
-        message: error.message || 'Invalid email or password',
+        message: error.response?.data?.message || error.message || 'Invalid email or password',
       });
     },
   });
 
   // Register mutation
   const registerMutation = useMutation({
-    mutationFn: authService.register,
+    mutationFn: (data: RegisterDto) => authService.register(data),
     onSuccess: (data) => {
-      setUser(data.user);
-      setAccessToken(data.accessToken);
+      setUser(data.user as any);
+      setTokens({ accessToken: data.accessToken, refreshToken: '' });
+      
       addNotification({
         type: 'success',
         title: 'Account created!',
@@ -51,25 +47,20 @@ export function useAuth() {
       });
       router.push('/dashboard');
     },
-    onError: () => {
+    onError: (error: any) => {
       addNotification({
         type: 'error',
         title: 'Registration failed',
-        message: 'Please check your information and try again',
+        message: error.response?.data?.message || 'Please check your information and try again',
       });
     },
   });
 
   // Logout mutation
   const logoutMutation = useMutation({
-    mutationFn: authService.logout,
+    mutationFn: () => authService.logout(),
     onSuccess: () => {
       storeLogout();
-      
-      // Remove token from localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('accessToken');
-      }
       
       addNotification({
         type: 'success',
@@ -78,11 +69,16 @@ export function useAuth() {
       });
       router.push('/auth/login');
     },
+    onError: () => {
+      // Even if server logout fails, clear local state
+      storeLogout();
+      router.push('/auth/login');
+    },
   });
 
   // Change password mutation
   const changePasswordMutation = useMutation({
-    mutationFn: authService.changePassword,
+    mutationFn: (data: ChangePasswordDto) => authService.changePassword(data),
     onSuccess: () => {
       addNotification({
         type: 'success',
@@ -90,11 +86,11 @@ export function useAuth() {
         message: 'Your password has been updated successfully',
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       addNotification({
         type: 'error',
         title: 'Failed to change password',
-        message: 'Please check your current password',
+        message: error.response?.data?.message || 'Please check your current password',
       });
     },
   });
