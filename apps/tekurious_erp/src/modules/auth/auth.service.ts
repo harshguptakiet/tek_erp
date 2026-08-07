@@ -36,6 +36,13 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     // Create user with profile and authentication
+    // In development, auto-activate users for easier testing
+    const userStatus = process.env.NODE_ENV === 'production' 
+      ? 'PENDING_VERIFICATION' 
+      : 'ACTIVE';
+    
+    const emailVerified = process.env.NODE_ENV !== 'production';
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -45,9 +52,9 @@ export class AuthService {
         phone: dto.phone,
         passwordHash: passwordHash,
         role: 'ORG_OWNER', // Default role, will be changed based on context
-        status: 'PENDING_VERIFICATION',
+        status: userStatus,
         authProvider: 'LOCAL',
-        emailVerified: false,
+        emailVerified: emailVerified,
       },
       include: {
         userRolesNew: {
