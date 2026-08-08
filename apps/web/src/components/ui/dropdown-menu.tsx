@@ -159,3 +159,57 @@ export function DropdownMenuLabel({ children, className }: { children: React.Rea
 export function DropdownMenuGroup({ children }: { children: React.ReactNode }) {
   return <div className="space-y-1">{children}</div>;
 }
+
+export function DropdownMenuCheckboxItem({
+  children,
+  checked,
+  onCheckedChange,
+  disabled,
+  className,
+}: {
+  children: React.ReactNode;
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { setOpen } = React.useContext(DropdownMenuContext);
+
+  const handleClick = () => {
+    if (!disabled && onCheckedChange) {
+      onCheckedChange(!checked);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+        disabled
+          ? 'pointer-events-none opacity-50'
+          : 'hover:bg-gray-100 focus:bg-gray-100',
+        className
+      )}
+      onClick={handleClick}
+    >
+      <span className="mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-gray-300">
+        {checked && (
+          <svg
+            className="h-3 w-3 text-gray-900"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        )}
+      </span>
+      {children}
+    </div>
+  );
+}

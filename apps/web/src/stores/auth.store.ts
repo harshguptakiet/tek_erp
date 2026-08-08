@@ -55,10 +55,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setTokens: (tokens) => {
     setAccessToken(tokens.accessToken);
+    // Save to localStorage for persistence
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('accessToken', tokens.accessToken);
+    }
   },
 
   logout: () => {
     setAccessToken(null);
+    // Remove from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+    }
     set({
       user: null,
       isAuthenticated: false,
@@ -72,6 +80,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearAuth: () => {
     setAccessToken(null);
+    // Remove from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+    }
     set({
       user: null,
       isAuthenticated: false,

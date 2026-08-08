@@ -25,6 +25,7 @@ import { SubscriptionsModule } from '../modules/subscriptions/subscriptions.modu
 import { ErpModule } from '../modules/erp/erp.module';
 import { MediaModule } from '../modules/media/media.module';
 import { SyncModule } from '../modules/sync/sync.module';
+import { StudentsModule } from '../modules/students/students.module';
 import { JwtAuthGuard } from '../modules/auth/guards';
 
 @Module({
@@ -77,6 +78,7 @@ import { JwtAuthGuard } from '../modules/auth/guards';
     ErpModule,
     MediaModule,
     SyncModule,
+    // StudentsModule, // TODO: Fix circular dependency - using old students controller in UsersModule for now
     // etc.
   ],
   controllers: [AppController],

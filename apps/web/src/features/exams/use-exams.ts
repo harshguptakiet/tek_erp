@@ -1,182 +1,67 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { examService } from '@/services/exam.service';
-import { toast } from 'sonner';
-import { useAuthStore } from '@/stores/auth.store';
 
-// ==================== QUERY HOOKS ====================
-
-export const useExams = (filters?: {
-  sectionId?: string;
-  subjectId?: string;
-  examType?: string;
-  academicYearId?: string;
-}) => {
-  const { user } = useAuthStore();
-
+export function useGetExams(filters?: any) {
   return useQuery({
-    queryKey: ['exams', filters, user?.schoolId],
+    queryKey: ['exams', filters],
     queryFn: () => examService.listExams(filters),
-    enabled: !!user?.schoolId,
   });
-};
+}
 
-export const useExam = (id: string) => {
+export function useGetExam(id: string) {
   return useQuery({
     queryKey: ['exam', id],
     queryFn: () => examService.getExam(id),
     enabled: !!id,
   });
-};
+}
 
-export const useExamResults = (examId: string) => {
+export function useGetExamAttempts(examId: string) {
   return useQuery({
-    queryKey: ['exam-results', examId],
-    queryFn: () => examService.getExamResults(examId),
+    queryKey: ['exam-attempts', examId],
+    queryFn: () => examService.getExamAttempts(examId),
     enabled: !!examId,
   });
-};
+}
 
-export const useStudentResult = (examId: string, studentId: string) => {
+export function useGetExamRankings(examId: string) {
   return useQuery({
-    queryKey: ['student-result', examId, studentId],
-    queryFn: () => examService.getStudentResult(examId, studentId),
-    enabled: !!examId && !!studentId,
+    queryKey: ['exam-rankings', examId],
+    queryFn: () => examService.getExamRankings(examId),
+    enabled: !!examId,
   });
-};
+}
 
-export const useReportCards = (filters?: {
-  studentId?: string;
-  academicYearId?: string;
-}) => {
-  return useQuery({
-    queryKey: ['report-cards', filters],
-    queryFn: () => examService.listReportCards(filters),
-  });
-};
-
-export const useReportCard = (id: string) => {
-  return useQuery({
-    queryKey: ['report-card', id],
-    queryFn: () => examService.getReportCard(id),
-    enabled: !!id,
-  });
-};
-
-// ==================== MUTATION HOOKS ====================
-
-export const useCreateExam = () => {
+export function useCreateExam() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data: {
-      title: string;
-      examType: string;
-      subjectId: string;
-      sectionId: string;
-      date: string;
-      duration: number;
-      totalMarks: number;
-      passingMarks: number;
-    }) => examService.createExam(data),
+    mutationFn: (data: any) => examService.createExam(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exams'] });
-      toast.success('Exam created successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create exam');
     },
   });
-};
+}
 
-export const useUpdateExam = () => {
+export function useUpdateExam() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      examService.updateExam(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['exams'] });
-      queryClient.invalidateQueries({ queryKey: ['exam', variables.id] });
-      toast.success('Exam updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update exam');
-    },
-  });
-};
-
-export const useDeleteExam = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => examService.deleteExam(id),
+    mutationFn: ({ id, data }: { id: string; data: any }) => examService.updateExam(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exams'] });
-      toast.success('Exam deleted successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete exam');
     },
   });
-};
+}
 
-export const useSubmitGrades = () => {
+export function useGradeExamAttempt() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: ({
-      examId,
-      grades,
-    }: {
-      examId: string;
-      grades: Array<{
-        studentId: string;
-        marksObtained: number;
-        grade?: string;
-        remarks?: string;
-      }>;
-    }) => examService.submitGrades(examId, grades),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['exam-results', variables.examId] });
-      queryClient.invalidateQueries({ queryKey: ['exam', variables.examId] });
-      toast.success('Grades submitted successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to submit grades');
-    },
-  });
-};
-
-export const usePublishResults = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (examId: string) => examService.publishResults(examId),
-    onSuccess: (_, examId) => {
-      queryClient.invalidateQueries({ queryKey: ['exam-results', examId] });
-      queryClient.invalidateQueries({ queryKey: ['exam', examId] });
-      toast.success('Results published successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to publish results');
-    },
-  });
-};
-
-export const useGenerateReportCard = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ studentId, academicYearId }: {
-      studentId: string;
-      academicYearId: string;
-    }) => examService.generateReportCard(studentId, academicYearId),
+    mutationFn: ({ attemptId, data }: { attemptId: string; data: any }) =>
+      examService.gradeAttempt(attemptId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['report-cards'] });
-      toast.success('Report card generated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to generate report card');
+      queryClient.invalidateQueries({ queryKey: ['exam-attempts'] });
     },
   });
-};
+}
+
+// Alias for backward compatibility
+export const useGradeAttempt = useGradeExamAttempt;

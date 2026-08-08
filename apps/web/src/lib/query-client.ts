@@ -1,11 +1,11 @@
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
 import type { AppError } from './error-mapper';
 
-// Default stale time: 5 minutes
-const DEFAULT_STALE_TIME = 5 * 60 * 1000;
+// Default stale time: 30 seconds (reduced for faster updates)
+const DEFAULT_STALE_TIME = 30 * 1000;
 
-// Default cache time: 10 minutes
-const DEFAULT_CACHE_TIME = 10 * 60 * 1000;
+// Default cache time: 5 minutes (reduced for memory efficiency)
+const DEFAULT_CACHE_TIME = 5 * 60 * 1000;
 
 // Global error handler
 const handleError = (error: unknown) => {
@@ -65,8 +65,9 @@ export const queryClient = new QueryClient({
         // Retry up to 2 times for other errors
         return failureCount < 2;
       },
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
+      refetchOnWindowFocus: false, // Disabled for better UX - prevents unnecessary refetches
+      refetchOnReconnect: false, // Disabled to reduce server load
+      refetchOnMount: false, // Only refetch if data is stale
     },
     mutations: {
       retry: false, // Don't retry mutations by default

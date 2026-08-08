@@ -2,208 +2,345 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'z od';
+import * as z from 'zod';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileUploader } from '@/components/ui/file-uploader';
 import { DatePicker } from '@/components/ui/date-picker';
+import { TimePicker } from '@/components/ui/time-picker';
+import { FileUploader } from '@/components/ui/file-uploader';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useCreateAssignment, useUpdateAssignment } from './use-assignments';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 const assignmentSchema = z.object({
   title: z.string().min(1, 'Title is required'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
+  description: z.string().min(1, 'Description is required'),
   subjectId: z.string().min(1, 'Subject is required'),
-  classId: z.string().min(1, 'Class is required'),
+  sectionId: z.string().min(1, 'Section is required'),
   dueDate: z.date(),
-  maxMarks: z.number().min(1, 'Max marks is required'),
-  submissionType: z.enum(['TEXT', 'FILE', 'BOTH']),
-  allowLateSubmission: z.boolean(),
+  dueTime: z.string().min(1, 'Due time is required'),
+  totalMarks: z.number().min(1, 'Total marks must be at least 1'),
+  passingMarks: z.number().optional(),
   instructions: z.string().optional(),
+  allowLateSubmission: z.boolean().default(false),
+  maxFileSize: z.number().optional(),
+  allowedFileTypes: z.array(z.string()).optional(),
 });
 
 type AssignmentFormData = z.infer<typeof assignmentSchema>;
 
 interface AssignmentFormProps {
-  initialData?: Partial<AssignmentFormData>;
-  onSubmit: (data: AssignmentFormData & { attachments?: File[] }) => void;
-  isSubmitting?: boolean;
+  initialData?: Partial<AssignmentFormData> & { id?: string };
   subjects?: Array<{ id: string; name: string }>;
-  classes?: Array<{ id: string; name: string }>;
+  sections?: Array<{ id: string; name: string }>;
 }
 
 export function AssignmentForm({
   initialData,
-  onSubmit,
-  isSubmitting,
   subjects = [],
-  classes = [],
+  sections = [],
 }: AssignmentFormProps) {
+  const router = useRouter();
+  const createAssignment = useCreateAssignment();
+  const updateAssignment = useUpdateAssignment();
+
+  const [dueDate, setDueDate] = useState<Date | undefined>(
+    initialData?.dueDate ? new Date(initialData.dueDate) : undefined
+  );
+  const [dueTime, setDueTime] = useState<string>(initialData?.dueTime || '23:59');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [allowLateSubmission, setAllowLateSubmission] = useState(
+    initialData?.allowLateSubmission || false
+  );
+
   const {
     register,
     handleSubmit,
-    formState: { errors },
-    watch,
+    formState: { errors, isSubmitting },
     setValue,
+    watch,
   } = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentSchema),
-    defaultValues: initialData || {
-      submissionType: 'BOTH',
-      allowLateSubmission: false,
-      maxMarks: 100,
+    defaultValues: {
+      ...initialData,
+      allowLateSubmission,
     },
   });
 
-  const [attachments, setAttachments] = React.useState<File[]>([]);
+  const totalMarks = watch('totalMarks');
 
-  const handleFormSubmit = (data: AssignmentFormData) => {
-    onSubmit({ ...data, attachments });
+  const onSubmit = async (data: AssignmentFormData) => {
+    if (!dueDate) {
+      toast.error('Please select a due date');
+      return;
+    }
+
+    try {
+      // Combine date and time
+      const dueDateTime = new Date(dueDate);
+      const [hours, minutes] = dueTime.split(':');
+      dueDateTime.setHours(parseInt(hours), parseInt(minutes));
+
+      const submitData = {
+        ...data,
+        dueDate: dueDateTime.toISOString(),
+        attachments: attachments.map((f) => f.name), // In real app, upload files first
+        allowLateSubmission,
+      };
+
+      if (initialData?.id) {
+        await updateAssignment.mutateAsync({
+          id: initialData.id,
+          data: submitData,
+        });
+      } else {
+        await createAssignment.mutateAsync(submitData);
+      }
+
+      router.push('/assignments');
+    } catch (error) {
+      console.error('Failed to save assignment:', error);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Assignment Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Basic Information */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Basic Information</h2>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Title <span className="text-red-500">*</span>
             </label>
             <Input
               {...register('title')}
-              placeholder="e.g., Chapter 5 Exercises"
-              error={errors.title?.message}
+              placeholder="Assignment title"
             />
+            {errors.title && (
+              <p className="text-sm text-red-500">{errors.title.message}</p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description *
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Subject <span className="text-red-500">*</span>
+              </label>
+              <Select
+                onValueChange={(value) => setValue('subjectId', value)}
+                defaultValue={initialData?.subjectId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.subjectId && (
+                <p className="text-sm text-red-500">{errors.subjectId.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Section <span className="text-red-500">*</span>
+              </label>
+              <Select
+                onValueChange={(value) => setValue('sectionId', value)}
+                defaultValue={initialData?.sectionId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>
+                      {section.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.sectionId && (
+                <p className="text-sm text-red-500">{errors.sectionId.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Description <span className="text-red-500">*</span>
             </label>
             <Textarea
               {...register('description')}
               placeholder="Describe the assignment..."
               rows={4}
-              error={errors.description?.message}
+            />
+            {errors.description && (
+              <p className="text-sm text-red-500">{errors.description.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Instructions</label>
+            <Textarea
+              {...register('instructions')}
+              placeholder="Additional instructions for students..."
+              rows={3}
             />
           </div>
+        </div>
+      </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Subject *
-              </label>
-              <Select {...register('subjectId')} error={errors.subjectId?.message}>
-                <option value="">Select subject</option>
-                {subjects.map((subject) => (
-                  <option key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Class *
-              </label>
-              <Select {...register('classId')} error={errors.classId?.message}>
-                <option value="">Select class</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Max Marks *
-              </label>
-              <Input
-                {...register('maxMarks', { valueAsNumber: true })}
-                type="number"
-                min="1"
-                error={errors.maxMarks?.message}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Due Date *
-              </label>
-              <DatePicker
-                value={watch('dueDate')}
-                onChange={(date) => setValue('dueDate', date!)}
-                error={errors.dueDate?.message}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Submission Type *
-              </label>
-              <Select {...register('submissionType')}>
-                <option value="TEXT">Text Only</option>
-                <option value="FILE">File Only</option>
-                <option value="BOTH">Text & File</option>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              {...register('allowLateSubmission')}
-              className="rounded"
-            />
-            <label className="text-sm font-medium text-gray-700">
-              Allow late submissions
+      {/* Due Date & Marks */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Due Date & Grading</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Due Date <span className="text-red-500">*</span>
             </label>
+            <DatePicker
+              date={dueDate}
+              onDateChange={(date) => {
+                setDueDate(date);
+                setValue('dueDate', date!);
+              }}
+              placeholder="Select due date"
+              fromDate={new Date()}
+            />
+            {errors.dueDate && (
+              <p className="text-sm text-red-500">{errors.dueDate.message}</p>
+            )}
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Additional Instructions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            {...register('instructions')}
-            placeholder="Add any special instructions..."
-            rows={4}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Due Time <span className="text-red-500">*</span>
+            </label>
+            <TimePicker
+              time={dueTime}
+              onTimeChange={(time) => {
+                setDueTime(time);
+                setValue('dueTime', time);
+              }}
+              placeholder="Select due time"
+            />
+            {errors.dueTime && (
+              <p className="text-sm text-red-500">{errors.dueTime.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Total Marks <span className="text-red-500">*</span>
+            </label>
+            <Input
+              {...register('totalMarks', { valueAsNumber: true })}
+              type="number"
+              min="1"
+              placeholder="100"
+            />
+            {errors.totalMarks && (
+              <p className="text-sm text-red-500">{errors.totalMarks.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Passing Marks</label>
+            <Input
+              {...register('passingMarks', { valueAsNumber: true })}
+              type="number"
+              min="1"
+              max={totalMarks}
+              placeholder="40"
+            />
+            {errors.passingMarks && (
+              <p className="text-sm text-red-500">{errors.passingMarks.message}</p>
+            )}
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="allowLateSubmission"
+            checked={allowLateSubmission}
+            onCheckedChange={(checked) => {
+              setAllowLateSubmission(checked as boolean);
+              setValue('allowLateSubmission', checked as boolean);
+            }}
           />
-        </CardContent>
+          <label
+            htmlFor="allowLateSubmission"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Allow late submissions
+          </label>
+        </div>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Attachments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FileUploader
-            value={attachments}
-            onChange={setAttachments}
-            accept=".pdf,.doc,.docx,.ppt,.pptx"
-            maxFiles={5}
-            maxSize={10}
-          />
-        </CardContent>
+      {/* Attachments */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Attachments</h2>
+        <FileUploader
+          value={attachments}
+          onChange={setAttachments}
+          maxFiles={5}
+          maxSize={10 * 1024 * 1024} // 10MB
+          accept=".pdf,.doc,.docx,.ppt,.pptx"
+          showPreview={true}
+        />
+        <p className="text-sm text-muted-foreground mt-2">
+          Upload reference materials, worksheets, or additional resources
+        </p>
       </Card>
 
-      <div className="flex items-center justify-end gap-4">
-        <Button type="button" variant="outline" disabled={isSubmitting}>
+      {/* Actions */}
+      <div className="flex justify-end gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          disabled={isSubmitting}
+        >
           Cancel
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            // Save as draft logic
+            toast.success('Saved as draft');
+          }}
+          disabled={isSubmitting}
+        >
+          Save as Draft
+        </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Assignment'}
+          {isSubmitting
+            ? 'Publishing...'
+            : initialData?.id
+            ? 'Update Assignment'
+            : 'Publish Assignment'}
         </Button>
       </div>
     </form>

@@ -47,11 +47,12 @@ export default function LiveClassesPage() {
   };
 
   const filteredClasses = classes?.filter((cls: any) => {
+    const teacherName = typeof cls.teacher === 'string' ? cls.teacher : cls.teacher?.name || '';
     const matchesSearch =
       searchQuery === '' ||
-      cls.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cls.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cls.teacher.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (cls.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (cls.subject || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      teacherName.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || cls.status === statusFilter;
     
@@ -241,10 +242,15 @@ export default function LiveClassesPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                         <span className="text-xs font-bold text-purple-600">
-                          {cls.teacher.name.split(' ').map((n: string) => n[0]).join('')}
+                          {((typeof cls.teacher === 'string' ? cls.teacher : cls.teacher?.name) || 'T')
+                            .split(' ')
+                            .map((n: string) => n[0])
+                            .join('')}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-900">{cls.teacher.name}</span>
+                      <span className="text-sm text-gray-900">
+                        {(typeof cls.teacher === 'string' ? cls.teacher : cls.teacher?.name) || 'Teacher'}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>

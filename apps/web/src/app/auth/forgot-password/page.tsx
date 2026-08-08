@@ -1,256 +1,146 @@
-/**
- * FR-AUTH-041: Forgot Password Page
- * Request password reset email
- */
-
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { formResolver } from '@/lib/form';
-import * as z from 'zod';
 import Link from 'next/link';
-import { useRequestPasswordReset } from '@/hooks/use-auth-mutations';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useForm } from 'react-hook-form';
+import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { authService } from '@/services/auth.service';
+import { toast } from 'sonner';
 
-const schema = z.object({
-  email: z.string().email('Invalid email address'),
-});
-
-type FormData = z.infer<typeof schema>;
+interface ForgotPasswordForm {
+  email: string;
+}
 
 export default function ForgotPasswordPage() {
-  const [emailSent, setEmailSent] = useState(false);
-  const [sentEmail, setSentEmail] = useState('');
-  const requestResetMutation = useRequestPasswordReset();
-
+  const [submitted, setSubmitted] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: formResolver(schema),
-  });
+    getValues,
+  } = useForm<ForgotPasswordForm>();
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: ForgotPasswordForm) => {
     try {
-      await requestResetMutation.mutateAsync(data.email);
-      setSentEmail(data.email);
-      setEmailSent(true);
-    } catch (error) {
-      // Error handled by mutation hook
+      await authService.forgotPassword({ email: data.email });
+      setSubmitted(true);
+    } catch (error: any) {
+      // Don't reveal whether email exists or not
+      setSubmitted(true);
     }
   };
 
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full">
-          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            {/* Success Icon */}
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-              <svg
-                className="h-6 w-6 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-
-            {/* Success Message */}
-            <div className="mt-3 text-center">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Check your email
-              </h3>
-              <div className="mt-2">
-                <p className="text-sm text-gray-500">
-                  We've sent a password reset link to
-                </p>
-                <p className="text-sm font-medium text-gray-900 mt-1">
-                  {sentEmail}
-                </p>
-                <p className="text-sm text-gray-500 mt-4">
-                  The link will expire in 1 hour. If you don't see the email,
-                  check your spam folder.
-                </p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="mt-6 space-y-3">
-              <Button
-                onClick={() => setEmailSent(false)}
-                variant="outline"
-                className="w-full"
-              >
-                Send to different email
-              </Button>
-
-              <Link href="/auth/login">
-                <Button variant="ghost" className="w-full">
-                  ← Back to login
-                </Button>
-              </Link>
-            </div>
-
-            {/* Help Text */}
-            <div className="mt-6 text-center">
-              <p className="text-xs text-gray-500">
-                Didn't receive the email?{' '}
-                <button
-                  onClick={async () => {
-                    await requestResetMutation.mutateAsync(sentEmail);
-                  }}
-                  disabled={requestResetMutation.isPending}
-                  className="font-medium text-indigo-600 hover:text-indigo-500"
-                >
-                  {requestResetMutation.isPending ? 'Sending...' : 'Resend'}
-                </button>
-              </p>
-            </div>
-          </div>
-
-          {/* Rate Limit Info */}
-          <p className="mt-4 text-center text-xs text-gray-500">
-            Password reset requests are limited to 3 per hour
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
-            <svg
-              className="h-6 w-6 text-indigo-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
-            </svg>
+    <div className="flex min-h-screen items-center justify-center px-6 py-12 bg-[hsl(var(--background))]">
+      <div className="w-full max-w-[420px] space-y-8 animate-fade-in">
+        {/* Logo */}
+        <div className="text-center">
+          <div
+            className="inline-flex items-center justify-center h-12 w-12 rounded-2xl mb-6"
+            style={{ background: 'var(--gradient-primary)' }}
+          >
+            <span className="text-white font-bold text-xl">T</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Reset your password
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your email address and we'll send you a link to reset your
-            password
-          </p>
         </div>
 
-        {/* Form */}
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email address
-              </label>
-              <div className="mt-1">
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="Enter your email"
-                  {...register('email')}
-                  error={errors.email?.message}
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting || requestResetMutation.isPending}
-              >
-                {isSubmitting || requestResetMutation.isPending
-                  ? 'Sending...'
-                  : 'Send reset link'}
-              </Button>
-            </div>
-
+        {!submitted ? (
+          <>
             <div className="text-center">
-              <Link
-                href="/auth/login"
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                ← Back to login
-              </Link>
-            </div>
-          </form>
-
-          {/* Help Text */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Need help?
-                </span>
-              </div>
+              <h1 className="text-2xl font-bold tracking-tight font-[var(--font-display)]">
+                Reset your password
+              </h1>
+              <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+                Enter your email and we&apos;ll send you a reset link
+              </p>
             </div>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
-              <p>
-                If you don't have access to your email, please{' '}
-                <Link
-                  href="/contact-support"
-                  className="font-medium text-indigo-600 hover:text-indigo-500"
+            <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-lg p-8">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-[hsl(var(--muted-foreground))]" />
+                    <input
+                      type="email"
+                      placeholder="name@school.edu"
+                      className={`
+                        w-full h-11 pl-11 pr-4 rounded-xl border text-sm
+                        bg-[hsl(var(--background))] border-[hsl(var(--border))]
+                        placeholder:text-[hsl(var(--muted-foreground)/0.5)]
+                        focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent
+                        transition-all duration-200
+                        ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}
+                      `}
+                      {...register('email', {
+                        required: 'Email is required',
+                        pattern: {
+                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                          message: 'Invalid email address',
+                        },
+                      })}
+                    />
+                  </div>
+                  {errors.email && (
+                    <p className="mt-1.5 text-xs text-red-500">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="
+                    w-full h-11 rounded-xl text-sm font-semibold text-white
+                    flex items-center justify-center gap-2
+                    disabled:opacity-60 disabled:cursor-not-allowed
+                    transition-all duration-200
+                    hover:shadow-lg hover:shadow-[hsl(var(--primary)/0.25)]
+                    active:scale-[0.98]
+                  "
+                  style={{ background: 'var(--gradient-primary)' }}
                 >
-                  contact support
-                </Link>
-              </p>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    'Send reset link'
+                  )}
+                </button>
+              </form>
             </div>
+          </>
+        ) : (
+          <div className="rounded-2xl bg-[hsl(var(--card))] border border-[hsl(var(--border))] shadow-lg p-8 text-center space-y-4">
+            <div className="flex items-center justify-center">
+              <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+            <h2 className="text-xl font-bold font-[var(--font-display)]">Check your email</h2>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              If an account exists for <strong>{getValues('email')}</strong>,
+              you&apos;ll receive a password reset link shortly.
+            </p>
+            <button
+              onClick={() => setSubmitted(false)}
+              className="text-sm text-[hsl(var(--primary))] font-medium hover:underline"
+            >
+              Try another email
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Security Info */}
-        <div className="rounded-md bg-blue-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-blue-400"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm text-blue-700">
-                For security, generic success messages are shown. This prevents
-                email enumeration attacks.
-              </p>
-            </div>
-          </div>
+        <div className="text-center">
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to login
+          </Link>
         </div>
       </div>
     </div>

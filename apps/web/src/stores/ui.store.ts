@@ -1,92 +1,78 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 
-type Theme = 'light' | 'dark' | 'system';
-
-interface Notification {
-  id: string;
+export interface UINotification {
+  id?: string;
   type: 'success' | 'error' | 'warning' | 'info';
   title: string;
   message?: string;
-  duration?: number;
 }
 
 interface UIState {
-  // Theme
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-
   // Sidebar
   sidebarOpen: boolean;
-  toggleSidebar: () => void;
-  setSidebarOpen: (open: boolean) => void;
+  sidebarCollapsed: boolean;
+
+  // Mobile
+  mobileSidebarOpen: boolean;
 
   // Notifications
-  notifications: Notification[];
-  addNotification: (notification: Omit<Notification, 'id'>) => void;
+  notifications: UINotification[];
+  addNotification: (notification: UINotification) => void;
   removeNotification: (id: string) => void;
-  clearNotifications: () => void;
 
-  // Loading states
-  globalLoading: boolean;
-  setGlobalLoading: (loading: boolean) => void;
-
-  // Modal/Dialog state
-  activeModal: string | null;
-  setActiveModal: (modal: string | null) => void;
+  // Actions
+  toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebarCollapse: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleMobileSidebar: () => void;
+  setMobileSidebarOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  // Theme
-  theme: 'system',
-  setTheme: (theme) => {
-    set({ theme });
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', theme);
-    }
-  },
-
-  // Sidebar
   sidebarOpen: true,
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  sidebarCollapsed: false,
+  mobileSidebarOpen: false,
 
-  // Notifications
   notifications: [],
   addNotification: (notification) => {
-    const id = Math.random().toString(36).substring(2, 11);
-    const newNotification = { ...notification, id };
+    // Show toast via sonner as well for instant UI feedback
+    if (notification.type === 'error') {
+      toast.error(notification.title, { description: notification.message });
+    } else if (notification.type === 'success') {
+      toast.success(notification.title, { description: notification.message });
+    } else {
+      toast.info(notification.title, { description: notification.message });
+    }
 
     set((state) => ({
-      notifications: [...state.notifications, newNotification],
+      notifications: [
+        ...state.notifications,
+        { ...notification, id: notification.id || Math.random().toString(36).substring(2, 9) },
+      ],
     }));
-
-    // Auto-remove after duration (default 5 seconds)
-    const duration = notification.duration || 5000;
-    setTimeout(() => {
-      set((state) => ({
-        notifications: state.notifications.filter((n) => n.id !== id),
-      }));
-    }, duration);
   },
   removeNotification: (id) =>
     set((state) => ({
       notifications: state.notifications.filter((n) => n.id !== id),
     })),
-  clearNotifications: () => set({ notifications: [] }),
 
-  // Loading
-  globalLoading: false,
-  setGlobalLoading: (loading) => set({ globalLoading: loading }),
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-  // Modal
-  activeModal: null,
-  setActiveModal: (modal) => set({ activeModal: modal }),
+  toggleSidebarCollapse: () =>
+    set((state) => {
+      const newCollapsed = !state.sidebarCollapsed;
+      // Persist preference
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebar-collapsed', String(newCollapsed));
+      }
+      return { sidebarCollapsed: newCollapsed };
+    }),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+  toggleMobileSidebar: () =>
+    set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
 }));
-
-// Selectors
-export const selectTheme = (state: UIState) => state.theme;
-export const selectSidebarOpen = (state: UIState) => state.sidebarOpen;
-export const selectNotifications = (state: UIState) => state.notifications;
-export const selectGlobalLoading = (state: UIState) => state.globalLoading;
-export const selectActiveModal = (state: UIState) => state.activeModal;

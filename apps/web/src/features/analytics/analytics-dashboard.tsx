@@ -3,201 +3,251 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import {
   TrendingUp,
   TrendingDown,
   Users,
   BookOpen,
-  CheckCircle,
-  AlertCircle,
+  GraduationCap,
+  Clock,
+  DollarSign,
   Award,
   Calendar,
-  ArrowRight,
+  BarChart3,
+  Download,
 } from 'lucide-react';
-import { useAnalyticsDashboard } from './use-analytics';
-import { useState } from 'react';
+import { useGetDashboardAnalytics } from './use-analytics';
+import { cn } from '@/lib/utils';
+
+interface StatCard {
+  title: string;
+  value: string | number;
+  change?: number;
+  changeType?: 'increase' | 'decrease';
+  icon: any;
+  color: string;
+}
 
 export function AnalyticsDashboard() {
-  const [timeRange, setTimeRange] = useState('30d');
-  const { data: analytics, isLoading } = useAnalyticsDashboard({ timeRange });
+  const { data: analytics, isLoading } = useGetDashboardAnalytics();
 
   if (isLoading) {
-    return <div className="p-8 text-center">Loading analytics...</div>;
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="p-6">
+            <div className="animate-pulse space-y-3">
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
-  const stats = [
+  const stats: StatCard[] = [
     {
       title: 'Total Students',
       value: analytics?.totalStudents || 0,
-      change: analytics?.studentGrowth || 0,
+      change: 12,
+      changeType: 'increase',
       icon: Users,
-      color: 'blue',
+      color: 'bg-blue-500',
     },
     {
-      title: 'Average Attendance',
-      value: `${analytics?.averageAttendance || 0}%`,
-      change: analytics?.attendanceChange || 0,
-      icon: CheckCircle,
-      color: 'green',
+      title: 'Total Teachers',
+      value: analytics?.totalTeachers || 0,
+      change: 5,
+      changeType: 'increase',
+      icon: GraduationCap,
+      color: 'bg-green-500',
     },
     {
-      title: 'Active Courses',
-      value: analytics?.activeCourses || 0,
-      change: analytics?.courseGrowth || 0,
+      title: 'Active Classes',
+      value: analytics?.activeClasses || 0,
       icon: BookOpen,
-      color: 'purple',
+      color: 'bg-purple-500',
     },
     {
-      title: 'Avg Performance',
-      value: `${analytics?.averagePerformance || 0}%`,
-      change: analytics?.performanceChange || 0,
-      icon: Award,
-      color: 'amber',
+      title: 'Attendance Rate',
+      value: `${analytics?.attendanceRate || 0}%`,
+      change: -3,
+      changeType: 'decrease',
+      icon: Clock,
+      color: 'bg-orange-500',
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-          <p className="text-gray-600">Overview of your school performance</p>
-        </div>
-        <Select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 3 months</option>
-          <option value="1y">Last year</option>
-        </Select>
-      </div>
-
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
-          const isPositive = stat.change >= 0;
-          const colorClasses = {
-            blue: 'bg-blue-100 text-blue-600',
-            green: 'bg-green-100 text-green-600',
-            purple: 'bg-purple-100 text-purple-600',
-            amber: 'bg-amber-100 text-amber-600',
-          };
-
           return (
-            <Card key={stat.title} className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-12 h-12 rounded-lg ${colorClasses[stat.color as keyof typeof colorClasses]} flex items-center justify-center`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                  {isPositive ? (
-                    <TrendingUp className="w-4 h-4" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4" />
+            <Card key={stat.title} className="p-6 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
+                  <h3 className="text-3xl font-bold mb-2">{stat.value}</h3>
+                  {stat.change !== undefined && (
+                    <div className="flex items-center gap-1">
+                      {stat.changeType === 'increase' ? (
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-500" />
+                      )}
+                      <span
+                        className={cn(
+                          'text-sm font-medium',
+                          stat.changeType === 'increase' ? 'text-green-500' : 'text-red-500'
+                        )}
+                      >
+                        {Math.abs(stat.change)}%
+                      </span>
+                      <span className="text-xs text-muted-foreground">vs last month</span>
+                    </div>
                   )}
-                  <span className="font-medium">{Math.abs(stat.change)}%</span>
+                </div>
+                <div className={cn('p-3 rounded-lg', stat.color, 'bg-opacity-10')}>
+                  <Icon className={cn('h-6 w-6', stat.color.replace('bg-', 'text-'))} />
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
-              <p className="text-2xl font-bold">{stat.value}</p>
             </Card>
           );
         })}
       </div>
 
-      {/* Charts Row */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Trend */}
+        {/* Attendance Trends */}
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold">Attendance Trend</h3>
-            <Button variant="ghost" size="sm">
-              View All
-              <ArrowRight className="w-4 h-4 ml-1" />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Attendance Trends</h3>
+            <Button size="sm" variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export
             </Button>
           </div>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center text-gray-500">
-              <Calendar className="w-12 h-12 mx-auto mb-2 opacity-20" />
-              <p>Chart visualization would go here</p>
-              <p className="text-xs">(Line chart showing attendance over time)</p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Performance Distribution */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold">Performance Distribution</h3>
-            <Button variant="ghost" size="sm">
-              View All
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center text-gray-500">
-              <Award className="w-12 h-12 mx-auto mb-2 opacity-20" />
-              <p>Chart visualization would go here</p>
-              <p className="text-xs">(Bar chart showing grade distribution)</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Recent Activity & Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Performers */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Top Performers</h3>
-          <div className="space-y-3">
-            {analytics?.topPerformers?.slice(0, 5).map((student: any, index: number) => (
-              <div key={student.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {index + 1}
+          <div className="space-y-4">
+            {analytics?.attendanceTrends?.map((trend: any) => (
+              <div key={trend.date} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{trend.date}</span>
+                  <span className="font-medium">{trend.percentage}%</span>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium">{student.name}</p>
-                  <p className="text-sm text-gray-600">{student.class}</p>
-                </div>
-                <Badge variant="success">{student.score}%</Badge>
+                <Progress value={trend.percentage} />
               </div>
             )) || (
-              <p className="text-center text-gray-500 py-8">No data available</p>
+              <div className="text-center py-8 text-muted-foreground">
+                No data available
+              </div>
             )}
           </div>
         </Card>
 
-        {/* Alerts & Warnings */}
+        {/* Performance Overview */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Alerts & Warnings</h3>
-          <div className="space-y-3">
-            {analytics?.alerts?.slice(0, 5).map((alert: any) => (
-              <div key={alert.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                <AlertCircle className={`w-5 h-5 flex-shrink-0 ${
-                  alert.severity === 'HIGH' ? 'text-red-600' : 
-                  alert.severity === 'MEDIUM' ? 'text-amber-600' : 
-                  'text-blue-600'
-                }`} />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{alert.title}</p>
-                  <p className="text-xs text-gray-600 mt-1">{alert.description}</p>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Performance Overview</h3>
+            <Button size="sm" variant="outline">
+              View Details
+            </Button>
+          </div>
+          <div className="space-y-4">
+            {analytics?.performanceMetrics?.map((metric: any) => (
+              <div key={metric.subject} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Award className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{metric.subject}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Avg: {metric.average}%
+                    </p>
+                  </div>
                 </div>
-                <Badge variant={
-                  alert.severity === 'HIGH' ? 'destructive' : 
-                  alert.severity === 'MEDIUM' ? 'warning' : 
-                  'default'
-                } className="text-xs">
-                  {alert.severity}
+                <Badge
+                  variant={
+                    metric.average >= 75 ? 'success' :
+                    metric.average >= 60 ? 'warning' : 'error'
+                  }
+                >
+                  {metric.average}%
                 </Badge>
               </div>
             )) || (
-              <p className="text-center text-gray-500 py-8">No alerts</p>
+              <div className="text-center py-8 text-muted-foreground">
+                No data available
+              </div>
             )}
           </div>
         </Card>
       </div>
+
+      {/* Recent Activities */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Recent Activities</h3>
+        <Tabs defaultValue="assignments" className="w-full">
+          <TabsList>
+            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="exams">Exams</TabsTrigger>
+            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="assignments" className="space-y-3">
+            {analytics?.recentAssignments?.map((assignment: any) => (
+              <div key={assignment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">{assignment.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="info">{assignment.submissions} submissions</Badge>
+              </div>
+            )) || (
+              <div className="text-center py-8 text-muted-foreground">
+                No recent assignments
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="exams" className="space-y-3">
+            {analytics?.upcomingExams?.map((exam: any) => (
+              <div key={exam.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">{exam.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(exam.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="warning">{exam.duration} mins</Badge>
+              </div>
+            )) || (
+              <div className="text-center py-8 text-muted-foreground">
+                No upcoming exams
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="attendance" className="space-y-3">
+            <div className="text-center py-8 text-muted-foreground">
+              Attendance records will appear here
+            </div>
+          </TabsContent>
+        </Tabs>
+      </Card>
     </div>
   );
 }

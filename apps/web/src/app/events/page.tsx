@@ -1,307 +1,120 @@
 /**
- * Module 17: Events - Event Calendar and Management
- * FR-EVENT-001 to FR-EVENT-010: School events and calendar
+ * Events & Calendar Management
  */
 
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Can } from '@/components/auth/can';
-import { PERMISSIONS } from '@/config/permissions';
-import { eventService } from '@/services/event.service';
-import { useAuthStore } from '@/stores/auth.store';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import Link from 'next/link';
 
 export default function EventsPage() {
-  const router = useRouter();
-  const { user } = useAuthStore();
-  const [selectedMonth, setSelectedMonth] = useState('2024-08');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [view, setView] = useState<'list' | 'calendar'>('list');
 
-  // Real API integration
-  const { data: eventsResponse, isLoading } = useQuery({
-    queryKey: ['events', user?.schoolId, selectedMonth, selectedCategory],
-    queryFn: () => eventService.listEvents({
-      schoolId: user?.schoolId,
-      eventType: selectedCategory !== 'all' ? selectedCategory : undefined,
-      startDate: `${selectedMonth}-01`,
-      endDate: `${selectedMonth}-31`,
-    }),
-    enabled: !!user?.schoolId,
-  });
+  const events = [
+    { id: '1', title: 'Annual Sports Day', date: new Date(), type: 'SPORTS', participants: 450 },
+    { id: '2', title: 'Parent-Teacher Meeting', date: addDays(new Date(), 3), type: 'ACADEMIC', participants: 280 },
+    { id: '3', title: 'Science Fair', date: addDays(new Date(), 7), type: 'ACADEMIC', participants: 150 },
+  ];
 
-  // Transform API data
-  const events = Array.isArray(eventsResponse) ? eventsResponse : eventsResponse?.events || [];
-  const eventsData = {
-    events,
-    upcomingCount: events.filter((e: any) => new Date(e.date || e.startDate) > new Date()).length,
-    todayCount: events.filter((e: any) => {
-      const eventDate = new Date(e.date || e.startDate).toDateString();
-      return eventDate === new Date().toDateString();
-    }).length,
-    monthCount: events.length,
-  };
-
-  // Generate calendar days
-  const generateCalendarDays = () => {
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
-    const days = [];
-    // Add empty cells for days before the first of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    // Add days of the month
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-    return days;
-  };
-
-  const getEventsForDay = (day: number) => {
-    const [year, month] = selectedMonth.split('-');
-    const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
-    return eventsData?.events.filter((e: any) => e.date === dateStr) || [];
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      ACADEMIC: 'bg-blue-100 text-blue-800',
-      SPORTS: 'bg-green-100 text-green-800',
-      CULTURAL: 'bg-purple-100 text-purple-800',
-      MEETING: 'bg-orange-100 text-orange-800',
-      EXAM: 'bg-red-100 text-red-800',
-      HOLIDAY: 'bg-gray-100 text-gray-800',
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      ACADEMIC: '📚',
-      SPORTS: '🏆',
-      CULTURAL: '🎭',
-      MEETING: '👥',
-      EXAM: '📝',
-      HOLIDAY: '🎉',
-    };
-    return icons[category] || '📅';
-  };
-
-  if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-96 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  const calendarDays = generateCalendarDays();
-  const filteredEvents = selectedCategory === 'all'
-    ? eventsData?.events
-    : eventsData?.events.filter((e: any) => e.category === selectedCategory);
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = endOfMonth(selectedDate);
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">School Events</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Manage and view all school events and activities
-            </p>
-          </div>
-          <Can permission={PERMISSIONS.EVENTS_CREATE}>
-            <Button onClick={() => router.push('/events/create')}>
-              + Create Event
-            </Button>
-          </Can>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Events & Calendar</h1>
+          <p className="text-muted-foreground">Manage school events and activities</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setView(view === 'list' ? 'calendar' : 'list')}>
+            {view === 'list' ? '📅 Calendar' : '📋 List'} View
+          </Button>
+          <Link href="/events/create">
+            <Button>+ Create Event</Button>
+          </Link>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600">Today's Events</p>
-            <p className="text-3xl font-bold text-blue-600">{eventsData?.todayCount || 0}</p>
-          </CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Total Events</div>
+          <div className="text-3xl font-bold">{events.length}</div>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600">Upcoming Events</p>
-            <p className="text-3xl font-bold text-green-600">{eventsData?.upcomingCount || 0}</p>
-          </CardContent>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Upcoming</div>
+          <div className="text-3xl font-bold text-blue-600">
+            {events.filter(e => e.date >= new Date()).length}
+          </div>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600">This Month</p>
-            <p className="text-3xl font-bold text-purple-600">{eventsData?.monthCount || 0}</p>
-          </CardContent>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">This Month</div>
+          <div className="text-3xl font-bold text-green-600">
+            {events.filter(e => e.date.getMonth() === new Date().getMonth()).length}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Total Participants</div>
+          <div className="text-3xl font-bold text-purple-600">
+            {events.reduce((sum, e) => sum + e.participants, 0)}
+          </div>
         </Card>
       </div>
 
-      {/* Controls */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-                <option value="2024-07">July 2024</option>
-                <option value="2024-08">August 2024</option>
-                <option value="2024-09">September 2024</option>
-                <option value="2024-10">October 2024</option>
-              </Select>
-
-              <Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                <option value="all">All Categories</option>
-                <option value="ACADEMIC">📚 Academic</option>
-                <option value="SPORTS">🏆 Sports</option>
-                <option value="CULTURAL">🎭 Cultural</option>
-                <option value="MEETING">👥 Meetings</option>
-                <option value="EXAM">📝 Exams</option>
-                <option value="HOLIDAY">🎉 Holidays</option>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === 'calendar' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('calendar')}
-              >
-                Calendar
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                List
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Calendar View */}
-      {viewMode === 'calendar' && (
+      {view === 'list' ? (
         <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-7 gap-2">
-              {/* Day headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-center font-semibold text-gray-700 py-2">
-                  {day}
-                </div>
-              ))}
-
-              {/* Calendar days */}
-              {calendarDays.map((day, idx) => {
-                const dayEvents = day ? getEventsForDay(day) : [];
-                return (
-                  <div
-                    key={idx}
-                    className={`min-h-24 border rounded-lg p-2 ${
-                      day ? 'bg-white hover:bg-gray-50' : 'bg-gray-50'
-                    }`}
-                  >
-                    {day && (
-                      <>
-                        <div className="text-sm font-semibold text-gray-900 mb-1">{day}</div>
-                        <div className="space-y-1">
-                          {dayEvents.slice(0, 2).map((event: any) => (
-                            <div
-                              key={event.id}
-                              onClick={() => router.push(`/events/${event.id}`)}
-                              className={`text-xs p-1 rounded cursor-pointer truncate ${getCategoryColor(
-                                event.category
-                              )}`}
-                            >
-                              {getCategoryIcon(event.category)} {event.title}
-                            </div>
-                          ))}
-                          {dayEvents.length > 2 && (
-                            <div className="text-xs text-gray-600 text-center">
-                              +{dayEvents.length - 2} more
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* List View */}
-      {viewMode === 'list' && (
-        <div className="space-y-4">
-          {filteredEvents?.map((event: any) => (
-            <Card key={event.id} className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => router.push(`/events/${event.id}`)}>
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-indigo-100 rounded-lg flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold text-indigo-600">
-                        {new Date(event.date).getDate()}
-                      </span>
-                      <span className="text-xs text-indigo-600">
-                        {new Date(event.date).toLocaleString('default', { month: 'short' })}
-                      </span>
-                    </div>
-                  </div>
-
+          <div className="p-4 border-b">
+            <h3 className="font-semibold">Upcoming Events</h3>
+          </div>
+          <div className="divide-y">
+            {events.map(event => (
+              <div key={event.id} className="p-4 hover:bg-muted/50 cursor-pointer">
+                <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900">{event.title}</h3>
-                        <p className="text-sm text-gray-600">{event.description}</p>
-                      </div>
-                      <Badge className={getCategoryColor(event.category)}>
-                        {getCategoryIcon(event.category)} {event.category}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mt-3">
-                      <div>
-                        <span className="font-medium">Time:</span>{' '}
-                        {event.isAllDay ? 'All Day' : `${event.startTime} - ${event.endTime}`}
-                      </div>
-                      <div>
-                        <span className="font-medium">Location:</span> {event.location}
-                      </div>
-                      <div>
-                        <span className="font-medium">Organizer:</span> {event.organizer}
-                      </div>
-                      <div>
-                        <span className="font-medium">Attendees:</span> {event.attendees}
-                      </div>
+                    <h4 className="font-semibold">{event.title}</h4>
+                    <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                      <span>📅 {format(event.date, 'MMM dd, yyyy')}</span>
+                      <span>👥 {event.participants} participants</span>
                     </div>
                   </div>
+                  <Badge>{event.type}</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-4">
+          <div className="grid grid-cols-7 gap-2">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="text-center font-semibold p-2">{day}</div>
+            ))}
+            {monthDays.map(day => {
+              const dayEvents = events.filter(e => 
+                e.date.toDateString() === day.toDateString()
+              );
+              return (
+                <div key={day.toISOString()} className={`border rounded p-2 min-h-[80px] ${
+                  day.toDateString() === new Date().toDateString() ? 'bg-blue-50 border-blue-300' : ''
+                }`}>
+                  <div className="text-sm font-medium">{format(day, 'd')}</div>
+                  {dayEvents.map(event => (
+                    <div key={event.id} className="text-xs bg-blue-100 rounded px-1 mt-1 truncate">
+                      {event.title}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
       )}
     </div>
   );

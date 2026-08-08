@@ -3,43 +3,58 @@
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 import { cn } from '@/lib/utils';
+import { Button } from './button';
+import { Calendar } from './calendar';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 interface DatePickerProps {
-  value?: Date;
-  onChange?: (date: Date | undefined) => void;
+  date?: Date;
+  onDateChange?: (date: Date | undefined) => void;
   placeholder?: string;
-  error?: string;
   disabled?: boolean;
+  className?: string;
+  fromDate?: Date;
+  toDate?: Date;
 }
 
 export function DatePicker({
-  value,
-  onChange,
+  date,
+  onDateChange,
   placeholder = 'Pick a date',
-  error,
-  disabled,
+  disabled = false,
+  className,
+  fromDate,
+  toDate,
 }: DatePickerProps) {
   return (
-    <div className="space-y-1">
-      <div className="relative">
-        <input
-          type="date"
-          value={value ? format(value, 'yyyy-MM-dd') : ''}
-          onChange={(e) => {
-            const date = e.target.value ? new Date(e.target.value) : undefined;
-            onChange?.(date);
-          }}
-          disabled={disabled}
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant={'outline'}
           className={cn(
-            'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-red-500'
+            'w-full justify-start text-left font-normal',
+            !date && 'text-muted-foreground',
+            className
           )}
+          disabled={disabled}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date ? format(date, 'PPP') : <span>{placeholder}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={onDateChange}
+          initialFocus
+          disabled={disabled}
+          fromDate={fromDate}
+          toDate={toDate}
         />
-        <CalendarIcon className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 pointer-events-none" />
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -1,212 +1,208 @@
 'use client';
 
 import * as React from 'react';
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  useReactTable,
+} from '@tanstack/react-table';
+import { ChevronDown, Search } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Input } from './input';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './table';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from './dropdown-menu';
 
-interface DataTableProps<T> {
-  data: T[];
-  columns: DataTableColumn<T>[];
-  searchable?: boolean;
+interface DataTableProps<TData, TValue> {
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  searchKey?: string;
   searchPlaceholder?: string;
-  pagination?: boolean;
+  showColumnToggle?: boolean;
+  showPagination?: boolean;
   pageSize?: number;
-  isLoading?: boolean;
-  emptyMessage?: string;
   className?: string;
 }
 
-export interface DataTableColumn<T> {
-  header: string;
-  accessor?: keyof T;
-  cell?: (row: T) => React.ReactNode;
-  sortable?: boolean;
-  className?: string;
-}
-
-export function DataTable<T extends Record<string, any>>({
-  data,
+export function DataTable<TData, TValue>({
   columns,
-  searchable = false,
+  data,
+  searchKey,
   searchPlaceholder = 'Search...',
-  pagination = true,
+  showColumnToggle = true,
+  showPagination = true,
   pageSize = 10,
-  isLoading = false,
-  emptyMessage = 'No data available',
   className,
-}: DataTableProps<T>) {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const [sortColumn, setSortColumn] = React.useState<keyof T | null>(null);
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
 
-  // Filter data based on search
-  const filteredData = React.useMemo(() => {
-    if (!searchQuery) return data;
-
-    return data.filter((row) =>
-      Object.values(row).some((value) =>
-        String(value).toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    );
-  }, [data, searchQuery]);
-
-  // Sort data
-  const sortedData = React.useMemo(() => {
-    if (!sortColumn) return filteredData;
-
-    return [...filteredData].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [filteredData, sortColumn, sortDirection]);
-
-  // Paginate data
-  const paginatedData = React.useMemo(() => {
-    if (!pagination) return sortedData;
-
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return sortedData.slice(startIndex, endIndex);
-  }, [sortedData, currentPage, pageSize, pagination]);
-
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-
-  const handleSort = (column: keyof T) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: showPagination ? getPaginationRowModel() : undefined,
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+    initialState: {
+      pagination: {
+        pageSize,
+      },
+    },
+  });
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Search */}
-      {searchable && (
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9"
-            />
+    <div className={cn('w-full space-y-4', className)}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-4">
+        {searchKey && (
+          <div className="flex-1 max-w-sm">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ''}
+                onChange={(event) =>
+                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
+                }
+                className="pl-8"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        {showColumnToggle && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
 
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {columns.map((column, index) => (
-                  <th
-                    key={index}
-                    className={cn(
-                      'px-4 py-3 text-left text-sm font-semibold text-gray-700',
-                      column.sortable && 'cursor-pointer hover:bg-gray-100',
-                      column.className
-                    )}
-                    onClick={() => column.sortable && column.accessor && handleSort(column.accessor)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {column.header}
-                      {column.sortable && sortColumn === column.accessor && (
-                        <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {paginatedData.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="px-4 py-8 text-center text-gray-500"
-                  >
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="hover:bg-gray-50">
-                    {columns.map((column, colIndex) => (
-                      <td
-                        key={colIndex}
-                        className={cn(
-                          'px-4 py-3 text-sm text-gray-900',
-                          column.className
-                        )}
-                      >
-                        {column.cell
-                          ? column.cell(row)
-                          : column.accessor
-                          ? String(row[column.accessor] ?? '')
-                          : ''}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       {/* Pagination */}
-      {pagination && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            Showing {((currentPage - 1) * pageSize) + 1} to{' '}
-            {Math.min(currentPage * pageSize, sortedData.length)} of{' '}
-            {sortedData.length} results
+      {showPagination && (
+        <div className="flex items-center justify-between space-x-2">
+          <div className="flex-1 text-sm text-muted-foreground">
+            {table.getFilteredSelectedRowModel().rows.length} of{' '}
+            {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
             >
-              <ChevronLeft className="w-4 h-4" />
               Previous
             </Button>
-            <div className="text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
+            <div className="text-sm text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} of{' '}
+              {table.getPageCount()}
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
             >
               Next
-              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>

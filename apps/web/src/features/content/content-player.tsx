@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import {
   Play,
   Pause,
@@ -10,189 +14,230 @@ import {
   VolumeX,
   Maximize,
   Download,
+  Share2,
+  BookmarkPlus,
+  ThumbsUp,
   FileText,
-  FileVideo,
-  FileAudio,
-  File,
+  Clock,
+  Eye,
 } from 'lucide-react';
-import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface ContentPlayerProps {
   content: {
     id: string;
     title: string;
-    contentType: string;
-    url: string;
-    duration?: number;
     description?: string;
+    contentType: 'VIDEO' | 'PDF' | 'IMAGE' | 'AUDIO' | 'DOCUMENT';
+    fileUrl: string;
+    duration?: number;
+    views: number;
+    likes: number;
+    createdAt: string;
+    author: {
+      name: string;
+      avatar?: string;
+    };
+    tags?: string[];
   };
   onComplete?: () => void;
+  onLike?: () => void;
+  onBookmark?: () => void;
 }
 
-export function ContentPlayer({ content, onComplete }: ContentPlayerProps) {
+export function ContentPlayer({ content, onComplete, onLike, onBookmark }: ContentPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
-  const getContentIcon = (type: string) => {
-    if (type.includes('video')) return FileVideo;
-    if (type.includes('audio')) return FileAudio;
-    if (type.includes('pdf') || type.includes('document')) return FileText;
-    return File;
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleLike = () => {
+    setIsLiked(!isLiked);
+    onLike?.();
+  };
+
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
+    onBookmark?.();
   };
 
   const renderPlayer = () => {
-    const type = content.contentType.toLowerCase();
-
-    // Video Player
-    if (type.includes('video')) {
-      return (
-        <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-          <video
-            src={content.url}
-            controls
-            className="w-full h-full"
-            onEnded={onComplete}
-          >
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      );
-    }
-
-    // Audio Player
-    if (type.includes('audio')) {
-      return (
-        <div className="bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg p-8 flex items-center justify-center">
-          <div className="text-center text-white space-y-4">
-            <FileAudio className="w-16 h-16 mx-auto opacity-80" />
-            <h3 className="text-xl font-semibold">{content.title}</h3>
-            <audio
-              src={content.url}
+    switch (content.contentType) {
+      case 'VIDEO':
+        return (
+          <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+            <video
+              src={content.fileUrl}
+              className="w-full h-full"
               controls
-              className="w-full mt-4"
-              onEnded={onComplete}
-            >
-              Your browser does not support the audio element.
-            </audio>
-          </div>
-        </div>
-      );
-    }
-
-    // PDF Viewer
-    if (type.includes('pdf')) {
-      return (
-        <div className="border rounded-lg overflow-hidden">
-          <iframe
-            src={content.url}
-            className="w-full h-[600px]"
-            title={content.title}
-          />
-        </div>
-      );
-    }
-
-    // Document/Text Viewer
-    if (type.includes('document') || type.includes('text')) {
-      return (
-        <Card className="p-8">
-          <div className="prose max-w-none">
-            <iframe
-              src={content.url}
-              className="w-full h-[600px] border-0"
-              title={content.title}
+              onTimeUpdate={(e) => {
+                const video = e.currentTarget;
+                setProgress((video.currentTime / video.duration) * 100);
+              }}
+              onEnded={() => onComplete?.()}
             />
           </div>
-        </Card>
-      );
-    }
+        );
 
-    // Image Viewer
-    if (type.includes('image')) {
-      return (
-        <div className="border rounded-lg overflow-hidden">
-          <img
-            src={content.url}
-            alt={content.title}
-            className="w-full h-auto"
-          />
-        </div>
-      );
-    }
+      case 'AUDIO':
+        return (
+          <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg p-8">
+            <div className="text-center mb-6">
+              <div className="w-32 h-32 mx-auto bg-white rounded-full flex items-center justify-center mb-4">
+                <Volume2 className="h-16 w-16 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold">{content.title}</h3>
+            </div>
+            <audio
+              src={content.fileUrl}
+              className="w-full"
+              controls
+              onTimeUpdate={(e) => {
+                const audio = e.currentTarget;
+                setProgress((audio.currentTime / audio.duration) * 100);
+              }}
+              onEnded={() => onComplete?.()}
+            />
+          </div>
+        );
 
-    // Default - Download option
-    return (
-      <Card className="p-12 text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
-          <File className="w-10 h-10 text-gray-400" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">{content.title}</h3>
-        <p className="text-gray-600 mb-4">
-          This file type cannot be previewed in the browser
-        </p>
-        <Button asChild>
-          <a href={content.url} download target="_blank" rel="noopener noreferrer">
-            <Download className="w-4 h-4 mr-2" />
-            Download File
-          </a>
-        </Button>
-      </Card>
-    );
+      case 'PDF':
+      case 'DOCUMENT':
+        return (
+          <div className="bg-gray-50 rounded-lg p-8 text-center min-h-[400px] flex flex-col items-center justify-center">
+            <FileText className="h-24 w-24 text-gray-400 mb-4" />
+            <h3 className="text-xl font-bold mb-2">{content.title}</h3>
+            <p className="text-muted-foreground mb-6">Document Preview</p>
+            <div className="flex gap-2">
+              <Button onClick={() => window.open(content.fileUrl, '_blank')}>
+                View Document
+              </Button>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'IMAGE':
+        return (
+          <div className="bg-gray-50 rounded-lg overflow-hidden">
+            <img
+              src={content.fileUrl}
+              alt={content.title}
+              className="w-full h-auto max-h-[600px] object-contain"
+            />
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
-  const Icon = getContentIcon(content.contentType);
-
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0">
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Icon className="w-6 h-6 text-blue-600" />
+    <div className="space-y-6">
+      {/* Player */}
+      <Card className="p-6">
+        {renderPlayer()}
+      </Card>
+
+      {/* Content Info */}
+      <Card className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold mb-2">{content.title}</h1>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Eye className="h-4 w-4" />
+                {content.views} views
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                {new Date(content.createdAt).toLocaleDateString()}
+              </span>
+              <span className="flex items-center gap-1">
+                by {content.author.name}
+              </span>
             </div>
           </div>
-          <div>
-            <h2 className="text-xl font-semibold mb-1">{content.title}</h2>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{content.contentType}</Badge>
-              {content.duration && (
-                <span className="text-sm text-gray-500">
-                  {Math.floor(content.duration / 60)}:{String(content.duration % 60).padStart(2, '0')}
-                </span>
-              )}
-            </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLike}
+              className={cn(isLiked && 'text-red-500')}
+            >
+              <ThumbsUp className="h-4 w-4 mr-2" />
+              {content.likes + (isLiked ? 1 : 0)}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBookmark}
+              className={cn(isBookmarked && 'text-blue-500')}
+            >
+              <BookmarkPlus className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm">
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <a href={content.url} download target="_blank" rel="noopener noreferrer">
-            <Download className="w-4 h-4" />
-          </a>
-        </Button>
-      </div>
 
-      {/* Description */}
-      {content.description && (
-        <Card className="p-4 bg-gray-50">
-          <p className="text-sm text-gray-700">{content.description}</p>
-        </Card>
-      )}
+        <Separator className="my-4" />
 
-      {/* Player */}
-      {renderPlayer()}
+        <Tabs defaultValue="description" className="w-full">
+          <TabsList>
+            <TabsTrigger value="description">Description</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
+            <TabsTrigger value="related">Related Content</TabsTrigger>
+          </TabsList>
 
-      {/* Actions */}
-      <div className="flex justify-center gap-2">
-        <Button variant="outline" size="sm" onClick={onComplete}>
-          Mark as Complete
-        </Button>
-        <Button variant="outline" size="sm">
-          Add to Favorites
-        </Button>
-        <Button variant="outline" size="sm">
-          Report Issue
-        </Button>
-      </div>
+          <TabsContent value="description" className="space-y-4">
+            <div>
+              <p className="text-muted-foreground">
+                {content.description || 'No description available'}
+              </p>
+            </div>
+
+            {content.tags && content.tags.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Tags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {content.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="notes">
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No notes yet. Start taking notes while learning!</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="related">
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No related content available</p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </Card>
     </div>
   );
 }

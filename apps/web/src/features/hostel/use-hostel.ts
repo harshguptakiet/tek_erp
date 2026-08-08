@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tantml:query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hostelService } from '@/services/hostel.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';

@@ -1,6 +1,6 @@
 /**
- * Module 22: Marketplace - Browse and Purchase Content
- * FR-MARKET-001 to FR-MARKET-010: Browse marketplace offerings
+ * Marketplace — Educational Content Store
+ * FR-MARKET-001 to FR-MARKET-040
  */
 
 'use client';
@@ -8,270 +8,220 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { marketplaceService } from '@/services/marketplace.service';
-import { useAuthStore } from '@/stores/auth.store';
+import { Button } from '@/components/ui/button';
+import {
+  Store, Search, ShoppingCart, Star, TrendingUp,
+  Package, Filter, BookOpen, Video, FileText, Headphones,
+} from 'lucide-react';
+
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  VIDEO: Video,
+  EBOOK: BookOpen,
+  DOCUMENT: FileText,
+  AUDIO: Headphones,
+};
+
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  VIDEO: 'from-violet-500 to-purple-600',
+  EBOOK: 'from-blue-500 to-cyan-600',
+  DOCUMENT: 'from-emerald-500 to-teal-600',
+  AUDIO: 'from-orange-500 to-red-600',
+  PHYSICAL: 'from-pink-500 to-rose-600',
+};
 
 export default function MarketplacePage() {
   const router = useRouter();
-  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedPriceRange, setSelectedPriceRange] = useState('');
-  const [sortBy, setSortBy] = useState('popular');
 
-  // Real API integration
-  const { data: productsResponse, isLoading } = useQuery({
-    queryKey: ['marketplace-products', searchTerm, selectedCategory, selectedPriceRange, sortBy],
-    queryFn: () =>
-      marketplaceService.browseMarketplace({
-        search: searchTerm || undefined,
-        category: selectedCategory || undefined,
-        priceRange: selectedPriceRange || undefined,
-        sortBy,
-      }),
+  const { data: items, isLoading } = useQuery({
+    queryKey: ['marketplace', { search: searchTerm, category: selectedCategory }],
+    queryFn: () => marketplaceService.browseItems({
+      searchQuery: searchTerm || undefined,
+      category: selectedCategory || undefined,
+    }),
   });
 
-  // Transform API data
-  const products = Array.isArray(productsResponse)
-    ? productsResponse
-    : productsResponse?.products || [];
-
-  const categories = [
-    'Courses',
-    'Books',
-    'Study Materials',
-    'Lab Equipment',
-    'Digital Content',
-    'AR/VR Modules',
-    'Assessments',
-    'Templates',
-  ];
+  const products = Array.isArray(items) ? items : items?.data || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Marketplace</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Browse and purchase educational content and resources
-            </p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Marketplace</h1>
+          <p className="page-description">
+            Browse and purchase educational content from publishers and creators
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="text-sm"
+          onClick={() => router.push('/marketplace/seller')}
+        >
+          <Store className="h-4 w-4 mr-2" />
+          Seller Dashboard
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card-premium p-5 stat-card stat-card-blue">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Total Products</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">{products.length || '—'}</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-primary)' }}>
+              <Package className="h-5 w-5 text-white" />
+            </div>
           </div>
-          <Button variant="outline" onClick={() => router.push('/marketplace/my-purchases')}>
-            My Purchases
-          </Button>
+        </div>
+        <div className="card-premium p-5 stat-card stat-card-green">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Categories</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">4</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-success)' }}>
+              <Filter className="h-5 w-5 text-white" />
+            </div>
+          </div>
+        </div>
+        <div className="card-premium p-5 stat-card stat-card-purple">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Avg Rating</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">4.5</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-accent)' }}>
+              <Star className="h-5 w-5 text-white" />
+            </div>
+          </div>
+        </div>
+        <div className="card-premium p-5 stat-card stat-card-orange">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Trending</p>
+              <p className="text-2xl font-bold tabular-nums mt-1">12</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-warm)' }}>
+              <TrendingUp className="h-5 w-5 text-white" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Stats/Featured Banner */}
-      <Card className="mb-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <p className="text-blue-100 text-sm">Total Products</p>
-              <p className="text-3xl font-bold mt-1">{products.length}</p>
-            </div>
-            <div>
-              <p className="text-blue-100 text-sm">Free Resources</p>
-              <p className="text-3xl font-bold mt-1">
-                {products.filter((p: any) => p.price === 0).length}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-100 text-sm">Premium Content</p>
-              <p className="text-3xl font-bold mt-1">
-                {products.filter((p: any) => p.price > 0).length}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-100 text-sm">Top Rated</p>
-              <p className="text-3xl font-bold mt-1">
-                {products.filter((p: any) => (p.rating || 0) >= 4.5).length}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Input
-              placeholder="Search products..."
+      {/* Search & Filter */}
+      <div className="card-premium p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            <input
+              type="text"
+              placeholder="Search products, courses, books…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="md:col-span-2"
+              className="w-full h-10 pl-9 pr-4 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm placeholder:text-[hsl(var(--muted-foreground)/0.5)] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent transition-all"
             />
-            <Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={selectedPriceRange}
-              onChange={(e) => setSelectedPriceRange(e.target.value)}
-            >
-              <option value="">All Prices</option>
-              <option value="free">Free</option>
-              <option value="0-1000">₹0 - ₹1,000</option>
-              <option value="1000-5000">₹1,000 - ₹5,000</option>
-              <option value="5000+">₹5,000+</option>
-            </Select>
-            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="popular">Most Popular</option>
-              <option value="newest">Newest First</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="rating">Highest Rated</option>
-            </Select>
           </div>
-        </CardContent>
-      </Card>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="h-10 px-3 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+          >
+            <option value="">All Categories</option>
+            <option value="VIDEO">Video Courses</option>
+            <option value="EBOOK">E-Books</option>
+            <option value="DOCUMENT">Documents</option>
+            <option value="AUDIO">Audio Content</option>
+          </select>
+        </div>
+      </div>
 
       {/* Products Grid */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading marketplace...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card-premium overflow-hidden">
+              <div className="h-48 animate-shimmer" />
+              <div className="p-5 space-y-3">
+                <div className="h-5 w-20 rounded animate-shimmer" />
+                <div className="h-5 w-3/4 rounded animate-shimmer" />
+                <div className="h-4 w-1/2 rounded animate-shimmer" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : products.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product: any) => (
-            <Card
-              key={product.id}
-              className="hover:shadow-xl transition-shadow cursor-pointer"
-              onClick={() => router.push(`/marketplace/${product.id}`)}
-            >
-              {/* Product Image */}
-              <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                {product.thumbnail ? (
-                  <img
-                    src={product.thumbnail}
-                    alt={product.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-6xl">{product.icon || '📦'}</span>
-                )}
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product: any) => {
+            const category = product.category || 'EBOOK';
+            const gradient = CATEGORY_GRADIENTS[category] || CATEGORY_GRADIENTS.EBOOK;
+            const Icon = CATEGORY_ICONS[category] || BookOpen;
 
-              <CardContent className="pt-4">
-                {/* Category & Rating */}
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {product.category || 'General'}
-                  </Badge>
-                  {product.rating && (
-                    <div className="flex items-center gap-1 text-sm">
-                      <span className="text-yellow-500">★</span>
-                      <span className="font-medium">{product.rating.toFixed(1)}</span>
-                      <span className="text-gray-500 text-xs">
-                        ({product.reviewCount || 0})
-                      </span>
-                    </div>
+            return (
+              <div
+                key={product.id}
+                className="card-premium card-interactive overflow-hidden group"
+                onClick={() => router.push(`/marketplace/${product.id}`)}
+              >
+                {/* Thumbnail */}
+                <div className={`h-48 bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
+                  <Icon className="h-16 w-16 text-white/30" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  {product.featured && (
+                    <span className="absolute top-3 left-3 badge-gradient">Featured</span>
                   )}
                 </div>
 
-                {/* Title */}
-                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                  {product.title || 'Untitled Product'}
-                </h3>
+                {/* Content */}
+                <div className="p-5">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))] mb-2`}>
+                    {category}
+                  </span>
+                  <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-[hsl(var(--primary))] transition-colors">
+                    {product.title || product.name}
+                  </h3>
 
-                {/* Seller */}
-                <p className="text-sm text-gray-600 mb-3">
-                  by {product.sellerName || 'Unknown Seller'}
-                </p>
-
-                {/* Description */}
-                <p className="text-sm text-gray-700 mb-4 line-clamp-2">
-                  {product.description || 'No description available'}
-                </p>
-
-                {/* Footer: Price & Action */}
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <div>
-                    {product.price === 0 ? (
-                      <Badge variant="success">FREE</Badge>
-                    ) : (
-                      <div>
-                        <span className="text-2xl font-bold text-blue-600">
-                          ₹{product.price?.toLocaleString()}
-                        </span>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="text-sm text-gray-500 line-through ml-2">
-                            ₹{product.originalPrice.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
+                  {/* Rating & Sales */}
+                  <div className="flex items-center gap-3 text-sm text-[hsl(var(--muted-foreground))] mb-4">
+                    {product.rating && (
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                        {product.rating}
+                      </span>
+                    )}
+                    {product.sales && (
+                      <span>{product.sales} sales</span>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/marketplace/${product.id}`);
-                    }}
-                  >
-                    {product.price === 0 ? 'Get' : 'Buy'}
-                  </Button>
-                </div>
 
-                {/* Tags */}
-                {product.tags && product.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-3">
-                    {product.tags.slice(0, 3).map((tag: string) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
+                  {/* Price & CTA */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl font-bold">
+                      {product.price ? `₹${product.price.toLocaleString()}` : 'Free'}
+                    </span>
+                    <Button size="sm" style={{ background: 'var(--gradient-primary)' }} className="text-white text-xs">
+                      <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                      Purchase
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <span className="text-6xl mb-4 block">🛒</span>
-              <p className="text-gray-600">No products found</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Try adjusting your search or filters
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="card-premium p-16 text-center">
+          <Store className="h-12 w-12 text-[hsl(var(--muted-foreground))] mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No products found</h3>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Try adjusting your search or filter criteria
+          </p>
+        </div>
       )}
-
-      {/* Seller CTA */}
-      <Card className="mt-8 bg-blue-50 border-blue-200">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Want to sell your content?
-              </h3>
-              <p className="text-gray-600">
-                Join our marketplace and reach thousands of schools and educators
-              </p>
-            </div>
-            <Button onClick={() => router.push('/marketplace/become-seller')}>
-              Become a Seller
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

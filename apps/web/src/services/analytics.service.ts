@@ -1,7 +1,32 @@
 import { apiClient } from '../lib/axios';
 
 // Analytics & Reporting Service
+export interface DashboardStats {
+  totalStudents?: number;
+  totalTeachers?: number;
+  totalClasses?: number;
+  todayAttendance?: number;
+  studentGrowth?: number;
+  attendanceTrend?: number;
+  pendingAssignments?: number;
+  upcomingExams?: number;
+  childrenCount?: number;
+  feeCollected?: number;
+  pendingFees?: number;
+}
+
 export const analyticsService = {
+  // ==================== DASHBOARD OVERVIEW ====================
+  getDashboardOverview: async (): Promise<DashboardStats> => {
+    try {
+      const response = await apiClient.get('/analytics/dashboard/overview');
+      return response.data;
+    } catch {
+      // Return empty stats if endpoint not ready yet — graceful degradation
+      return {};
+    }
+  },
+
   // ==================== DASHBOARDS ====================
   getOverviewDashboard: async (schoolId: string) => {
     const response = await apiClient.get('/analytics/dashboard', {

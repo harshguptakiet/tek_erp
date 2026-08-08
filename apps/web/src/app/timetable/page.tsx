@@ -19,6 +19,19 @@ import { useAuthStore } from '@/stores/auth.store';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const TIME_SLOTS = [
+  { id: 1, label: '08:00 - 08:45', start: '08:00', end: '08:45' },
+  { id: 2, label: '08:45 - 09:30', start: '08:45', end: '09:30' },
+  { id: 3, label: '09:30 - 10:15', start: '09:30', end: '10:15' },
+  { id: 4, label: '10:15 - 10:30', start: '10:15', end: '10:30', isBreak: true },
+  { id: 5, label: '10:30 - 11:15', start: '10:30', end: '11:15' },
+  { id: 6, label: '11:15 - 12:00', start: '11:15', end: '12:00' },
+  { id: 7, label: '12:00 - 12:45', start: '12:00', end: '12:45' },
+  { id: 8, label: '12:45 - 13:30', start: '12:45', end: '13:30', isBreak: true },
+  { id: 9, label: '13:30 - 14:15', start: '13:30', end: '14:15' },
+  { id: 10, label: '14:15 - 15:00', start: '14:15', end: '15:00' },
+];
+
 export default function TimetablePage() {
   const router = useRouter();
   const { user } = useAuthStore();

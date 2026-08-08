@@ -1,57 +1,24 @@
 import { apiClient } from '../lib/axios';
 
-// Library Management Service
 export const libraryService = {
-  // ==================== BOOKS ====================
-  listBooks: async (filters?: {
-    searchQuery?: string;
-    category?: string;
-    isAvailable?: boolean;
-  }) => {
-    const response = await apiClient.get('/library/books', { params: filters });
+  async listBooks(params?: { searchQuery?: string; category?: string; isAvailable?: boolean }) {
+    const response = await apiClient.get('/library/books', { params });
     return response.data;
   },
-
-  getBook: async (id: string) => {
-    const response = await apiClient.get(`/library/books/${id}`);
+  async getBookDetails(bookId: string) {
+    const response = await apiClient.get(`/library/books/${bookId}`);
     return response.data;
   },
-
-  addBook: async (data: {
-    title: string;
-    author: string;
-    isbn?: string;
-    category: string;
-    quantity: number;
-  }) => {
-    const response = await apiClient.post('/library/books', data);
+  async borrowBook(bookId: string, userId: string) {
+    const response = await apiClient.post('/library/borrow', { bookId, userId });
     return response.data;
   },
-
-  // ==================== ISSUE & RETURN ====================
-  issueBook: async (data: {
-    bookId: string;
-    userId: string;
-    dueDate: string;
-  }) => {
-    const response = await apiClient.post('/library/issue', data);
+  async returnBook(borrowId: string) {
+    const response = await apiClient.post(`/library/return/${borrowId}`);
     return response.data;
   },
-
-  returnBook: async (issueId: string) => {
-    const response = await apiClient.post('/library/return', { issueId });
-    return response.data;
-  },
-
-  getBorrowedBooks: async (userId: string) => {
+  async getBorrowedBooks(userId: string) {
     const response = await apiClient.get(`/library/borrowed/${userId}`);
-    return response.data;
-  },
-
-  getOverdueBooks: async (schoolId: string) => {
-    const response = await apiClient.get('/library/overdue', {
-      params: { schoolId },
-    });
     return response.data;
   },
 };

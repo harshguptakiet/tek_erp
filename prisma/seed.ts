@@ -4,9 +4,19 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+// Create PostgreSQL connection pool with proper config
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/tekurious_db';
+const pool = new Pool({ 
+  connectionString,
+  // Ensure password is treated as string
+  ssl: false
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Starting database seed...');
@@ -20,10 +30,10 @@ async function main() {
     update: {},
     create: {
       email: 'admin@example.com',
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: 'Super',
       lastName: 'Admin',
-      role: 'SUPER_ADMIN',
+      role: 'PLATFORM_ADMIN',
       status: 'ACTIVE',
       emailVerified: true,
     },
@@ -92,7 +102,7 @@ async function main() {
     update: {},
     create: {
       email: 'schooladmin@demo.com',
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: 'School',
       lastName: 'Administrator',
       role: 'SCHOOL_ADMIN',
@@ -110,7 +120,7 @@ async function main() {
     update: {},
     create: {
       email: 'teacher@demo.com',
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: 'John',
       lastName: 'Teacher',
       role: 'TEACHER',
@@ -215,7 +225,7 @@ async function main() {
     update: {},
     create: {
       email: 'student@demo.com',
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: 'Jane',
       lastName: 'Student',
       role: 'STUDENT',
@@ -271,7 +281,7 @@ async function main() {
     update: {},
     create: {
       email: 'parent@demo.com',
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: 'Robert',
       lastName: 'Parent',
       role: 'PARENT',

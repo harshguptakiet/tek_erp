@@ -27,6 +27,11 @@ export function useAnalyticsDashboard() {
   });
 }
 
+// Alias for dashboard analytics (used by analytics-dashboard component)
+export function useGetDashboardAnalytics() {
+  return useAnalyticsDashboard();
+}
+
 // Fetch student performance analytics
 export function useStudentPerformance(studentId: string, academicYearId?: string) {
   const { user } = useAuthStore();

@@ -2,212 +2,251 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { useCreateTeacher, useUpdateTeacher } from './use-teachers';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 const teacherSchema = z.object({
+  employeeId: z.string().min(1, 'Employee ID is required'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  employeeId: z.string().min(1, 'Employee ID is required'),
-  department: z.string().min(1, 'Department is required'),
-  subjects: z.array(z.string()).min(1, 'At least one subject is required'),
-  qualification: z.string().min(1, 'Qualification is required'),
-  experience: z.number().min(0, 'Experience must be a positive number'),
-  joiningDate: z.string().min(1, 'Joining date is required'),
+  phone: z.string().min(10, 'Phone number is required'),
+  dateOfBirth: z.date().optional(),
+  dateOfJoining: z.date(),
+  qualification: z.string().optional(),
+  specialization: z.string().optional(),
+  experience: z.number().optional(),
   address: z.string().optional(),
-  emergencyContact: z.string().optional(),
+  schoolId: z.string().min(1, 'School is required'),
 });
 
 type TeacherFormData = z.infer<typeof teacherSchema>;
 
 interface TeacherFormProps {
-  initialData?: Partial<TeacherFormData>;
-  onSubmit: (data: TeacherFormData) => void;
-  isSubmitting?: boolean;
+  initialData?: Partial<TeacherFormData> & { id?: string };
+  schoolId: string;
 }
 
-export function TeacherForm({ initialData, onSubmit, isSubmitting }: TeacherFormProps) {
+export function TeacherForm({ initialData, schoolId }: TeacherFormProps) {
+  const router = useRouter();
+  const createTeacher = useCreateTeacher();
+  const updateTeacher = useUpdateTeacher();
+  
+  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(
+    initialData?.dateOfBirth ? new Date(initialData.dateOfBirth) : undefined
+  );
+  const [dateOfJoining, setDateOfJoining] = useState<Date | undefined>(
+    initialData?.dateOfJoining ? new Date(initialData.dateOfJoining) : new Date()
+  );
+
   const {
     register,
     handleSubmit,
-    formState: { errors },
-    watch,
+    formState: { errors, isSubmitting },
     setValue,
   } = useForm<TeacherFormData>({
     resolver: zodResolver(teacherSchema),
-    defaultValues: initialData || {
-      subjects: [],
-      experience: 0,
+    defaultValues: {
+      ...initialData,
+      schoolId,
+      dateOfJoining: dateOfJoining,
     },
   });
 
+  const onSubmit = async (data: TeacherFormData) => {
+    try {
+      const submitData = {
+        ...data,
+        dateOfBirth: dateOfBirth?.toISOString(),
+        dateOfJoining: dateOfJoining!.toISOString(),
+      };
+
+      if (initialData?.id) {
+        await updateTeacher.mutateAsync({
+          id: initialData.id,
+          data: submitData,
+        });
+      } else {
+        await createTeacher.mutateAsync(submitData);
+      }
+      
+      router.push('/teachers');
+    } catch (error) {
+      console.error('Failed to save teacher:', error);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Personal Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name *
-              </label>
-              <Input
-                {...register('firstName')}
-                placeholder="Enter first name"
-                error={errors.firstName?.message}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name *
-              </label>
-              <Input
-                {...register('lastName')}
-                placeholder="Enter last name"
-                error={errors.lastName?.message}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
-              </label>
-              <Input
-                {...register('email')}
-                type="email"
-                placeholder="teacher@school.com"
-                error={errors.email?.message}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
-              <Input
-                {...register('phone')}
-                placeholder="+91 98765 43210"
-                error={errors.phone?.message}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address
-            </label>
-            <Textarea
-              {...register('address')}
-              placeholder="Enter full address"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Emergency Contact
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Basic Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Employee ID <span className="text-red-500">*</span>
             </label>
             <Input
-              {...register('emergencyContact')}
-              placeholder="Emergency contact number"
+              {...register('employeeId')}
+              placeholder="EMP001"
+              disabled={!!initialData?.id}
+            />
+            {errors.employeeId && (
+              <p className="text-sm text-red-500">{errors.employeeId.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <Input
+              {...register('email')}
+              type="email"
+              placeholder="teacher@school.com"
+            />
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <Input {...register('firstName')} placeholder="John" />
+            {errors.firstName && (
+              <p className="text-sm text-red-500">{errors.firstName.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <Input {...register('lastName')} placeholder="Doe" />
+            {errors.lastName && (
+              <p className="text-sm text-red-500">{errors.lastName.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <Input
+              {...register('phone')}
+              placeholder="+1234567890"
+            />
+            {errors.phone && (
+              <p className="text-sm text-red-500">{errors.phone.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date of Birth</label>
+            <DatePicker
+              date={dateOfBirth}
+              onDateChange={(date) => {
+                setDateOfBirth(date);
+                setValue('dateOfBirth', date);
+              }}
+              placeholder="Select date of birth"
+              toDate={new Date()}
             />
           </div>
-        </CardContent>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">
+              Date of Joining <span className="text-red-500">*</span>
+            </label>
+            <DatePicker
+              date={dateOfJoining}
+              onDateChange={(date) => {
+                setDateOfJoining(date);
+                setValue('dateOfJoining', date!);
+              }}
+              placeholder="Select joining date"
+            />
+            {errors.dateOfJoining && (
+              <p className="text-sm text-red-500">{errors.dateOfJoining.message}</p>
+            )}
+          </div>
+        </div>
       </Card>
 
-      {/* Employment Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Employment Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee ID *
-              </label>
-              <Input
-                {...register('employeeId')}
-                placeholder="EMP001"
-                error={errors.employeeId?.message}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Joining Date *
-              </label>
-              <Input
-                {...register('joiningDate')}
-                type="date"
-                error={errors.joiningDate?.message}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Department *
-              </label>
-              <Select
-                {...register('department')}
-                error={errors.department?.message}
-              >
-                <option value="">Select department</option>
-                <option value="MATHEMATICS">Mathematics</option>
-                <option value="SCIENCE">Science</option>
-                <option value="ENGLISH">English</option>
-                <option value="SOCIAL_STUDIES">Social Studies</option>
-                <option value="LANGUAGES">Languages</option>
-                <option value="ARTS">Arts</option>
-                <option value="PHYSICAL_EDUCATION">Physical Education</option>
-                <option value="COMPUTER_SCIENCE">Computer Science</option>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Years of Experience *
-              </label>
-              <Input
-                {...register('experience', { valueAsNumber: true })}
-                type="number"
-                min="0"
-                placeholder="0"
-                error={errors.experience?.message}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Qualification *
-            </label>
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Professional Details</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Qualification</label>
             <Input
               {...register('qualification')}
-              placeholder="e.g., M.Ed., B.Ed., M.Sc."
-              error={errors.qualification?.message}
+              placeholder="B.Ed, M.Ed, PhD"
             />
           </div>
-        </CardContent>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Specialization</label>
+            <Input
+              {...register('specialization')}
+              placeholder="Mathematics, Science, etc."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Experience (Years)</label>
+            <Input
+              {...register('experience', { valueAsNumber: true })}
+              type="number"
+              min="0"
+              placeholder="5"
+            />
+          </div>
+        </div>
       </Card>
 
-      {/* Form Actions */}
-      <div className="flex items-center justify-end gap-4">
-        <Button type="button" variant="outline" disabled={isSubmitting}>
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Address</label>
+          <Textarea
+            {...register('address')}
+            placeholder="Enter full address"
+            rows={3}
+          />
+        </div>
+      </Card>
+
+      <div className="flex justify-end gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          disabled={isSubmitting}
+        >
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : initialData ? 'Update Teacher' : 'Create Teacher'}
+          {isSubmitting
+            ? 'Saving...'
+            : initialData?.id
+            ? 'Update Teacher'
+            : 'Create Teacher'}
         </Button>
       </div>
     </form>

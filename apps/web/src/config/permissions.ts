@@ -87,7 +87,25 @@ export const PERMISSIONS = {
   TIMETABLE_UPDATE: 'timetable:update',
 
   // Transport
+  TRANSPORT_VIEW: 'transport:view',
   TRANSPORT_MANAGE: 'transport:manage',
+
+  // Hostel
+  HOSTEL_VIEW: 'hostel:view',
+  HOSTEL_MANAGE: 'hostel:manage',
+
+  // Inventory
+  INVENTORY_VIEW: 'inventory:view',
+  INVENTORY_MANAGE: 'inventory:manage',
+  INVENTORY_CREATE: 'inventory:create',
+  INVENTORY_UPDATE: 'inventory:update',
+  INVENTORY_DELETE: 'inventory:delete',
+
+  // Payroll
+  PAYROLL_VIEW: 'payroll:view',
+  PAYROLL_MANAGE: 'payroll:manage',
+  PAYROLL_PROCESS: 'payroll:process',
+  PAYROLL_APPROVE: 'payroll:approve',
 
   // Organization & Admin
   ORGANIZATION_UPDATE: 'organization:update',
@@ -104,6 +122,8 @@ export const PERMISSIONS = {
   // Learning Paths & Other
   LEARNING_PATHS_CREATE: 'learning-paths:create',
   LEARNING_PATHS_ASSIGN: 'learning-paths:assign',
+  // Library
+  LIBRARY_VIEW: 'library:view',
   LIBRARY_MANAGE: 'library:manage',
   MESSAGES_READ: 'messages:read',
   EVENTS_CREATE: 'events:create',

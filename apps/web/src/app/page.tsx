@@ -19,10 +19,15 @@ export default function Index() {
   }, [user, isLoading, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-lg text-muted-foreground">Loading Tekurious ERP...</p>
+    <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))]">
+      <div className="text-center animate-fade-in">
+        <div className="relative mx-auto mb-6 h-14 w-14">
+          <div className="absolute inset-0 rounded-full border-4 border-[hsl(var(--primary)/0.2)]" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[hsl(var(--primary))] animate-spin" />
+        </div>
+        <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
+          Loading Tekurious ERP…
+        </p>
       </div>
     </div>
   );

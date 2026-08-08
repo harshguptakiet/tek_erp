@@ -1,51 +1,50 @@
+'use client';
+
 import * as React from 'react';
+import * as AvatarPrimitive from '@radix-ui/react-avatar';
+
 import { cn } from '@/lib/utils';
 
-interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
-  src?: string;
-  alt?: string;
-  fallback?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-}
+const Avatar = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Root
+    ref={ref}
+    className={cn(
+      'relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full',
+      className
+    )}
+    {...props}
+  />
+));
+Avatar.displayName = AvatarPrimitive.Root.displayName;
 
-const sizeClasses = {
-  sm: 'h-8 w-8 text-xs',
-  md: 'h-10 w-10 text-sm',
-  lg: 'h-12 w-12 text-base',
-  xl: 'h-16 w-16 text-lg',
-};
+const AvatarImage = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Image>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Image
+    ref={ref}
+    className={cn('aspect-square h-full w-full', className)}
+    {...props}
+  />
+));
+AvatarImage.displayName = AvatarPrimitive.Image.displayName;
 
-export function Avatar({
-  src,
-  alt,
-  fallback,
-  size = 'md',
-  className,
-  ...props
-}: AvatarProps) {
-  const [error, setError] = React.useState(false);
+const AvatarFallback = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Fallback>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Fallback
+    ref={ref}
+    className={cn(
+      'flex h-full w-full items-center justify-center rounded-full bg-muted',
+      className
+    )}
+    {...props}
+  />
+));
+AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
 
-  const initials = fallback || alt?.substring(0, 2).toUpperCase() || '?';
-
-  return (
-    <div
-      className={cn(
-        'relative flex items-center justify-center rounded-full overflow-hidden bg-gray-200',
-        sizeClasses[size],
-        className
-      )}
-      {...props}
-    >
-      {src && !error ? (
-        <img
-          src={src}
-          alt={alt || 'Avatar'}
-          onError={() => setError(true)}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <span className="font-semibold text-gray-600">{initials}</span>
-      )}
-    </div>
-  );
-}
+export { Avatar, AvatarImage, AvatarFallback };
