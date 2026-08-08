@@ -93,48 +93,66 @@ export function PeriodForm({
           {/* Subject Selection */}
           <div>
             <label className="block text-sm font-medium mb-1">Subject *</label>
-            <Select {...register('subjectId')} error={errors.subjectId?.message}>
+            <select
+              {...register('subjectId')}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <option value="">Select subject</option>
               {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name} ({subject.code})
                 </option>
               ))}
-            </Select>
+            </select>
+            {errors.subjectId?.message && (
+              <p className="mt-1 text-sm text-red-600">{errors.subjectId.message}</p>
+            )}
           </div>
 
           {/* Teacher Selection */}
           <div>
             <label className="block text-sm font-medium mb-1">Teacher *</label>
-            <Select {...register('teacherId')} error={errors.teacherId?.message}>
+            <select
+              {...register('teacherId')}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <option value="">Select teacher</option>
               {teachers.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
                   {teacher.firstName} {teacher.lastName}
                 </option>
               ))}
-            </Select>
+            </select>
+            {errors.teacherId?.message && (
+              <p className="mt-1 text-sm text-red-600">{errors.teacherId.message}</p>
+            )}
           </div>
 
           {/* Room Selection */}
           <div>
             <label className="block text-sm font-medium mb-1">Room</label>
-            <Select {...register('roomId')} error={errors.roomId?.message}>
+            <select
+              {...register('roomId')}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <option value="">Select room (optional)</option>
               {rooms.map((room) => (
                 <option key={room.id} value={room.id}>
                   {room.name} - {room.building}
                 </option>
               ))}
-            </Select>
+            </select>
+            {errors.roomId?.message && (
+              <p className="mt-1 text-sm text-red-600">{errors.roomId.message}</p>
+            )}
           </div>
 
           {/* Day of Week */}
           <div>
             <label className="block text-sm font-medium mb-1">Day *</label>
-            <Select
+            <select
               {...register('dayOfWeek', { valueAsNumber: true })}
-              error={errors.dayOfWeek?.message}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Select day</option>
               {DAYS.map((day) => (
@@ -142,7 +160,10 @@ export function PeriodForm({
                   {day.label}
                 </option>
               ))}
-            </Select>
+            </select>
+            {errors.dayOfWeek?.message && (
+              <p className="mt-1 text-sm text-red-600">{errors.dayOfWeek.message}</p>
+            )}
           </div>
 
           {/* Time Range */}

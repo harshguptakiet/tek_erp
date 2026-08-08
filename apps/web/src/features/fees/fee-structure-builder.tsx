@@ -276,38 +276,40 @@ export function FeeStructureBuilder({
                           <label className="block text-sm font-medium mb-1">
                             Category
                           </label>
-                          <Select
+                          <select
                             value={component.category}
                             onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                               updateComponent(index, { category: e.target.value })
                             }
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                           >
                             {categories.map((cat) => (
                               <option key={cat} value={cat}>
                                 {cat}
                               </option>
                             ))}
-                          </Select>
+                          </select>
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium mb-1">
                             Frequency
                           </label>
-                          <Select
+                          <select
                             value={component.frequency}
                             onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                               updateComponent(index, {
                                 frequency: e.target.value as any,
                               })
                             }
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                           >
                             {frequencies.map((freq) => (
                               <option key={freq.value} value={freq.value}>
                                 {freq.label}
                               </option>
                             ))}
-                          </Select>
+                          </select>
                         </div>
                       </div>
 

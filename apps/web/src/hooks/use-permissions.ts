@@ -20,12 +20,12 @@ export function usePermissions(): Permission[] {
     
     // Super admin/Platform admin has all permissions
     if (user.isSuperAdmin || user.role === 'PLATFORM_ADMIN') {
-      return ['*']; // Wildcard for all permissions
+      return ['*'] as Permission[]; // Wildcard for all permissions
     }
     
     // If permissions array exists, use it
     if (user.permissions && user.permissions.length > 0) {
-      return user.permissions;
+      return user.permissions as Permission[];
     }
     
     // Otherwise, derive permissions from role
@@ -41,8 +41,8 @@ function getRolePermissions(role: string | undefined): Permission[] {
   
   const rolePermissions: Record<string, Permission[]> = {
     // ========== ADMINS (Full Access) ==========
-    'PLATFORM_ADMIN': ['*'],
-    'ORG_ADMIN': ['*'],
+    'PLATFORM_ADMIN': ['*'] as Permission[],
+    'ORG_ADMIN': ['*'] as Permission[],
     'SCHOOL_ADMIN': [
       // Students & Parents
       'students:view', 'students:create', 'students:update', 'students:delete', 'students:manage',
@@ -319,7 +319,7 @@ export function useCanAccess(options: {
   isOwner?: boolean;
   resourceUserId?: string;
 }): boolean {
-  const hasPermission = useHasPermission(options.permission || '');
+  const hasPermission = useHasPermission(options.permission as Permission);
   const hasAnyPermission = useHasAnyPermission(options.permissions || []);
   const hasAllPermissions = useHasAllPermissions(options.permissions || []);
   const hasRole = useHasRole(options.role || '');

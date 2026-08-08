@@ -110,6 +110,13 @@ export class AcademicController {
     return this.academicService.createClass(req.user.userId, dto);
   }
 
+  // List all classes
+  @Get('classes')
+  @ApiOperation({ summary: 'List all classes' })
+  listClasses(@Query('schoolId') schoolId?: string, @Query('academicYearId') academicYearId?: string) {
+    return this.academicService.listClasses(schoolId, academicYearId);
+  }
+
   @Post('sections')
   @ApiOperation({ summary: 'Create section within class' })
   createSection(@Request() req, @Body() dto: CreateSectionDto) {

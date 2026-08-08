@@ -110,12 +110,13 @@ export function LeaveApplicationForm({
         <div className="space-y-4">
           <div>
             <Label>Leave Type *</Label>
-            <Select
+            <select
               {...register('leaveType')}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                 register('leaveType').onChange(e);
                 setSelectedLeaveType(e.target.value);
               }}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
               <option value="">Select leave type</option>
               {getLeaveTypes().map((type) => {
@@ -126,7 +127,7 @@ export function LeaveApplicationForm({
                   </option>
                 );
               })}
-            </Select>
+            </select>
             {errors.leaveType && (
               <p className="text-sm text-red-500 mt-1">{errors.leaveType.message}</p>
             )}

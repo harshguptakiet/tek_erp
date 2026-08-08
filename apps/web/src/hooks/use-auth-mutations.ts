@@ -4,8 +4,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { authService as simpleAuthService } from '../services/auth.service';
-import { authService as completeAuthService } from '../services/auth-complete.service';
+import { authService, authService as simpleAuthService } from '../services/auth.service';
 import { useAuthStore, type User as StoreUser } from '../stores/auth.store';
 import { toast } from 'sonner';
 import type {

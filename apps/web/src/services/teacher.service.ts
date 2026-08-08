@@ -1,5 +1,5 @@
 import { apiClient } from '../lib/axios';
-import type { PaginatedResponse, BaseFilters } from '../types';
+import type { PaginatedResponse, BaseFilters, Status } from '../types';
 
 export interface Teacher {
   id: string;
@@ -8,6 +8,7 @@ export interface Teacher {
   lastName: string;
   email: string;
   phone: string;
+  avatar?: string;
   dateOfBirth?: string;
   dateOfJoining: string;
   qualification?: string;
@@ -24,7 +25,6 @@ export interface TeacherFilters extends BaseFilters {
   schoolId?: string;
   subjectId?: string;
   classId?: string;
-  status?: string;
   specialization?: string;
 }
 

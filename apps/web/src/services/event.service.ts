@@ -41,9 +41,29 @@ export const eventService = {
     return response.data;
   },
 
+  getUpcomingEvents: async (filters?: any) => {
+    const response = await apiClient.get('/events/upcoming', { params: filters });
+    return response.data;
+  },
+
   // ==================== REGISTRATIONS ====================
   registerForEvent: async (eventId: string) => {
     const response = await apiClient.post(`/events/${eventId}/register`);
+    return response.data;
+  },
+
+  cancelRegistration: async (eventId: string) => {
+    const response = await apiClient.post(`/events/${eventId}/cancel`);
+    return response.data;
+  },
+
+  getEventRegistrations: async (eventId: string) => {
+    const response = await apiClient.get(`/events/${eventId}/registrations`);
+    return response.data;
+  },
+
+  getMyRegistrations: async () => {
+    const response = await apiClient.get('/events/my-registrations');
     return response.data;
   },
 

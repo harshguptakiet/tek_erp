@@ -16,7 +16,7 @@ const paymentSchema = z.object({
   feeStructureId: z.string().min(1, 'Fee structure is required'),
   amount: z.number().positive('Amount must be positive'),
   paymentMethod: z.enum(['CASH', 'CARD', 'UPI', 'BANK_TRANSFER', 'CHEQUE'], {
-    required_error: 'Payment method is required',
+    message: 'Payment method is required',
   }),
   transactionId: z.string().optional(),
   remarks: z.string().optional(),

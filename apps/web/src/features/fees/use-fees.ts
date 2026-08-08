@@ -118,6 +118,8 @@ export function useProcessPayment() {
   });
 }
 
+export const useRecordPayment = useProcessPayment;
+
 // Generate receipt mutation
 export function useGenerateReceipt() {
   return useMutation({

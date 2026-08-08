@@ -1,5 +1,8 @@
 // Centralized permissions configuration
 export const PERMISSIONS = {
+  // Wildcard
+  ALL: '*',
+
   // Students
   STUDENTS_VIEW: 'students:view',
   STUDENTS_CREATE: 'students:create',

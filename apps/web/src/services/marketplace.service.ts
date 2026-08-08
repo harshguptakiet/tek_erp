@@ -32,20 +32,43 @@ export const marketplaceService = {
     return response.data;
   },
 
-  // ==================== SELLER ====================
-  listMyItems: async () => {
+  browseMarketplace: async (filters?: any) => {
+    const response = await apiClient.get('/marketplace/items', { params: filters });
+    return response.data;
+  },
+
+  getProduct: async (id: string) => {
+    const response = await apiClient.get(`/marketplace/items/${id}`);
+    return response.data;
+  },
+
+  getSellerProducts: async () => {
     const response = await apiClient.get('/marketplace/my-items');
     return response.data;
   },
 
-  createItem: async (data: {
-    title: string;
-    description: string;
-    price: number;
-    category: string;
-    contentId?: string;
-  }) => {
+  getMySales: async () => {
+    const response = await apiClient.get('/marketplace/my-purchases');
+    return response.data;
+  },
+
+  listProduct: async (data: any) => {
     const response = await apiClient.post('/marketplace/items', data);
+    return response.data;
+  },
+
+  updateProduct: async (id: string, data: any) => {
+    const response = await apiClient.patch(`/marketplace/items/${id}`, data);
+    return response.data;
+  },
+
+  purchaseProduct: async (data: any) => {
+    const response = await apiClient.post('/marketplace/purchase', data);
+    return response.data;
+  },
+
+  deleteProduct: async (id: string) => {
+    const response = await apiClient.delete(`/marketplace/items/${id}`);
     return response.data;
   },
 };

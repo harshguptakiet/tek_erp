@@ -65,3 +65,41 @@ export function useGradeExamAttempt() {
 
 // Alias for backward compatibility
 export const useGradeAttempt = useGradeExamAttempt;
+
+export function useExamResults(examId: string) {
+  return useQuery({
+    queryKey: ['exam-results', examId],
+    queryFn: () => examService.getExamAttempts(examId),
+    enabled: !!examId,
+  });
+}
+
+export function usePublishResults() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (examId: string) => examService.publishResults(examId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exam-results'] });
+    },
+  });
+}
+
+export function useCreateQuestion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => examService.createQuestion(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+    },
+  });
+}
+
+export function useUpdateQuestion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => examService.updateQuestion(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+    },
+  });
+}

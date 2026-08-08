@@ -12,7 +12,7 @@ import { formResolver } from '@/lib/form';
 import * as z from 'zod';
 import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth.store';
-import { authService } from '@/services/auth-complete.service';
+import { authService } from '@/services/auth.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -67,7 +67,7 @@ export function FeePaymentForm({
     setValue,
     watch,
   } = useForm<PaymentFormData>({
-    resolver: zodResolver(paymentSchema),
+    resolver: zodResolver(paymentSchema) as any,
     defaultValues: {
       amount: dueAmount,
       paymentDate: new Date(),

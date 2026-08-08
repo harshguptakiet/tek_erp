@@ -12,7 +12,7 @@ import { formResolver } from '@/lib/form';
 import * as z from 'zod';
 import Link from 'next/link';
 import { useVerify2FA } from '@/hooks/use-auth-mutations';
-import { authService } from '@/services/auth-complete.service';
+import { authService } from '@/services/auth.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';

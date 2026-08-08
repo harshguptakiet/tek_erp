@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBackupCodes } from '@/hooks/use-auth-queries';
-import { authService } from '@/services/auth-complete.service';
+import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

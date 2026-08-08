@@ -16,29 +16,21 @@ import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { contentService } from '@/services/content.service';
-import { academicService } from '@/services/academic.service';
-import { useAuthStore } from '@/stores/auth.store';
 
 export default function ContentPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [contentType, setContentType] = useState('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
 
   // Real API integration
-  const { data: contents, isLoading } = useQuery({
+  const { data: contentsResponse, isLoading } = useQuery({
     queryKey: ['content', searchQuery, contentType, subjectFilter],
     queryFn: () => contentService.searchContent({
       query: searchQuery || undefined,
       contentType: contentType !== 'all' ? contentType : undefined,
       subjectId: subjectFilter !== 'all' ? subjectFilter : undefined,
     }),
-  });
-
-  const { data: subjectsData } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => academicService.listSubjects(),
   });
 
 
@@ -53,9 +45,11 @@ if (isLoading) {
   );
 }
 
-const videoContent = contents?.filter((c: any) => c.type === 'VIDEO') || [];
-const documentContent = contents?.filter((c: any) => c.type === 'DOCUMENT') || [];
-const arvrContent = contents?.filter((c: any) => c.type === 'AR_VR') || [];
+// Extract data array from paginated response
+const contents = contentsResponse?.data || [];
+const videoContent = contents.filter((c: any) => c.contentType === 'VIDEO');
+const documentContent = contents.filter((c: any) => c.contentType === 'DOCUMENT');
+const arvrContent = contents.filter((c: any) => c.contentType === 'AR_VR');
 
 return (
   <div className="max-w-7xl mx-auto px-4 py-8">
@@ -82,7 +76,7 @@ return (
         <CardContent className="pt-6">
           <div className="text-center">
             <p className="text-sm font-medium text-gray-600">Total Content</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{contents?.length || 0}</p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{contents.length}</p>
           </div>
         </CardContent>
       </Card>
@@ -125,7 +119,7 @@ return (
             />
           </div>
           <div>
-            <Select value={contentType} onChange={(e) => setContentType(e.target.value)}>
+            <Select value={contentType} onValueChange={setContentType}>
               <option value="all">All Types</option>
               <option value="VIDEO">Videos</option>
               <option value="DOCUMENT">Documents</option>
@@ -135,7 +129,7 @@ return (
             </Select>
           </div>
           <div>
-            <Select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
+            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
               <option value="all">All Subjects</option>
               <option value="mathematics">Mathematics</option>
               <option value="physics">Physics</option>
@@ -149,7 +143,7 @@ return (
 
     {/* Content Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {contents?.map((content: any) => (
+      {contents.map((content: any) => (
         <Card
           key={content.id}
           className="hover:shadow-lg transition-shadow cursor-pointer"
@@ -159,13 +153,13 @@ return (
             {/* Thumbnail */}
             <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
               <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {content.type === 'VIDEO' && (
+                {content.contentType === 'VIDEO' && (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 )}
-                {content.type === 'DOCUMENT' && (
+                {content.contentType === 'DOCUMENT' && (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 )}
-                {content.type === 'AR_VR' && (
+                {content.contentType === 'AR_VR' && (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 )}
               </svg>
@@ -176,19 +170,19 @@ return (
               <div className="flex items-start justify-between">
                 <h3 className="font-semibold text-gray-900 line-clamp-2">{content.title}</h3>
                 <Badge variant={
-                  content.type === 'VIDEO' ? 'info' :
-                    content.type === 'DOCUMENT' ? 'secondary' :
-                      content.type === 'AR_VR' ? 'success' :
+                  content.contentType === 'VIDEO' ? 'info' :
+                    content.contentType === 'DOCUMENT' ? 'secondary' :
+                      content.contentType === 'AR_VR' ? 'success' :
                         'warning'
                 } className="ml-2">
-                  {content.type}
+                  {content.contentType}
                 </Badge>
               </div>
 
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>{content.subject}</span>
+                <span>{content.board || 'N/A'}</span>
                 <span>•</span>
-                <span>{content.class}</span>
+                <span>Grade {content.grade || 'N/A'}</span>
               </div>
 
               <div className="flex items-center justify-between text-sm">
@@ -196,14 +190,14 @@ return (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>{content.duration}</span>
+                  <span>{content.duration || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-600">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  <span>{content.views}</span>
+                  <span>{content.viewCount || 0}</span>
                 </div>
               </div>
 

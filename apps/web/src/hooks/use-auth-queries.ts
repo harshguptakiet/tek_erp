@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { authService } from '../services/auth-complete.service';
+import { authService } from '../services/auth.service';
 
 export function useSessions() {
   return useQuery({

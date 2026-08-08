@@ -27,6 +27,10 @@ export const analyticsService = {
     }
   },
 
+  getDashboardAnalytics: async (): Promise<DashboardStats> => {
+    return analyticsService.getDashboardOverview();
+  },
+
   // ==================== DASHBOARDS ====================
   getOverviewDashboard: async (schoolId: string) => {
     const response = await apiClient.get('/analytics/dashboard', {

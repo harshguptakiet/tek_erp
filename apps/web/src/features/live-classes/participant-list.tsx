@@ -68,12 +68,12 @@ export function ParticipantList({
       if (participant.isAudioEnabled) {
         await muteParticipant.mutateAsync({
           classId,
-          userId: participant.userId,
+          participantId: participant.id || participant.userId,
         });
       } else {
         await unmuteParticipant.mutateAsync({
           classId,
-          userId: participant.userId,
+          participantId: participant.id || participant.userId,
         });
       }
     } catch (error) {
@@ -86,7 +86,7 @@ export function ParticipantList({
       try {
         await removeParticipant.mutateAsync({
           classId,
-          userId: participant.userId,
+          participantId: participant.id || participant.userId,
         });
         toast.success(`${participant.userName} removed from class`);
       } catch (error) {

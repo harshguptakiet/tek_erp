@@ -111,7 +111,7 @@ export function useDeleteMessage() {
   
   return useMutation({
     mutationFn: ({ conversationId, messageId }: { conversationId: string; messageId: string }) =>
-      messageService.deleteMessage(conversationId, messageId),
+      messageService.deleteMessage(messageId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: messagingKeys.messages(variables.conversationId) });
       toast.success('Message deleted');

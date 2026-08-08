@@ -33,14 +33,18 @@ import {
   DropdownMenuTrigger,
 } from './dropdown-menu';
 
-interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
+export interface DataTableProps<TData = any, TValue = any> {
+  columns: any[];
   data: TData[];
   searchKey?: string;
+  searchable?: boolean;
   searchPlaceholder?: string;
   showColumnToggle?: boolean;
   showPagination?: boolean;
+  pagination?: boolean;
   pageSize?: number;
+  isLoading?: boolean;
+  emptyMessage?: string;
   className?: string;
 }
 
@@ -210,3 +214,11 @@ export function DataTable<TData, TValue>({
     </div>
   );
 }
+
+export type DataTableColumn<TData = any> = {
+  header: string;
+  accessorKey?: string;
+  accessor?: string | ((row: TData) => any);
+  sortable?: boolean;
+  cell?: (row: TData) => React.ReactNode;
+};

@@ -7,7 +7,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { authService } from '@/services/auth-complete.service';
+import { authService } from '@/services/auth.service';
 import { Card, CardContent } from '@/components/ui/card';
 
 type CallbackStatus = 'processing' | 'success' | 'error';

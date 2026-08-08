@@ -261,6 +261,25 @@ export class AcademicService {
     return classRecord;
   }
 
+  async listClasses(schoolId?: string, academicYearId?: string) {
+    return this.prisma.class.findMany({
+      where: {
+        deletedAt: null,
+        ...(schoolId ? { schoolId } : {}),
+        ...(academicYearId ? { academicYearId } : {}),
+      },
+      orderBy: [{ grade: 'asc' }, { stream: 'asc' }],
+      select: {
+        id: true,
+        grade: true,
+        gradeName: true,
+        stream: true,
+        schoolId: true,
+        academicYearId: true,
+      },
+    });
+  }
+
   async createSection(adminId: string, dto: CreateSectionDto) {
     const classRecord = await this.prisma.class.findUnique({
       where: { id: dto.classId },

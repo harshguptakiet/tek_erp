@@ -114,7 +114,7 @@ export const prefetchHelpers = {
       queryFn: async () => {
         // Import dynamically to avoid circular dependencies
         const { studentService } = await import('@/services/student.service');
-        return studentService.listStudents(filters);
+        return studentService.getAll(filters);
       },
     });
   },
@@ -125,7 +125,7 @@ export const prefetchHelpers = {
       queryKey: queryKeys.teachers.list(filters),
       queryFn: async () => {
         const { teacherService } = await import('@/services/teacher.service');
-        return teacherService.listTeachers(filters);
+        return teacherService.getAll(filters);
       },
     });
   },

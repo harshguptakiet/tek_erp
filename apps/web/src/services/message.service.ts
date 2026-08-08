@@ -3,8 +3,13 @@ import { apiClient } from '../lib/axios';
 // Messaging Service
 export const messageService = {
   // ==================== CONVERSATIONS ====================
-  getConversations: async () => {
-    const response = await apiClient.get('/messages');
+  getConversations: async (params?: any) => {
+    const response = await apiClient.get('/messages', { params });
+    return response.data;
+  },
+
+  listConversations: async (params?: any) => {
+    const response = await apiClient.get('/messages', { params });
     return response.data;
   },
 
@@ -27,6 +32,21 @@ export const messageService = {
     attachments?: string[];
   }) => {
     const response = await apiClient.post(`/messages/${conversationId}/send`, data);
+    return response.data;
+  },
+
+  getMessages: async (conversationId: string, params?: any) => {
+    const response = await apiClient.get(`/messages/${conversationId}/history`, { params });
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await apiClient.get('/messages/unread-count');
+    return response.data;
+  },
+
+  archiveConversation: async (id: string) => {
+    const response = await apiClient.post(`/messages/${id}/archive`);
     return response.data;
   },
 

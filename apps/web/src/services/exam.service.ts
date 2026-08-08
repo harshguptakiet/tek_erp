@@ -106,6 +106,11 @@ export const examService = {
     return response.data;
   },
 
+  async publishResults(id: string) {
+    const response = await apiClient.post(`/exams/${id}/publish-results`);
+    return response.data;
+  },
+
   // ==================== EXAM BLUEPRINT ====================
   async generateExamPaper(data: {
     examId: string;

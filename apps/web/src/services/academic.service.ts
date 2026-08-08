@@ -13,6 +13,22 @@ export const academicService = {
     const response = await apiClient.get('/academic/subjects', { params: { schoolId } });
     return response.data;
   },
+  async getSubject(id: string) {
+    const response = await apiClient.get(`/academic/subjects/${id}`);
+    return response.data;
+  },
+  async createSubject(data: any) {
+    const response = await apiClient.post('/academic/subjects', data);
+    return response.data;
+  },
+  async updateSubject(id: string, data: any) {
+    const response = await apiClient.patch(`/academic/subjects/${id}`, data);
+    return response.data;
+  },
+  async deleteSubject(id: string) {
+    const response = await apiClient.delete(`/academic/subjects/${id}`);
+    return response.data;
+  },
   async createAcademicYear(data: any) {
     const response = await apiClient.post('/academic/years', data);
     return response.data;

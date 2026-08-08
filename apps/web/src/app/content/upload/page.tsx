@@ -15,15 +15,24 @@ import { classService } from '@/services/class.service';
 export default function ContentUploadPage() {
   const router = useRouter();
 
-  const { data: subjects = [] } = useQuery({
+  const { data: subjectsResponse = [] } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => subjectService.getAll({}),
   });
 
-  const { data: classes = [] } = useQuery({
+  const { data: classesResponse = [] } = useQuery({
     queryKey: ['classes'],
     queryFn: () => classService.getAll({}),
   });
+
+  // Handle paginated or direct array responses
+  const subjects = Array.isArray(subjectsResponse) 
+    ? subjectsResponse 
+    : (subjectsResponse?.data || []);
+  
+  const classes = Array.isArray(classesResponse) 
+    ? classesResponse 
+    : (classesResponse?.data || []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -45,7 +54,10 @@ export default function ContentUploadPage() {
 
       <ContentUploader
         subjects={subjects.map((s: any) => ({ id: s.id, name: s.name }))}
-        classes={classes.map((c: any) => ({ id: c.id, name: c.name }))}
+        classes={classes.map((c: any) => ({ 
+          id: c.id, 
+          name: c.gradeName || `Grade ${c.grade}${c.stream ? ` - ${c.stream}` : ''}` 
+        }))}
         onSuccess={() => router.push('/content')}
       />
     </div>

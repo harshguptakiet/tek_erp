@@ -124,4 +124,132 @@ export const authService = {
     const response = await apiClient.post<{ message: string }>('/auth/resend-verification', { email });
     return response.data;
   },
+
+  /**
+   * Verify 2FA code during login
+   */
+  async verify2FA(twoFactorToken: string, code: string): Promise<{ user: any; tokens: { accessToken: string; refreshToken: string } }> {
+    const response = await apiClient.post('/auth/2fa/verify', { twoFactorToken, code });
+    return response.data;
+  },
+
+  /**
+   * Complete OAuth callback authentication
+   */
+  async handleOAuthCallback(data: { provider: 'google' | 'microsoft'; code: string; state: string }): Promise<{ user: any; accessToken: string; isNewUser?: boolean }> {
+    const response = await apiClient.post(`/auth/oauth/${data.provider}/callback`, data);
+    return response.data;
+  },
+
+  /**
+   * Verify 2FA backup code during login
+   */
+  async verifyBackupCode(twoFactorToken: string, backupCode: string): Promise<{ user: any; tokens: { accessToken: string; refreshToken: string } }> {
+    const response = await apiClient.post('/auth/2fa/verify-backup', { twoFactorToken, backupCode });
+    return response.data;
+  },
+
+  /**
+   * Initiate 2FA setup
+   */
+  async enable2FA(): Promise<{ secret: string; qrCode: string }> {
+    const response = await apiClient.post('/auth/2fa/enable');
+    return response.data;
+  },
+
+  /**
+   * Verify 2FA setup with code
+   */
+  async verify2FASetup(code: string): Promise<{ backupCodes: string[] }> {
+    const response = await apiClient.post('/auth/2fa/verify-setup', { code });
+    return response.data;
+  },
+
+  /**
+   * Disable 2FA
+   */
+  async disable2FA(password: string, code: string): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/2fa/disable', { password, code });
+    return response.data;
+  },
+
+  /**
+   * Logout from all devices
+   */
+  async logoutAllDevices(password: string, twoFactorCode?: string): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/logout-all', { password, twoFactorCode });
+    return response.data;
+  },
+
+  /**
+   * Revoke a specific session
+   */
+  async revokeSession(sessionId: string): Promise<{ message: string }> {
+    const response = await apiClient.delete(`/auth/sessions/${sessionId}`);
+    return response.data;
+  },
+
+  /**
+   * Mark current device as trusted
+   */
+  async trustDevice(): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/trust-device');
+    return response.data;
+  },
+
+  /**
+   * Resend email verification
+   */
+  async resendEmailVerification(email: string): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/resend-email-verification', { email });
+    return response.data;
+  },
+
+  /**
+   * Request 2FA recovery
+   */
+  async request2FARecovery(email: string): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/2fa/recovery-request', { email });
+    return response.data;
+  },
+
+  /**
+   * Get active sessions
+   */
+  async getSessions(): Promise<any[]> {
+    const response = await apiClient.get('/auth/sessions');
+    return response.data;
+  },
+
+  /**
+   * Get login history
+   */
+  async getLoginHistory(params?: { page?: number; limit?: number }): Promise<{ history: any[] }> {
+    const response = await apiClient.get('/auth/login-history', { params });
+    return response.data;
+  },
+
+  /**
+   * Get 2FA backup codes
+   */
+  async getBackupCodes(): Promise<{ backupCodes: string[] }> {
+    const response = await apiClient.get('/auth/2fa/backup-codes');
+    return response.data;
+  },
+
+  /**
+   * Check password expiry status
+   */
+  async checkPasswordExpiry(): Promise<{ isExpired: boolean; daysRemaining: number }> {
+    const response = await apiClient.get('/auth/password-expiry');
+    return response.data;
+  },
+
+  /**
+   * Check account lock status
+   */
+  async checkLockStatus(email?: string): Promise<{ isLocked: boolean; lockedUntil?: string }> {
+    const response = await apiClient.get('/auth/lock-status', { params: { email } });
+    return response.data;
+  },
 };

@@ -73,7 +73,7 @@ export function RoomAllocationWizard({
     status: 'AVAILABLE',
   });
 
-  const students = Array.isArray(studentsData) ? studentsData : studentsData?.students || [];
+  const students = Array.isArray(studentsData) ? studentsData : (studentsData as any)?.data || (studentsData as any)?.students || [];
   const rooms = Array.isArray(roomsData) ? roomsData : roomsData?.rooms || [];
 
   const form = useForm<AllocationFormData>({

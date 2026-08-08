@@ -68,7 +68,7 @@ export function TimetableWizard({
     setValue,
     watch,
   } = useForm<TimetableFormData>({
-    resolver: zodResolver(timetableSchema),
+    resolver: zodResolver(timetableSchema) as any,
     defaultValues: {
       autoGenerate: false,
     },

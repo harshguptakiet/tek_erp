@@ -99,11 +99,17 @@ export function SubjectForm({ initialData, onSubmit, isSubmitting }: SubjectForm
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Category *
               </label>
-              <Select {...register('category')} error={errors.category?.message}>
+              <select
+                {...register('category')}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <option value="CORE">Core</option>
                 <option value="ELECTIVE">Elective</option>
                 <option value="OPTIONAL">Optional</option>
-              </Select>
+              </select>
+              {errors.category?.message && (
+                <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
