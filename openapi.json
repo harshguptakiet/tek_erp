@@ -5298,6 +5298,41 @@
         "tags": [
           "Academic"
         ]
+      },
+      "get": {
+        "operationId": "AcademicController_listClasses",
+        "parameters": [
+          {
+            "name": "schoolId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "academicYearId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all classes",
+        "tags": [
+          "Academic"
+        ]
       }
     },
     "/api/v1/academic/sections": {

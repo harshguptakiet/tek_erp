@@ -2,7 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import GlobalLoading from '@/app/loading';
 import { useAuthStore } from '@/stores/auth.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuth } from '@/hooks/use-auth';
@@ -145,6 +146,7 @@ function getRoleBadgeColor(role?: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [pendingPathname, setPendingPathname] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
   const { logout, isLoggingOut } = useAuth();
   const { setTheme, resolvedTheme } = useTheme();
@@ -155,6 +157,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMobileSidebarOpen,
     setSidebarCollapsed,
   } = useUIStore();
+
+  // Reset optimistic pendingPathname when real route navigation finishes
+  useEffect(() => {
+    setPendingPathname(null);
+  }, [pathname]);
+
+  // Active path calculation (optimistic selection)
+  const activePath = pendingPathname ?? pathname;
+
+  const isNavigating = pendingPathname !== null && pendingPathname !== pathname;
+
+  const handleNavClick = (href: string) => {
+    if (pathname !== href) {
+      setPendingPathname(href);
+    }
+  };
 
   // Read sidebar collapsed state from localStorage on mount
   useEffect(() => {
@@ -191,8 +209,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const isActive = (path: string) => {
-    if (path === '/dashboard') return pathname === '/dashboard';
-    return pathname === path || pathname?.startsWith(path + '/');
+    if (path === '/dashboard') return activePath === '/dashboard';
+    return activePath === path || activePath?.startsWith(path + '/');
   };
 
   const isAdmin =
@@ -265,7 +283,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const Icon = item.icon;
 
                 const linkContent = (
-                  <Link href={item.href}>
+                  <Link href={item.href} onClick={() => handleNavClick(item.href)}>
                     <div
                       className={`
                         group flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150
@@ -477,7 +495,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* ── Page content ── */}
         <main className="min-h-[calc(100vh-var(--header-height))] p-4 md:p-6 animate-fade-in">
-          {children}
+          {isNavigating ? <GlobalLoading /> : children}
         </main>
       </div>
     </div>
