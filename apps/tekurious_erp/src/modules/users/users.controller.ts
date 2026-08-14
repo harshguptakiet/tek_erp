@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { UsersService } from './users.service';
 import { BulkOperationsService } from './services/bulk-operations.service';
 import { UserSearchService } from './services/user-search.service';
@@ -959,6 +960,7 @@ export class UsersController {
   // ═══════════════════════════════════════════════════════════════════════════
   // TEMPORARY: Promote User to PLATFORM_ADMIN (Remove after setup)
   // ═══════════════════════════════════════════════════════════════════════════
+  @Public()
   @Post('temp/promote-superadmin')
   @ApiOperation({ summary: 'TEMPORARY: Promote user to PLATFORM_ADMIN by phone' })
   async tempPromoteToSuperAdmin(@Body() dto: { phone: string; secretKey: string }) {
