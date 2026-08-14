@@ -13,6 +13,7 @@ import { OtpService } from './services/otp.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SessionService } from './services/session.service';
 import { SecurityService } from './services/security.service';
+import { EmailService } from './services/email.service';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SecurityService } from './services/security.service';
     TwoFactorService,
     SessionService,
     SecurityService,
+    EmailService,
   ],
   exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, SecurityService],
 })

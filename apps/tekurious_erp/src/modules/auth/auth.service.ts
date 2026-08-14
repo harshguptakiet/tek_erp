@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
+import { EmailService } from './services/email.service';
 import { PasswordValidator } from './utils/password-validator';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
@@ -18,6 +19,7 @@ export class AuthService {
     private configService: ConfigService,
     private eventBus: EventBusService,
     private securityService: SecurityService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -84,9 +86,14 @@ export class AuthService {
       { expiresIn: '24h' }
     );
 
-    // TODO: Send verification email
-    this.logger.log(`Verification email should be sent to: ${user.email}`);
-    this.logger.log(`Verification token: ${verificationToken}`);
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(user.email!, verificationToken, user.firstName);
+      this.logger.log(`Verification email sent to: ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send verification email: ${error.message}`);
+      // Continue with registration even if email fails
+    }
 
     // Emit user registered event
     await this.eventBus.publish('user.registered', {
@@ -292,6 +299,13 @@ export class AuthService {
 
     // SECURITY: Blacklist all user's tokens (force re-login on all devices)
     await this.securityService.blacklistAllUserTokens(userId, 'PASSWORD_CHANGE');
+
+    // Send password changed notification email
+    try {
+      await this.emailService.sendPasswordChangedEmail(user.email!, user.firstName);
+    } catch (error) {
+      this.logger.error(`Failed to send password changed email: ${error.message}`);
+    }
 
     // Emit password changed event
     await this.eventBus.publish('user.password_changed', {
@@ -527,10 +541,14 @@ export class AuthService {
       { expiresIn: '1h' }
     );
 
-    // TODO: Send password reset email
-    this.logger.log(`Password reset email should be sent to: ${user.email}`);
-    this.logger.log(`Reset token: ${resetToken}`);
-    this.logger.log(`Reset link: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`);
+    // Send password reset email
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email!, resetToken, user.firstName);
+      this.logger.log(`Password reset email sent to: ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email: ${error.message}`);
+      // Still return success to prevent email enumeration
+    }
 
     // Emit event
     await this.eventBus.publish('password.reset_requested', {
@@ -739,9 +757,13 @@ export class AuthService {
       { expiresIn: '24h' }
     );
 
-    // TODO: Send verification email
-    this.logger.log(`Verification email should be sent to: ${user.email}`);
-    this.logger.log(`Verification token: ${verificationToken}`);
+    // Send verification email
+    try {
+      await this.emailService.sendVerificationEmail(user.email!, verificationToken, user.firstName);
+      this.logger.log(`Verification email resent to: ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to resend verification email: ${error.message}`);
+    }
 
     return { message: 'If your email is registered, you will receive a verification link.' };
   }
