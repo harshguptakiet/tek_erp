@@ -1,0 +1,76 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/05-geography-address.dbml
+  %% Tables: 6
+  %% Internal relationships: 4
+  %% Table: countries
+  countries {
+    String id PK
+    String code UK
+    String name
+    String phoneCode
+    String currency
+    Boolean isActive
+  }
+  %% Table: states
+  states {
+    String id PK
+    String countryId
+    String code
+    String name
+    Boolean isActive
+  }
+  %% Table: districts
+  districts {
+    String id PK
+    String stateId
+    String code
+    String name
+    Boolean isActive
+  }
+  %% Table: blocks
+  blocks {
+    String id PK
+    String districtId
+    String code
+    String name
+    Boolean isActive
+  }
+  %% Table: villages
+  villages {
+    String id PK
+    String blockId
+    String code
+    String name
+    String pincode
+    Boolean isActive
+  }
+  %% Table: addresses
+  addresses {
+    String id PK
+    String addressType
+    String line1
+    String line2
+    String landmark
+    String cityTown
+    String stateId
+    String districtId
+    String blockId
+    String villageId
+    String pincode
+    String countryId
+    Decimal latitude
+    Decimal longitude
+    Boolean isPrimary
+    Boolean isVerified
+    String entityType
+    String entityId
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  countries ||--o{ states : countryId Restrict
+  states ||--o{ districts : stateId Restrict
+  districts ||--o{ blocks : districtId Restrict
+  blocks ||--o{ villages : blockId Restrict

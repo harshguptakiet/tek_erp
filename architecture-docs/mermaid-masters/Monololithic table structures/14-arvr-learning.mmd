@@ -1,0 +1,99 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/14-arvr-learning.dbml
+  %% Tables: 6
+  %% Internal relationships: 2
+  %% Table: ar_markers
+  ar_markers {
+    String id PK
+    String publisherId
+    String diagramId UK
+    String markerCode UK
+    String markerImage
+    String title
+    String description
+    Boolean isActive
+    Json metadata
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: ar_contents
+  ar_contents {
+    String id PK
+    String contentId
+    String markerId
+    String assetType
+    String assetUrl
+    String thumbnailUrl
+    Int fileSize
+    String format
+    Boolean optimized
+    String compressionLevel
+    Json lodLevels
+    String targetLevel
+    Json metadata
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: vr_contents
+  vr_contents {
+    String id PK
+    String contentId
+    String experimentName
+    String assetType
+    String assetUrl
+    String thumbnailUrl
+    Int fileSize
+    String format
+    Boolean optimized
+    Json metadata
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: vr_usage_logs
+  vr_usage_logs {
+    String id PK
+    String vrContentId
+    String userId
+    String sessionId
+    String headsetType
+    DateTime startTime
+    DateTime endTime
+    Int duration
+    Json interactions
+    Decimal completionRate
+    DateTime createdAt
+  }
+  %% Table: three_d_models
+  three_d_models {
+    String id PK
+    String title
+    String description
+    String modelUrl
+    String thumbnailUrl
+    String format
+    Int fileSize
+    Int polyCount
+    Boolean optimized
+    Json lodLevels
+    String subjectId
+    String topicId
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: metaverse_rooms
+  metaverse_rooms {
+    String id PK
+    String name
+    String roomUrl
+    Int capacity
+    Json environmentConfig
+    Boolean spatialAudioEnabled
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  ar_markers ||--o{ ar_contents : markerId
+  vr_contents ||--o{ vr_usage_logs : vrContentId Cascade

@@ -1,0 +1,115 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/28-analytics-reporting.dbml
+  %% Tables: 8
+  %% Internal relationships: 1
+  %% Table: analytics_snapshots
+  analytics_snapshots {
+    String id PK
+    String snapshotType
+    DateTime snapshotDate
+    String entityType
+    String entityId
+    Json metrics
+    DateTime createdAt
+  }
+  %% Table: metric_definitions
+  metric_definitions {
+    String id PK
+    String metricKey UK
+    String metricName
+    String description
+    String category
+    String calculationFormula
+    String unit
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: kpis
+  kpis {
+    String id PK
+    String metricId
+    String name
+    Decimal targetValue
+    Decimal currentValue
+    Json threshold
+    String entityType
+    String entityId
+    String period
+    DateTime periodDate
+    String status
+  }
+  %% Table: dashboard_cache
+  dashboard_cache {
+    String id PK
+    String dashboardKey UK
+    String userId
+    String organizationId
+    Json cacheData
+    DateTime expiresAt
+    DateTime createdAt
+  }
+  %% Table: analytics_reports
+  analytics_reports {
+    String id PK
+    String organizationId
+    String schoolId
+    String reportType
+    String reportName
+    Json filters
+    Json data
+    String generatedBy
+    DateTime generatedAt
+    String format
+    String fileUrl
+    Boolean isScheduled
+    Json schedule
+  }
+  %% Table: school_analytics
+  school_analytics {
+    String id PK
+    String schoolId
+    String academicYearId
+    Int totalStudents
+    Int totalTeachers
+    Decimal averageAttendance
+    Decimal passPercentage
+    Decimal averageGPA
+    Decimal revenueCollected
+    Decimal outstandingFees
+    Decimal infraUtilization
+    Decimal studentTeacherRatio
+    DateTime calculatedAt
+  }
+  %% Table: student_analytics
+  student_analytics {
+    String id PK
+    String studentId UK
+    Decimal overallGPA
+    Decimal overallPercentage
+    Decimal attendancePercent
+    String learningStyle
+    Decimal engagementScore
+    Json predictedPerformance
+    Json recommendations
+    DateTime calculatedAt
+  }
+  %% Table: teacher_analytics
+  teacher_analytics {
+    String id PK
+    String teacherId UK
+    Decimal averageStudentScore
+    Decimal classCompletionRate
+    Decimal syllabusCompletionRate
+    Decimal attendancePercent
+    Decimal studentSatisfaction
+    Int assignmentsCreated
+    Int examsCreated
+    Decimal gradingTurnaround
+    Int professionalDevelopmentHours
+    DateTime calculatedAt
+  }
+
+  %% Relationships
+  metric_definitions ||--o{ kpis : metricId

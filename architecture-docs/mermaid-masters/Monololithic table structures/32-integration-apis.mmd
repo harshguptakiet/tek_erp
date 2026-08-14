@@ -1,0 +1,115 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/32-integration-apis.dbml
+  %% Tables: 8
+  %% Internal relationships: 1
+  %% Table: integrations
+  integrations {
+    String id PK
+    String organizationId
+    IntegrationType integrationType
+    String providerName
+    Json config
+    Boolean isActive
+    Boolean isTest
+    DateTime lastSyncAt
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: oauth_tokens
+  oauth_tokens {
+    String id PK
+    String userId
+    String provider
+    String accessToken
+    String refreshToken
+    String tokenType
+    DateTime expiresAt
+    String scope
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: external_mappings
+  external_mappings {
+    String id PK
+    String internalEntityType
+    String internalEntityId
+    String externalSystem
+    String externalId
+    Json mappingData
+    Boolean isActive
+    DateTime lastSyncedAt
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: sync_history
+  sync_history {
+    String id PK
+    String integrationId
+    String externalSystem
+    String syncType
+    String entityType
+    Int recordsProcessed
+    Int recordsSuccess
+    Int recordsFailed
+    String status
+    DateTime startedAt
+    DateTime completedAt
+    String error
+    Json metadata
+  }
+  %% Table: sync_failures
+  sync_failures {
+    String id PK
+    String syncHistoryId
+    String entityType
+    String entityId
+    String errorMessage
+    Json errorDetails
+    Int retryCount
+    Int maxRetries
+    DateTime nextRetryAt
+    Boolean isResolved
+    DateTime resolvedAt
+    DateTime createdAt
+  }
+  %% Table: sync_logs
+  sync_logs {
+    String id PK
+    String organizationId
+    String syncType
+    String dataType
+    Int recordCount
+    String status
+    DateTime startedAt
+    DateTime completedAt
+    String error
+    Json metadata
+  }
+  %% Table: webhooks
+  webhooks {
+    String id PK
+    String organizationId
+    String url
+    String secret
+    Boolean isActive
+    DateTime lastTriggeredAt
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: webhook_deliveries
+  webhook_deliveries {
+    String id PK
+    String webhookId
+    String event
+    Json payload
+    String status
+    Int attempts
+    Int responseStatus
+    String responseBody
+    DateTime deliveredAt
+    DateTime createdAt
+  }
+
+  %% Relationships
+  webhooks ||--o{ webhook_deliveries : webhookId Cascade

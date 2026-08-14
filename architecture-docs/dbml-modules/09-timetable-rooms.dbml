@@ -1,0 +1,139 @@
+//// ======================================================
+//// TIMETABLE & ROOMS
+//// Module: 09-timetable-rooms
+//// Category: Academic Core
+//// Tables: 4
+//// ======================================================
+
+Enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+Table rooms [headercolor: #50C878] {
+  id String [pk]
+  schoolId String [not null]
+  roomNumber String [not null]
+  roomName String
+  roomType String [not null, default: 'CLASSROOM']
+  floor String
+  building String
+  capacity Int
+  facilities String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  timetableEntries timetable_entries [not null]
+
+  indexes {
+    (schoolId, roomNumber) [unique]
+  }
+}
+
+Table time_slots [headercolor: #50C878] {
+  id String [pk]
+  schoolId String [not null]
+  slotName String [not null]
+  slotNumber Int [not null]
+  startTime String [not null]
+  endTime String [not null]
+  duration Int [not null]
+  isBreak Boolean [not null, default: false]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  timetableEntries timetable_entries [not null]
+
+  indexes {
+    (schoolId, slotNumber, effectiveFrom) [unique]
+  }
+}
+
+Table timetable_entries [headercolor: #50C878] {
+  id String [pk]
+  schoolId String [not null]
+  sectionId String [not null]
+  academicYearId String [not null]
+  dayOfWeek DayOfWeek [not null]
+  timeSlotId String [not null]
+  subjectId String
+  teacherId String
+  roomId String
+  isSubstitution Boolean [not null, default: false]
+  substitutionReason String
+  originalTeacherId String
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  notes String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  section sections [not null]
+  timeSlot time_slots [not null]
+  room rooms
+
+  indexes {
+    (schoolId, sectionId, dayOfWeek, timeSlotId, effectiveFrom) [unique]
+  }
+}
+
+Table lesson_plans [headercolor: #50C878] {
+  id String [pk]
+  teacherId String [not null]
+  subjectId String
+  topicId String
+  title String [not null]
+  objectives String[] [not null]
+  duration Int [not null]
+  activities Json
+  resources String[] [not null]
+  assessment Json
+  homework String
+  plannedFor DateTime
+  completedAt DateTime
+  effectiveness Decimal
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: timetable_entries.timeSlotId > time_slots.id [delete: Cascade]
+Ref: timetable_entries.roomId > rooms.id
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (4)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: rooms.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: time_slots.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: timetable_entries.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: timetable_entries.sectionId > sections.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 4
+//// Internal Relationships: 2
+//// Cross-Module References: 4
+//// Color: #50C878
+//// Category: Academic Core
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

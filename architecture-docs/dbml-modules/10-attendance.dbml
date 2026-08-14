@@ -1,0 +1,164 @@
+//// ======================================================
+//// ATTENDANCE TRACKING
+//// Module: 10-attendance
+//// Category: Academic Core
+//// Tables: 5
+//// ======================================================
+
+Enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+}
+
+Enum AttendanceMethod {
+  MANUAL
+  BIOMETRIC_FINGERPRINT
+  BIOMETRIC_FACE
+  RFID_CARD
+  QR_CODE
+  GPS_LOCATION
+  ONLINE_CLASS
+  MOBILE_APP
+}
+
+Table attendance [headercolor: #50C878] {
+  id String [pk]
+  studentId String [not null]
+  schoolId String [not null]
+  sectionId String
+  date DateTime [not null]
+  period Int
+  status AttendanceStatus [not null]
+  method AttendanceMethod [not null, default: 'MANUAL']
+  checkInTime DateTime
+  checkOutTime DateTime
+  location Json
+  deviceId String
+  remarks String
+  markedBy String
+  markedAt DateTime [default: `now()`, not null]
+  correctionRequested Boolean [not null, default: false]
+  correctionReason String
+  correctedBy String
+  correctedAt DateTime
+  biometricLogId String
+  student student_profiles [not null]
+  school schools [not null]
+
+  indexes {
+    (studentId, date, period) [unique]
+  }
+}
+
+Table attendance_devices [headercolor: #50C878] {
+  id String [pk]
+  schoolId String [not null]
+  deviceId String [unique, not null]
+  deviceName String [not null]
+  deviceType String [not null]
+  location String
+  roomId String
+  ipAddress String
+  macAddress String
+  isActive Boolean [not null, default: true]
+  lastSyncAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  biometricLogs biometric_attendance_logs [not null]
+}
+
+Table biometric_attendance_logs [headercolor: #50C878] {
+  id String [pk]
+  deviceId String [not null]
+  userId String [not null]
+  userType String [not null]
+  biometricType String [not null]
+  biometricData String
+  matchScore Decimal
+  timestamp DateTime [default: `now()`, not null]
+  isVerified Boolean [not null, default: true]
+  processed Boolean [not null, default: false]
+  processedAt DateTime
+  device attendance_devices [not null]
+}
+
+Table teacher_attendance [headercolor: #50C878] {
+  id String [pk]
+  teacherId String [not null]
+  schoolId String
+  date DateTime [not null]
+  status AttendanceStatus [not null]
+  method AttendanceMethod [not null, default: 'MANUAL']
+  checkInTime DateTime
+  checkOutTime DateTime
+  location Json
+  deviceId String
+  remarks String
+  markedBy String
+  markedAt DateTime [default: `now()`, not null]
+  biometricLogId String
+  teacher teacher_profiles [not null]
+
+  indexes {
+    (teacherId, date) [unique]
+  }
+}
+
+Table teacher_leaves [headercolor: #50C878] {
+  id String [pk]
+  teacherId String [not null]
+  leaveType String [not null]
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  totalDays Int [not null]
+  reason String
+  attachments String[] [not null]
+  status String [not null, default: 'PENDING']
+  appliedAt DateTime [default: `now()`, not null]
+  approvedBy String
+  approvedAt DateTime
+  rejectedBy String
+  rejectedAt DateTime
+  rejectionReason String
+  cancelledAt DateTime
+  cancellationReason String
+  substituteTeacherId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  teacher teacher_profiles [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: biometric_attendance_logs.deviceId > attendance_devices.id
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (4)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: attendance.studentId > student_profiles.id [delete: Cascade] (cross-module)
+// Ref: attendance.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: teacher_attendance.teacherId > teacher_profiles.id [delete: Cascade] (cross-module)
+// Ref: teacher_leaves.teacherId > teacher_profiles.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 5
+//// Internal Relationships: 1
+//// Cross-Module References: 4
+//// Color: #50C878
+//// Category: Academic Core
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

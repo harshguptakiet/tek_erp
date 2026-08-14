@@ -1,0 +1,147 @@
+//// ======================================================
+//// ANALYTICS & REPORTING
+//// Module: 28-analytics-reporting
+//// Category: Platform Services
+//// Tables: 8
+//// ======================================================
+
+Table analytics_snapshots [headercolor: #E74C3C] {
+  id String [pk]
+  snapshotType String [not null]
+  snapshotDate DateTime [not null]
+  entityType String [not null]
+  entityId String
+  metrics Json [not null]
+  createdAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (snapshotType, snapshotDate, entityType, entityId) [unique]
+  }
+}
+
+Table metric_definitions [headercolor: #E74C3C] {
+  id String [pk]
+  metricKey String [unique, not null]
+  metricName String [not null]
+  description String
+  category String [not null]
+  calculationFormula String
+  unit String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  kpis kpis [not null]
+}
+
+Table kpis [headercolor: #E74C3C] {
+  id String [pk]
+  metricId String [not null]
+  name String [not null]
+  targetValue Decimal [not null]
+  currentValue Decimal [not null]
+  threshold Json
+  entityType String
+  entityId String
+  period String [not null]
+  periodDate DateTime [not null]
+  status String [not null, default: 'ON_TRACK']
+  metric metric_definitions [not null]
+}
+
+Table dashboard_cache [headercolor: #E74C3C] {
+  id String [pk]
+  dashboardKey String [unique, not null]
+  userId String
+  organizationId String
+  cacheData Json [not null]
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table analytics_reports [headercolor: #E74C3C] {
+  id String [pk]
+  organizationId String
+  schoolId String
+  reportType String [not null]
+  reportName String [not null]
+  filters Json
+  data Json [not null]
+  generatedBy String [not null]
+  generatedAt DateTime [default: `now()`, not null]
+  format String [not null, default: 'JSON']
+  fileUrl String
+  isScheduled Boolean [not null, default: false]
+  schedule Json
+}
+
+Table school_analytics [headercolor: #E74C3C] {
+  id String [pk]
+  schoolId String [not null]
+  academicYearId String
+  totalStudents Int [not null, default: 0]
+  totalTeachers Int [not null, default: 0]
+  averageAttendance Decimal
+  passPercentage Decimal
+  averageGPA Decimal
+  revenueCollected Decimal
+  outstandingFees Decimal
+  infraUtilization Decimal
+  studentTeacherRatio Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (schoolId, academicYearId) [unique]
+  }
+}
+
+Table student_analytics [headercolor: #E74C3C] {
+  id String [pk]
+  studentId String [unique, not null]
+  overallGPA Decimal
+  overallPercentage Decimal
+  attendancePercent Decimal
+  strengths String[] [not null]
+  weaknesses String[] [not null]
+  learningStyle String
+  engagementScore Decimal
+  predictedPerformance Json
+  recommendations Json
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table teacher_analytics [headercolor: #E74C3C] {
+  id String [pk]
+  teacherId String [unique, not null]
+  averageStudentScore Decimal
+  classCompletionRate Decimal
+  syllabusCompletionRate Decimal
+  attendancePercent Decimal
+  studentSatisfaction Decimal
+  assignmentsCreated Int [not null, default: 0]
+  examsCreated Int [not null, default: 0]
+  gradingTurnaround Decimal
+  professionalDevelopmentHours Int [not null, default: 0]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: kpis.metricId > metric_definitions.id
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 8
+//// Internal Relationships: 1
+//// Cross-Module References: 0
+//// Color: #E74C3C
+//// Category: Platform Services
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

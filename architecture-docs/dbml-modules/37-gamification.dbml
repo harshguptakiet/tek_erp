@@ -1,0 +1,97 @@
+//// ======================================================
+//// GAMIFICATION & ENGAGEMENT
+//// Module: 37-gamification
+//// Category: Academic Core
+//// Tables: 6
+//// ======================================================
+
+Table badges [headercolor: #50C878] {
+  id String [pk]
+  name String [not null]
+  description String
+  iconUrl String
+  criteria Json [not null]
+  points Int [not null, default: 0]
+  rarity String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  awards badge_awards [not null]
+}
+
+Table badge_awards [headercolor: #50C878] {
+  id String [pk]
+  badgeId String [not null]
+  userId String [not null]
+  awardedFor String
+  awardedAt DateTime [default: `now()`, not null]
+  badge badges [not null]
+
+  indexes {
+    (badgeId, userId) [unique]
+  }
+}
+
+Table leaderboards [headercolor: #50C878] {
+  id String [pk]
+  name String [not null]
+  scope String [not null]
+  metricType String [not null]
+  filters Json
+  entries Json [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table rankings [headercolor: #50C878] {
+  id String [pk]
+  studentId String [not null]
+  examId String
+  scope RankingScope [not null]
+  rank Int [not null]
+  totalParticipants Int [not null]
+  percentile Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+  metadata Json
+}
+
+Table student_points [headercolor: #50C878] {
+  id String [pk]
+  studentId String [unique, not null]
+  totalPoints Int [not null, default: 0]
+  pointsBreakdown Json
+  currentStreak Int [not null, default: 0]
+  longestStreak Int [not null, default: 0]
+  lastEarnedAt DateTime
+  updatedAt DateTime [not null]
+}
+
+Table points_transactions [headercolor: #50C878] {
+  id String [pk]
+  studentId String [not null]
+  points Int [not null]
+  reason String [not null]
+  resourceType String
+  resourceId String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: badge_awards.badgeId > badges.id [delete: Cascade]
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 6
+//// Internal Relationships: 1
+//// Cross-Module References: 0
+//// Color: #50C878
+//// Category: Academic Core
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

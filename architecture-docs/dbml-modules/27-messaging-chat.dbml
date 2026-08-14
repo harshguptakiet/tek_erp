@@ -1,0 +1,176 @@
+//// ======================================================
+//// MESSAGING & CHAT
+//// Module: 27-messaging-chat
+//// Category: Platform Services
+//// Tables: 9
+//// ======================================================
+
+Table conversations [headercolor: #E74C3C] {
+  id String [pk]
+  conversationType String [not null]
+  name String
+  description String
+  avatarUrl String
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  lastMessageAt DateTime
+  lastMessagePreview String
+  isArchived Boolean [not null, default: false]
+  metadata Json
+  participants message_participants [not null]
+  messages messages [not null]
+}
+
+Table messages [headercolor: #E74C3C] {
+  id String [pk]
+  conversationId String [not null]
+  senderId String [not null]
+  recipientId String
+  groupId String
+  subject String
+  body String [not null]
+  messageType String [not null, default: 'TEXT']
+  replyToId String
+  isEdited Boolean [not null, default: false]
+  editedAt DateTime
+  isDeleted Boolean [not null, default: false]
+  deletedAt DateTime
+  deletedFor String[] [not null]
+  sentAt DateTime [default: `now()`, not null]
+  metadata Json
+  sender users [not null]
+  conversation conversations [not null]
+  replyTo messages
+  replies messages [not null]
+  attachments message_attachments [not null]
+  reactions message_reactions [not null]
+  readReceipts message_read_receipts [not null]
+}
+
+Table message_participants [headercolor: #E74C3C] {
+  id String [pk]
+  conversationId String [not null]
+  userId String [not null]
+  role String [not null, default: 'MEMBER']
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  lastReadAt DateTime
+  isMuted Boolean [not null, default: false]
+  isPinned Boolean [not null, default: false]
+  conversation conversations [not null]
+
+  indexes {
+    (conversationId, userId) [unique]
+  }
+}
+
+Table message_attachments [headercolor: #E74C3C] {
+  id String [pk]
+  messageId String [not null]
+  fileName String [not null]
+  fileUrl String [not null]
+  fileType String [not null]
+  fileSize Int [not null]
+  thumbnailUrl String
+  uploadedAt DateTime [default: `now()`, not null]
+  message messages [not null]
+}
+
+Table message_read_receipts [headercolor: #E74C3C] {
+  id String [pk]
+  messageId String [not null]
+  userId String [not null]
+  readAt DateTime [default: `now()`, not null]
+  message messages [not null]
+
+  indexes {
+    (messageId, userId) [unique]
+  }
+}
+
+Table message_reactions [headercolor: #E74C3C] {
+  id String [pk]
+  messageId String [not null]
+  userId String [not null]
+  emoji String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  message messages [not null]
+
+  indexes {
+    (messageId, userId, emoji) [unique]
+  }
+}
+
+Table pinned_messages [headercolor: #E74C3C] {
+  id String [pk]
+  conversationId String [not null]
+  messageId String [not null]
+  pinnedBy String [not null]
+  pinnedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (conversationId, messageId) [unique]
+  }
+}
+
+Table message_groups [headercolor: #E74C3C] {
+  id String [pk]
+  name String [not null]
+  description String
+  createdBy String [not null]
+  members String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table announcements [headercolor: #E74C3C] {
+  id String [pk]
+  schoolId String
+  organizationId String
+  title String [not null]
+  content String [not null]
+  targetRoleIds String[] [not null]
+  targetClasses String[] [not null]
+  attachments String[] [not null]
+  publishedAt DateTime
+  expiresAt DateTime
+  isPinned Boolean [not null, default: false]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: message_participants.conversationId > conversations.id [delete: Cascade]
+Ref: messages.conversationId > conversations.id [delete: Cascade]
+Ref: messages.replyToId - messages.id
+Ref: message_attachments.messageId > messages.id [delete: Cascade]
+Ref: message_read_receipts.messageId > messages.id [delete: Cascade]
+Ref: message_reactions.messageId > messages.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (1)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: messages.senderId > users.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 9
+//// Internal Relationships: 6
+//// Cross-Module References: 1
+//// Color: #E74C3C
+//// Category: Platform Services
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

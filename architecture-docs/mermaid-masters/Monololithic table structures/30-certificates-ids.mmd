@@ -1,0 +1,73 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/30-certificates-ids.dbml
+  %% Tables: 4
+  %% Internal relationships: 2
+  %% Table: certificates
+  certificates {
+    String id PK
+    String templateId
+    String recipientId
+    String recipientType
+    String certificateNumber UK
+    String title
+    String description
+    String issuedFor
+    Json data
+    String generatedPdfUrl
+    String issuedBy
+    DateTime issuedAt
+    DateTime expiresAt
+    Boolean isRevoked
+    DateTime revokedAt
+    String revokedReason
+    String verificationCode UK
+  }
+  %% Table: certificate_templates
+  certificate_templates {
+    String id PK
+    String name
+    String certificateType
+    String templateHtml
+    String templateCss
+    Json signaturePositions
+    Boolean isActive
+    String createdBy
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: id_cards
+  id_cards {
+    String id PK
+    String templateId
+    String holderId
+    String holderType
+    String cardNumber UK
+    Json data
+    String qrCode
+    String barcode
+    String photoUrl
+    DateTime validFrom
+    DateTime validUntil
+    String status
+    String generatedPdfUrl
+    DateTime issuedAt
+  }
+  %% Table: id_card_templates
+  id_card_templates {
+    String id PK
+    String name
+    String cardType
+    String schoolId
+    String organizationId
+    String templateFront
+    String templateBack
+    Json dimensions
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  certificate_templates ||--o{ certificates : templateId
+  id_card_templates ||--o{ id_cards : templateId

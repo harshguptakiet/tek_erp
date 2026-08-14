@@ -1,0 +1,88 @@
+//// ======================================================
+//// GOVERNMENT & COMPLIANCE
+//// Module: 38-government-compliance
+//// Category: Infrastructure
+//// Tables: 5
+//// ======================================================
+
+Table government_dashboards [headercolor: #7F8C8D] {
+  id String [pk]
+  level String [not null]
+  stateCode String
+  districtCode String
+  metrics Json [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table government_reports [headercolor: #7F8C8D] {
+  id String [pk]
+  reportType String [not null]
+  reportingPeriod String [not null]
+  schoolId String
+  districtId String
+  stateId String
+  data Json [not null]
+  status String [not null, default: 'DRAFT']
+  submittedBy String
+  submittedAt DateTime
+  approvedBy String
+  approvedAt DateTime
+  fileUrl String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table compliance_checks [headercolor: #7F8C8D] {
+  id String [pk]
+  checkType String [not null]
+  entityType String [not null]
+  entityId String [not null]
+  status String [not null]
+  findings Json
+  score Decimal
+  checkedBy String
+  checkedAt DateTime [default: `now()`, not null]
+  nextCheckDue DateTime
+}
+
+Table archival_policies [headercolor: #7F8C8D] {
+  id String [pk]
+  entityType String [unique, not null]
+  retentionDays Int [not null]
+  archiveAfterDays Int [not null]
+  deleteAfterDays Int
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table archived_data [headercolor: #7F8C8D] {
+  id String [pk]
+  entityType String [not null]
+  entityId String [not null]
+  data Json [not null]
+  archivedAt DateTime [default: `now()`, not null]
+  deleteAt DateTime
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+// No internal relationships defined
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 5
+//// Internal Relationships: 0
+//// Cross-Module References: 0
+//// Color: #7F8C8D
+//// Category: Infrastructure
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

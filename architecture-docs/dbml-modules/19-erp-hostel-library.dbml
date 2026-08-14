@@ -1,0 +1,212 @@
+//// ======================================================
+//// ERP: HOSTEL & LIBRARY
+//// Module: 19-erp-hostel-library
+//// Category: ERP
+//// Tables: 9
+//// ======================================================
+
+Table hostel_blocks [headercolor: #16A085] {
+  id String [pk]
+  schoolId String [not null]
+  blockName String [not null]
+  blockNumber String
+  blockType String
+  totalFloors Int [not null, default: 1]
+  totalRooms Int [not null]
+  totalCapacity Int [not null]
+  wardenName String
+  wardenPhone String
+  wardenId String
+  facilities String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  rooms hostel_rooms [not null]
+  fees hostel_fees [not null]
+}
+
+Table hostel_rooms [headercolor: #16A085] {
+  id String [pk]
+  blockId String [not null]
+  roomNumber String [not null]
+  roomType String [not null, default: 'STANDARD']
+  capacity Int [not null]
+  occupied Int [not null, default: 0]
+  floor Int
+  facilities String[] [not null]
+  monthlyRent Decimal
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  block hostel_blocks [not null]
+  assignments hostel_room_assignments [not null]
+  maintenanceRecords hostel_maintenance [not null]
+
+  indexes {
+    (blockId, roomNumber) [unique]
+  }
+}
+
+Table hostel_room_assignments [headercolor: #16A085] {
+  id String [pk]
+  studentId String [unique, not null]
+  roomId String [not null]
+  bedNumber String
+  assignedAt DateTime [default: `now()`, not null]
+  vacatedAt DateTime
+  status String [not null, default: 'ACTIVE']
+  monthlyRent Decimal [not null]
+  securityDeposit Decimal
+  student student_profiles [not null]
+  room hostel_rooms [not null]
+}
+
+Table hostel_fees [headercolor: #16A085] {
+  id String [pk]
+  blockId String [not null]
+  feeType String [not null]
+  amount Decimal [not null]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  block hostel_blocks [not null]
+}
+
+Table hostel_maintenance [headercolor: #16A085] {
+  id String [pk]
+  roomId String [not null]
+  issueType String [not null]
+  description String [not null]
+  reportedBy String [not null]
+  reportedAt DateTime [default: `now()`, not null]
+  assignedTo String
+  assignedAt DateTime
+  status String [not null, default: 'PENDING']
+  completedAt DateTime
+  completedBy String
+  cost Decimal
+  room hostel_rooms [not null]
+}
+
+Table library_books [headercolor: #16A085] {
+  id String [pk]
+  schoolId String [not null]
+  isbn String
+  title String [not null]
+  author String
+  publisher String
+  edition String
+  publicationYear Int
+  category String
+  subCategory String
+  language String
+  totalCopies Int [not null]
+  availableCopies Int [not null]
+  issuedCopies Int [not null, default: 0]
+  damagedCopies Int [not null, default: 0]
+  lostCopies Int [not null, default: 0]
+  location String
+  deweyDecimal String
+  coverImage String
+  description String
+  purchaseDate DateTime
+  purchasePrice Decimal
+  condition String
+  isActive Boolean [not null, default: true]
+  isReferenceOnly Boolean [not null, default: false]
+  tags String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  issues library_issues [not null]
+  reservations library_reservations [not null]
+}
+
+Table library_issues [headercolor: #16A085] {
+  id String [pk]
+  bookId String [not null]
+  userId String [not null]
+  userType String [not null]
+  issueDate DateTime [not null]
+  dueDate DateTime [not null]
+  returnDate DateTime
+  renewalCount Int [not null, default: 0]
+  maxRenewals Int [not null, default: 2]
+  fineAmount Decimal [not null, default: 0]
+  finePaid Boolean [not null, default: false]
+  isReturned Boolean [not null, default: false]
+  isOverdue Boolean [not null, default: false]
+  condition String
+  damageRemarks String
+  remarks String
+  issuedBy String
+  returnedTo String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  book library_books [not null]
+  student student_profiles
+}
+
+Table library_reservations [headercolor: #16A085] {
+  id String [pk]
+  bookId String [not null]
+  userId String [not null]
+  userType String [not null]
+  reservedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime [not null]
+  status String [not null, default: 'ACTIVE']
+  notifiedAt DateTime
+  book library_books [not null]
+}
+
+Table library_members [headercolor: #16A085] {
+  id String [pk]
+  userId String [unique, not null]
+  userType String [not null]
+  membershipNumber String [unique, not null]
+  membershipType String [not null]
+  maxBooksAllowed Int [not null, default: 3]
+  maxDays Int [not null, default: 14]
+  isActive Boolean [not null, default: true]
+  joinedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: library_issues.bookId > library_books.id [delete: Cascade]
+Ref: library_reservations.bookId > library_books.id [delete: Cascade]
+Ref: hostel_rooms.blockId > hostel_blocks.id [delete: Cascade]
+Ref: hostel_room_assignments.roomId > hostel_rooms.id [delete: Cascade]
+Ref: hostel_fees.blockId > hostel_blocks.id [delete: Cascade]
+Ref: hostel_maintenance.roomId > hostel_rooms.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (4)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: library_books.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: library_issues.userId > student_profiles.id [delete: Cascade] (cross-module)
+// Ref: hostel_blocks.schoolId > schools.id [delete: Cascade] (cross-module)
+// Ref: hostel_room_assignments.studentId - student_profiles.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 9
+//// Internal Relationships: 6
+//// Cross-Module References: 4
+//// Color: #16A085
+//// Category: ERP
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

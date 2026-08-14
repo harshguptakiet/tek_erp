@@ -1,0 +1,127 @@
+//// ======================================================
+//// ASSIGNMENTS & GRADING
+//// Module: 13-assignments-grades
+//// Category: Assessment
+//// Tables: 5
+//// ======================================================
+
+Table assignments [headercolor: #9B59B6] {
+  id String [pk]
+  teacherId String [not null]
+  sectionId String
+  title String [not null]
+  description String
+  subjectId String
+  topicId String
+  maxMarks Decimal
+  dueDate DateTime
+  attachments String[] [not null]
+  allowLateSubmission Boolean [not null, default: true]
+  isPublished Boolean [not null, default: false]
+  publishedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  teacher teacher_profiles [not null]
+  section sections
+  submissions assignment_submissions [not null]
+}
+
+Table assignment_submissions [headercolor: #9B59B6] {
+  id String [pk]
+  assignmentId String [not null]
+  studentId String [not null]
+  submittedAt DateTime [default: `now()`, not null]
+  submissionFiles String[] [not null]
+  submissionText String
+  status AssignmentStatus [not null, default: 'SUBMITTED']
+  marksObtained Decimal
+  feedback String
+  gradedAt DateTime
+  gradedBy String
+  assignment assignments [not null]
+  student student_profiles [not null]
+
+  indexes {
+    (assignmentId, studentId) [unique]
+  }
+}
+
+Table student_report_cards [headercolor: #9B59B6] {
+  id String [pk]
+  studentId String [not null]
+  academicYearId String [not null]
+  term String
+  grades Json [not null]
+  overallGrade String
+  overallPercentage Decimal
+  overallGPA Decimal
+  classRank Int
+  totalStudents Int
+  attendancePercent Decimal
+  teacherRemarks Json
+  principalRemarks String
+  coScholastic Json
+  generatedAt DateTime [default: `now()`, not null]
+  fileUrl String
+
+  indexes {
+    (studentId, academicYearId, term) [unique]
+  }
+}
+
+Table performance_metrics [headercolor: #9B59B6] {
+  id String [pk]
+  studentId String [not null]
+  metricType String [not null]
+  subjectId String
+  topicId String
+  score Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+  metadata Json
+}
+
+Table disciplinary_records [headercolor: #9B59B6] {
+  id String [pk]
+  studentId String [not null]
+  incidentDate DateTime [not null]
+  incidentType String [not null]
+  description String [not null]
+  actionTaken String
+  recordedBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  student student_profiles [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: assignment_submissions.assignmentId > assignments.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (4)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: assignments.teacherId > teacher_profiles.id [delete: Cascade] (cross-module)
+// Ref: assignments.sectionId > sections.id (cross-module)
+// Ref: assignment_submissions.studentId > student_profiles.id [delete: Cascade] (cross-module)
+// Ref: disciplinary_records.studentId > student_profiles.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 5
+//// Internal Relationships: 1
+//// Cross-Module References: 4
+//// Color: #9B59B6
+//// Category: Assessment
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

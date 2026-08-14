@@ -1,0 +1,112 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/31-audit-logging.dbml
+  %% Tables: 6
+  %% Internal relationships: 0
+  %% Table: audit_logs
+  audit_logs {
+    String id PK
+    String userId
+    String tenantId
+    String organizationId
+    String schoolId
+    String action
+    String tableName
+    String recordId
+    String columnName
+    String oldValue
+    String newValue
+    String resource
+    String resourceId
+    Json changes
+    String ipAddress
+    String userAgent
+    String device
+    String browser
+    String os
+    Json location
+    String reason
+    Json metadata
+    String apiEndpoint
+    String httpMethod
+    String riskLevel
+    Boolean flagged
+    DateTime timestamp
+  }
+  %% Table: activity_logs
+  activity_logs {
+    String id PK
+    String userId
+    String activityType
+    String page
+    String action
+    Json metadata
+    String ipAddress
+    String userAgent
+    DateTime timestamp
+  }
+  %% Table: user_login_history
+  user_login_history {
+    String id PK
+    String userId
+    DateTime loginAt
+    DateTime logoutAt
+    String ipAddress
+    String userAgent
+    String device
+    String browser
+    String os
+    Json location
+    String loginMethod
+    Boolean success
+    String failureReason
+    String sessionId
+  }
+  %% Table: session_analytics
+  session_analytics {
+    String id PK
+    String userId
+    String sessionId
+    DateTime startTime
+    DateTime endTime
+    Int duration
+    Int pagesViewed
+    Int actionsPerformed
+    String device
+    String browser
+    String os
+    String referrer
+  }
+  %% Table: error_logs
+  error_logs {
+    String id PK
+    String errorType
+    String errorMessage
+    String stackTrace
+    String userId
+    String requestPath
+    String requestMethod
+    Json requestBody
+    String userAgent
+    String ipAddress
+    Boolean resolved
+    DateTime resolvedAt
+    String resolvedBy
+    DateTime timestamp
+  }
+  %% Table: usage_logs
+  usage_logs {
+    String id PK
+    String userId
+    String sessionId
+    String activityType
+    String resourceType
+    String resourceId
+    Json deviceInfo
+    String ipAddress
+    Int duration
+    Json metadata
+    DateTime timestamp
+  }
+
+  %% No internal relationships in this module
