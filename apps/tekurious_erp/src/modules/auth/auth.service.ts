@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
 import { EmailService } from './services/email.service';
+import { TwoFactorService } from './services/two-factor.service';
 import { PasswordValidator } from './utils/password-validator';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
@@ -20,6 +21,7 @@ export class AuthService {
     private eventBus: EventBusService,
     private securityService: SecurityService,
     private emailService: EmailService,
+    private twoFactorService: TwoFactorService,
   ) {}
 
   /**
@@ -112,7 +114,7 @@ export class AuthService {
   /**
    * Login user
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
     this.logger.log(`Login attempt for email: ${dto.email}`);
 
     // Find user with authentication
@@ -171,6 +173,23 @@ export class AuthService {
 
     // Record successful login
     await this.recordLoginAttempt(dto.email, true, dto.ipAddress, dto.userAgent);
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      this.logger.log(`2FA required for user: ${user.id}`);
+
+      // Generate temporary token for 2FA verification (5-minute expiry)
+      const tempToken = this.jwtService.sign(
+        { userId: user.id, email: user.email, type: '2fa_required' },
+        { expiresIn: '5m' }
+      );
+
+      return {
+        requiresTwoFactor: true,
+        tempToken,
+        message: 'Two-factor authentication required. Please enter your 2FA code.',
+      };
+    }
 
     // Update last login
     await this.prisma.user.update({
@@ -1805,5 +1824,411 @@ export class AuthService {
     });
 
     return this.generateTokens(targetUser);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FR-AUTH-010 to FR-AUTH-012: Two-Factor Authentication (2FA/TOTP)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Enable 2FA for user - Step 1: Generate secret and QR code
+   * Returns: secret (to be saved temporarily), qrCodeUrl (for user to scan), backupCodes (to show user)
+   */
+  async enable2FA(userId: string): Promise<{ secret: string; qrCodeUrl: string; backupCodes: string[] }> {
+    this.logger.log(`Enabling 2FA for user: ${userId}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is already enabled for this account');
+    }
+
+    // Generate TOTP secret and QR code
+    const { secret, qrCodeUrl } = await this.twoFactorService.generateSecret(user.email!);
+
+    // Generate backup codes
+    const backupCodes = this.twoFactorService.generateBackupCodes(10);
+
+    this.logger.log(`2FA setup initiated for user: ${userId}`);
+
+    // Return secret, QR code, and backup codes
+    // User must verify with a code before we save the secret to DB
+    return {
+      secret,
+      qrCodeUrl,
+      backupCodes,
+    };
+  }
+
+  /**
+   * Enable 2FA for user - Step 2: Verify setup with TOTP code
+   * User scans QR code, enters code from authenticator app to verify setup
+   */
+  async verify2FASetup(userId: string, code: string, secret: string, backupCodes: string[]): Promise<{ message: string }> {
+    this.logger.log(`Verifying 2FA setup for user: ${userId}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is already enabled for this account');
+    }
+
+    // Verify TOTP code
+    const isValid = await this.twoFactorService.verifyToken(secret, code);
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid 2FA code. Please try again.');
+    }
+
+    // Encrypt secret for storage
+    const encryptedSecret = this.twoFactorService.encryptSecret(secret);
+
+    // Hash backup codes for storage
+    const hashedBackupCodes = backupCodes.map(code => this.twoFactorService.hashBackupCode(code));
+
+    // Save encrypted secret and backup codes to user
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorSecret: encryptedSecret,
+        twoFactorEnabled: true,
+        backupCodes: hashedBackupCodes,
+      },
+    });
+
+    // Log security event
+    await this.securityService.logSecurityEvent(userId, '2FA_ENABLED', 'LOW', {
+      enabledAt: new Date(),
+    });
+
+    // Emit event
+    await this.eventBus.publish('user.2fa_enabled', {
+      userId,
+      email: user.email,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`2FA enabled successfully for user: ${userId}`);
+
+    return { message: '2FA has been enabled successfully. Save your backup codes in a safe place.' };
+  }
+
+  /**
+   * Disable 2FA for user
+   * Requires password and current 2FA code for verification
+   */
+  async disable2FA(userId: string, password: string, code: string): Promise<{ message: string }> {
+    this.logger.log(`Disabling 2FA for user: ${userId}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled for this account');
+    }
+
+    // Verify password
+    if (!user.passwordHash) {
+      throw new BadRequestException('Cannot disable 2FA: No password set');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    // Decrypt secret and verify TOTP code
+    const secret = this.twoFactorService.decryptSecret(user.twoFactorSecret!);
+    const isValid = await this.twoFactorService.verifyToken(secret, code);
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid 2FA code');
+    }
+
+    // Remove 2FA secret and backup codes
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        backupCodes: [],
+      },
+    });
+
+    // Log security event
+    await this.securityService.logSecurityEvent(userId, '2FA_DISABLED', 'MEDIUM', {
+      disabledAt: new Date(),
+    });
+
+    // Emit event
+    await this.eventBus.publish('user.2fa_disabled', {
+      userId,
+      email: user.email,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`2FA disabled for user: ${userId}`);
+
+    return { message: '2FA has been disabled successfully' };
+  }
+
+  /**
+   * Verify 2FA code during login
+   * After successful password login, if user has 2FA enabled, they must verify with TOTP code
+   */
+  async verify2FALogin(tempToken: string, code: string): Promise<AuthResponseDto> {
+    this.logger.log('Verifying 2FA code for login');
+
+    try {
+      // Verify temp token
+      const payload = this.jwtService.verify(tempToken);
+
+      if (payload.type !== '2fa_required') {
+        throw new BadRequestException('Invalid token type');
+      }
+
+      // Find user
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.userId },
+        include: {
+          userRolesNew: {
+            include: {
+              role: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!user || !user.twoFactorEnabled) {
+        throw new UnauthorizedException('Invalid 2FA setup');
+      }
+
+      // Decrypt secret and verify TOTP code
+      const secret = this.twoFactorService.decryptSecret(user.twoFactorSecret!);
+      const isValid = await this.twoFactorService.verifyToken(secret, code);
+
+      if (!isValid) {
+        // Log failed 2FA attempt
+        await this.securityService.logSecurityEvent(user.id, '2FA_LOGIN_FAILED', 'MEDIUM', {
+          timestamp: new Date(),
+        });
+
+        throw new UnauthorizedException('Invalid 2FA code');
+      }
+
+      // Update last login
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      });
+
+      // Log successful 2FA login
+      await this.securityService.logSecurityEvent(user.id, '2FA_LOGIN_SUCCESS', 'LOW', {
+        timestamp: new Date(),
+      });
+
+      // Emit login event
+      await this.eventBus.publish('user.logged_in', {
+        userId: user.id,
+        email: user.email,
+        tenantId: user.tenantId,
+        timestamp: new Date(),
+      });
+
+      this.logger.log(`2FA login successful for user: ${user.id}`);
+
+      // Generate and return real access token
+      return this.generateTokens(user);
+    } catch (error) {
+      if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Verify 2FA backup code during login
+   * If user lost access to authenticator app, they can use backup codes
+   */
+  async verify2FABackupCode(tempToken: string, backupCode: string): Promise<AuthResponseDto> {
+    this.logger.log('Verifying 2FA backup code for login');
+
+    try {
+      // Verify temp token
+      const payload = this.jwtService.verify(tempToken);
+
+      if (payload.type !== '2fa_required') {
+        throw new BadRequestException('Invalid token type');
+      }
+
+      // Find user
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.userId },
+        include: {
+          userRolesNew: {
+            include: {
+              role: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!user || !user.twoFactorEnabled) {
+        throw new UnauthorizedException('Invalid 2FA setup');
+      }
+
+      // Get backup codes
+      const hashedBackupCodes = user.backupCodes as string[] || [];
+
+      if (hashedBackupCodes.length === 0) {
+        throw new BadRequestException('No backup codes available');
+      }
+
+      // Verify backup code
+      let matchedCodeIndex = -1;
+      for (let i = 0; i < hashedBackupCodes.length; i++) {
+        const isMatch = this.twoFactorService.verifyBackupCode(backupCode, hashedBackupCodes[i]);
+        if (isMatch) {
+          matchedCodeIndex = i;
+          break;
+        }
+      }
+
+      if (matchedCodeIndex === -1) {
+        // Log failed backup code attempt
+        await this.securityService.logSecurityEvent(user.id, '2FA_BACKUP_CODE_FAILED', 'MEDIUM', {
+          timestamp: new Date(),
+        });
+
+        throw new UnauthorizedException('Invalid backup code');
+      }
+
+      // Remove used backup code
+      hashedBackupCodes.splice(matchedCodeIndex, 1);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          backupCodes: hashedBackupCodes,
+          lastLogin: new Date(),
+        },
+      });
+
+      // Log successful backup code login
+      await this.securityService.logSecurityEvent(user.id, '2FA_BACKUP_CODE_SUCCESS', 'LOW', {
+        timestamp: new Date(),
+        remainingCodes: hashedBackupCodes.length,
+      });
+
+      // Emit login event
+      await this.eventBus.publish('user.logged_in', {
+        userId: user.id,
+        email: user.email,
+        tenantId: user.tenantId,
+        timestamp: new Date(),
+      });
+
+      // Warn if running low on backup codes
+      if (hashedBackupCodes.length <= 2) {
+        this.logger.warn(`User ${user.id} has only ${hashedBackupCodes.length} backup codes remaining`);
+      }
+
+      this.logger.log(`2FA backup code login successful for user: ${user.id}`);
+
+      // Generate and return real access token
+      return this.generateTokens(user);
+    } catch (error) {
+      if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Generate new backup codes for user (if they ran out)
+   * Requires password and current 2FA code for verification
+   */
+  async regenerate2FABackupCodes(userId: string, password: string, code: string): Promise<{ backupCodes: string[] }> {
+    this.logger.log(`Regenerating 2FA backup codes for user: ${userId}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled for this account');
+    }
+
+    // Verify password
+    if (!user.passwordHash) {
+      throw new BadRequestException('Cannot regenerate backup codes: No password set');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    // Decrypt secret and verify TOTP code
+    const secret = this.twoFactorService.decryptSecret(user.twoFactorSecret!);
+    const isValid = await this.twoFactorService.verifyToken(secret, code);
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid 2FA code');
+    }
+
+    // Generate new backup codes
+    const backupCodes = this.twoFactorService.generateBackupCodes(10);
+
+    // Hash backup codes for storage
+    const hashedBackupCodes = backupCodes.map(code => this.twoFactorService.hashBackupCode(code));
+
+    // Save new backup codes
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        backupCodes: hashedBackupCodes,
+      },
+    });
+
+    // Log security event
+    await this.securityService.logSecurityEvent(userId, '2FA_BACKUP_CODES_REGENERATED', 'LOW', {
+      regeneratedAt: new Date(),
+    });
+
+    this.logger.log(`2FA backup codes regenerated for user: ${userId}`);
+
+    return { backupCodes };
   }
 }

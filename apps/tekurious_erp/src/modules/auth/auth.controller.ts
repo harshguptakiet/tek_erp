@@ -60,7 +60,7 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
     this.logger.log(`POST /auth/login - Email: ${loginDto.email}`);
     
     // Add IP and User Agent to DTO
@@ -559,6 +559,107 @@ export class AuthController {
     @Param('userId') targetUserId: string,
   ): Promise<AuthResponseDto> {
     return this.authService.impersonateUser(adminId, targetUserId);
+  }
+
+  // ==================== TWO-FACTOR AUTHENTICATION (FR-AUTH-010 to FR-AUTH-012) ====================
+
+  /**
+   * Enable 2FA - Step 1: Generate secret and QR code
+   * POST /api/v1/auth/2fa/enable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/enable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Enable 2FA - Generate secret and QR code' })
+  @ApiBearerAuth()
+  async enable2FA(
+    @CurrentUser('id') userId: string,
+  ): Promise<Enable2FAResponseDto> {
+    this.logger.log(`POST /auth/2fa/enable - User: ${userId}`);
+    return this.authService.enable2FA(userId);
+  }
+
+  /**
+   * Enable 2FA - Step 2: Verify setup with TOTP code
+   * POST /api/v1/auth/2fa/verify-setup
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/verify-setup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify 2FA setup with authenticator code' })
+  @ApiBearerAuth()
+  async verify2FASetup(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { code: string; secret: string; backupCodes: string[] },
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/2fa/verify-setup - User: ${userId}`);
+    return this.authService.verify2FASetup(userId, dto.code, dto.secret, dto.backupCodes);
+  }
+
+  /**
+   * Disable 2FA
+   * POST /api/v1/auth/2fa/disable
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Disable 2FA for account' })
+  @ApiBearerAuth()
+  async disable2FA(
+    @CurrentUser('id') userId: string,
+    @Body() dto: Disable2FADto,
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/2fa/disable - User: ${userId}`);
+    return this.authService.disable2FA(userId, dto.password, dto.code);
+  }
+
+  /**
+   * Verify 2FA code during login
+   * POST /api/v1/auth/2fa/verify
+   */
+  @Public()
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify 2FA code after password login' })
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 per minute
+  async verify2FALogin(
+    @Body() dto: Verify2FADto,
+  ): Promise<AuthResponseDto> {
+    this.logger.log(`POST /auth/2fa/verify - Temp token provided`);
+    return this.authService.verify2FALogin(dto.tempToken, dto.code);
+  }
+
+  /**
+   * Verify 2FA backup code during login
+   * POST /api/v1/auth/2fa/verify-backup
+   */
+  @Public()
+  @Post('2fa/verify-backup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify 2FA backup code after password login' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 per minute
+  async verify2FABackupCode(
+    @Body() dto: UseBackupCodeDto,
+  ): Promise<AuthResponseDto> {
+    this.logger.log(`POST /auth/2fa/verify-backup - Temp token provided`);
+    return this.authService.verify2FABackupCode(dto.tempToken, dto.backupCode);
+  }
+
+  /**
+   * Regenerate 2FA backup codes
+   * POST /api/v1/auth/2fa/regenerate-backup-codes
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/regenerate-backup-codes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Regenerate 2FA backup codes' })
+  @ApiBearerAuth()
+  async regenerate2FABackupCodes(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { password: string; code: string },
+  ): Promise<{ backupCodes: string[] }> {
+    this.logger.log(`POST /auth/2fa/regenerate-backup-codes - User: ${userId}`);
+    return this.authService.regenerate2FABackupCodes(userId, dto.password, dto.code);
   }
 }
 
