@@ -11,14 +11,17 @@ import {
   Delete,
   Param,
   Res,
+  Put,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { authThrottle } from './config/auth-throttle.config';
 import { AuthService } from './auth.service';
+import { RolesService } from './services/roles.service';
 import { RegisterDto, LoginDto, PhoneLoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
 import { PhoneRegisterDto, SendOtpDto, VerifyOtpDto } from './dto/phone-register.dto';
 import { Enable2FADto, Enable2FAResponseDto, Verify2FADto, Disable2FADto, UseBackupCodeDto } from './dto/two-factor.dto';
+import { CreateCustomRoleDto, UpdateCustomRoleDto, AssignCustomRoleDto, CustomRoleResponseDto } from './dto/custom-role.dto';
 import { OAuthUserDto } from './dto/oauth.dto';
 import { SessionDto, LogoutDeviceDto, LogoutAllDto } from './dto/session.dto';
 import { JwtAuthGuard } from './guards';
@@ -32,7 +35,10 @@ import { CurrentUser, Public } from './decorators';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly rolesService: RolesService,
+  ) {}
 
   /**
    * Register a new user
@@ -660,6 +666,142 @@ export class AuthController {
   ): Promise<{ backupCodes: string[] }> {
     this.logger.log(`POST /auth/2fa/regenerate-backup-codes - User: ${userId}`);
     return this.authService.regenerate2FABackupCodes(userId, dto.password, dto.code);
+  }
+
+  // ==================== CUSTOM ROLES MANAGEMENT (FR-AUTH-021) ====================
+
+  /**
+   * Create custom role for organization
+   * POST /api/v1/auth/roles
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('roles')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create custom role for B2B organization' })
+  @ApiBearerAuth()
+  async createCustomRole(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateCustomRoleDto,
+  ): Promise<CustomRoleResponseDto> {
+    this.logger.log(`POST /auth/roles - User: ${userId}, Role: ${dto.name}`);
+    return this.rolesService.createCustomRole(dto, userId);
+  }
+
+  /**
+   * Get all custom roles for organization
+   * GET /api/v1/auth/roles/organization/:organizationId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('roles/organization/:organizationId')
+  @ApiOperation({ summary: 'Get all custom roles for organization' })
+  @ApiBearerAuth()
+  async getOrganizationRoles(
+    @Param('organizationId') organizationId: string,
+  ): Promise<CustomRoleResponseDto[]> {
+    this.logger.log(`GET /auth/roles/organization/${organizationId}`);
+    return this.rolesService.getOrganizationRoles(organizationId);
+  }
+
+  /**
+   * Get role by ID
+   * GET /api/v1/auth/roles/:roleId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('roles/:roleId')
+  @ApiOperation({ summary: 'Get role by ID with user count' })
+  @ApiBearerAuth()
+  async getRoleById(@Param('roleId') roleId: string): Promise<CustomRoleResponseDto> {
+    this.logger.log(`GET /auth/roles/${roleId}`);
+    return this.rolesService.getRoleById(roleId);
+  }
+
+  /**
+   * Update custom role
+   * PUT /api/v1/auth/roles/:roleId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Put('roles/:roleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update custom role' })
+  @ApiBearerAuth()
+  async updateCustomRole(
+    @CurrentUser('id') userId: string,
+    @Param('roleId') roleId: string,
+    @Body() dto: UpdateCustomRoleDto,
+  ): Promise<CustomRoleResponseDto> {
+    this.logger.log(`PUT /auth/roles/${roleId} - User: ${userId}`);
+    return this.rolesService.updateCustomRole(roleId, dto, userId);
+  }
+
+  /**
+   * Delete custom role
+   * DELETE /api/v1/auth/roles/:roleId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('roles/:roleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete custom role' })
+  @ApiBearerAuth()
+  async deleteCustomRole(
+    @CurrentUser('id') userId: string,
+    @Param('roleId') roleId: string,
+  ): Promise<{ message: string }> {
+    this.logger.log(`DELETE /auth/roles/${roleId} - User: ${userId}`);
+    return this.rolesService.deleteCustomRole(roleId, userId);
+  }
+
+  /**
+   * Assign role to user
+   * POST /api/v1/auth/roles/assign
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('roles/assign')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Assign custom role to user' })
+  @ApiBearerAuth()
+  async assignRoleToUser(
+    @CurrentUser('id') assignedBy: string,
+    @Body() dto: AssignCustomRoleDto,
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/roles/assign - User: ${dto.userId}, Role: ${dto.roleId}`);
+    return this.rolesService.assignRoleToUser(
+      dto.userId,
+      dto.roleId,
+      dto.scopeType,
+      dto.scopeId,
+      assignedBy,
+    );
+  }
+
+  /**
+   * Remove role from user
+   * DELETE /api/v1/auth/roles/:roleId/users/:userId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('roles/:roleId/users/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove role from user' })
+  @ApiBearerAuth()
+  async removeRoleFromUser(
+    @CurrentUser('id') removedBy: string,
+    @Param('roleId') roleId: string,
+    @Param('userId') userId: string,
+  ): Promise<{ message: string }> {
+    this.logger.log(`DELETE /auth/roles/${roleId}/users/${userId} - Removed by: ${removedBy}`);
+    return this.rolesService.removeRoleFromUser(userId, roleId, removedBy);
+  }
+
+  /**
+   * Get available permission categories
+   * GET /api/v1/auth/roles/permissions
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('roles/permissions')
+  @ApiOperation({ summary: 'Get available permission categories' })
+  @ApiBearerAuth()
+  async getPermissionCategories() {
+    this.logger.log(`GET /auth/roles/permissions`);
+    return this.rolesService.getPermissionCategories();
   }
 }
 

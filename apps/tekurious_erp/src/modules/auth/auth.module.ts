@@ -15,6 +15,7 @@ import { SessionService } from './services/session.service';
 import { SecurityService } from './services/security.service';
 import { EmailService } from './services/email.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
+import { RolesService } from './services/roles.service';
 
 @Module({
   imports: [
@@ -47,7 +48,8 @@ import { SuspiciousActivityService } from './services/suspicious-activity.servic
     SecurityService,
     EmailService,
     SuspiciousActivityService,
+    RolesService,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, PermissionsGuard, SecurityService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, PermissionsGuard, SecurityService, RolesService],
 })
 export class AuthModule {}
