@@ -4,6 +4,24 @@ Complete guide to deploy Tekurious ERP (Next.js Frontend + NestJS Backend + Post
 
 ---
 
+## 🚀 Quick Start - Render Configuration
+
+### Frontend Service Settings
+```
+Root Directory: apps/web
+Build Command: npm install && npx next build
+Start Command: npx next start -p $PORT
+```
+
+### Backend Service Settings
+```
+Root Directory: (leave empty)
+Build Command: npm install && npx prisma generate && npm run build
+Start Command: node dist/apps/tekurious_erp/main.js
+```
+
+---
+
 ## Prerequisites
 
 - [x] GitHub repository with your code
@@ -163,17 +181,17 @@ npx prisma db seed
 Name: tekurious-frontend
 Region: Same as backend
 Branch: master (or main)
-Root Directory: (leave empty)
+Root Directory: apps/web
 Runtime: Node
-Build Command: npm install && cd apps/web && npx next build
-Start Command: cd apps/web && npx next start -p $PORT
+Build Command: npm install && npx next build
+Start Command: npx next start -p $PORT
 Plan: Starter ($7/month) or Free
 ```
 
 **Critical for Monorepo:**
-- Leave **Root Directory EMPTY** (builds from repository root)
-- Build command: `npm install && cd apps/web && npx next build`
-- Start command: `cd apps/web && npx next start -p $PORT`
+- Set **Root Directory to `apps/web`** (Next.js app with its own package.json)
+- Build command: `npm install && npx next build`
+- Start command: `npx next start -p $PORT`
 
 ### 4.2 Add Environment Variables
 
@@ -280,6 +298,16 @@ Now every push to master will trigger automatic deployment!
 
 ### Build Fails
 
+**Issue:** `Cannot find module '@tailwindcss/postcss'`
+```bash
+# Solution: Ensure apps/web has its own package.json with all dependencies
+# This is now fixed - apps/web/package.json includes all required packages
+
+Root Directory: apps/web
+Build Command: npm install && npx next build
+Start Command: npx next start -p $PORT
+```
+
 **Issue:** `Prisma generate fails`
 ```bash
 # Solution: Add to Build Command
@@ -288,7 +316,8 @@ npm install && npx prisma generate && npm run build
 
 **Issue:** `Module not found`
 ```bash
-# Solution: Ensure all dependencies in package.json
+# Solution: Add missing dependency to apps/web/package.json
+cd apps/web
 npm install --save <missing-package>
 ```
 
