@@ -39,12 +39,10 @@ export class AuthService {
 
     // Create user with profile and authentication
     // All registered users get ORG_OWNER role and are auto-verified (no email verification needed)
-    // In development, auto-activate all users for easier testing
-    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const userStatus = 'ACTIVE'; // Force ACTIVE status for all new users
+    const emailVerified = true; // Auto-verify email
     
-    // ORG_OWNER users are always auto-verified since they're organization owners
-    const userStatus = 'ACTIVE';
-    const emailVerified = true;
+    this.logger.log(`🔥 CREATING USER WITH STATUS: ${userStatus}, EMAIL_VERIFIED: ${emailVerified}`);
 
     const user = await this.prisma.user.create({
       data: {
@@ -71,6 +69,8 @@ export class AuthService {
         },
       },
     });
+
+    this.logger.log(`🔥 USER CREATED IN DB WITH STATUS: ${user.status}, EMAIL_VERIFIED: ${user.emailVerified}`);
 
     // Generate email verification token
     const verificationToken = this.jwtService.sign(
