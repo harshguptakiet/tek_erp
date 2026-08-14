@@ -264,4 +264,157 @@ export class EmailService {
       // Don't throw - this is just a notification
     }
   }
+
+  /**
+   * Send password expiry reminder (FR-AUTH-019)
+   */
+  async sendPasswordExpiryReminder(email: string, firstName: string, daysRemaining: number): Promise<void> {
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
+    const changePasswordLink = `${frontendUrl}/settings/security`;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Tekurious ERP" <${this.configService.get('EMAIL_FROM', 'noreply@tekurious.com')}>`,
+        to: email,
+        subject: `Password Expiring in ${daysRemaining} Day${daysRemaining > 1 ? 's' : ''} - Tekurious ERP`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .button { display: inline-block; padding: 12px 30px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+              .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>⚠️ Password Expiring Soon</h1>
+              </div>
+              <div class="content">
+                <h2>Hi ${firstName},</h2>
+                <p>Your password will expire in <strong>${daysRemaining} day${daysRemaining > 1 ? 's' : ''}</strong>.</p>
+                <div class="warning">
+                  <p><strong>What happens when it expires?</strong></p>
+                  <ul>
+                    <li>You'll have 3 days grace period to login and change it</li>
+                    <li>After the grace period, your account will be locked</li>
+                    <li>You'll need to use "Forgot Password" to reset it</li>
+                  </ul>
+                </div>
+                <p>Change your password now to avoid disruption:</p>
+                <a href="${changePasswordLink}" class="button">Change Password</a>
+              </div>
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Tekurious ERP. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+
+      this.logger.log(`Password expiry reminder sent to ${email} (${daysRemaining} days remaining)`);
+    } catch (error) {
+      this.logger.error(`Failed to send password expiry reminder to ${email}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send login notification (FR-AUTH-036)
+   */
+  async sendLoginNotification(
+    email: string,
+    firstName: string,
+    deviceInfo: string,
+    location: string,
+    ipAddress: string,
+    loginTime: Date,
+  ): Promise<void> {
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
+    const securitySettingsLink = `${frontendUrl}/settings/security`;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Tekurious ERP" <${this.configService.get('EMAIL_FROM', 'noreply@tekurious.com')}>`,
+        to: email,
+        subject: 'New Login to Your Account - Tekurious ERP',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .info-box { background: white; border: 1px solid #ddd; padding: 15px; margin: 20px 0; border-radius: 5px; }
+              .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+              .info-row:last-child { border-bottom: none; }
+              .button { display: inline-block; padding: 12px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+              .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>🔐 New Login Detected</h1>
+              </div>
+              <div class="content">
+                <h2>Hi ${firstName},</h2>
+                <p>A new login was detected on your Tekurious ERP account.</p>
+                <div class="info-box">
+                  <div class="info-row">
+                    <span><strong>Device:</strong></span>
+                    <span>${deviceInfo}</span>
+                  </div>
+                  <div class="info-row">
+                    <span><strong>Location:</strong></span>
+                    <span>${location}</span>
+                  </div>
+                  <div class="info-row">
+                    <span><strong>IP Address:</strong></span>
+                    <span>${ipAddress}</span>
+                  </div>
+                  <div class="info-row">
+                    <span><strong>Time:</strong></span>
+                    <span>${loginTime.toLocaleString()}</span>
+                  </div>
+                </div>
+                <p><strong>Was this you?</strong></p>
+                <p>If yes, you can ignore this email. If not, your account may be compromised.</p>
+                <div class="warning">
+                  <p><strong>⚠️ This wasn't you?</strong></p>
+                  <p>Take immediate action to secure your account:</p>
+                  <ol>
+                    <li>Change your password immediately</li>
+                    <li>Review your active sessions</li>
+                    <li>Enable two-factor authentication if not already enabled</li>
+                  </ol>
+                </div>
+                <a href="${securitySettingsLink}" class="button">Secure My Account</a>
+              </div>
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Tekurious ERP. All rights reserved.</p>
+                <p>This is an automated security notification. Please do not reply to this email.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+
+      this.logger.log(`Login notification sent to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send login notification to ${email}:`, error);
+      // Don't throw - this is just a notification
+    }
+  }
 }

@@ -13,6 +13,9 @@ export class AuthResponseDto {
     schoolId?: string;
     status?: string;
   };
+  // FR-AUTH-009: Remember Me support
+  rememberMe?: boolean;
+  tokenExpiry?: number; // Token expiry in seconds
 }
 
 export class UserPayload {

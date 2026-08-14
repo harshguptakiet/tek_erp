@@ -114,7 +114,7 @@ export class AuthService {
   /**
    * Login user
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
+  async login(dto: LoginDto & { rememberMe?: boolean }): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
     this.logger.log(`Login attempt for email: ${dto.email}`);
 
     // Find user with authentication
@@ -180,7 +180,7 @@ export class AuthService {
 
       // Generate temporary token for 2FA verification (5-minute expiry)
       const tempToken = this.jwtService.sign(
-        { userId: user.id, email: user.email, type: '2fa_required' },
+        { userId: user.id, email: user.email, type: '2fa_required', rememberMe: dto.rememberMe },
         { expiresIn: '5m' }
       );
 
@@ -207,8 +207,8 @@ export class AuthService {
 
     this.logger.log(`User logged in successfully: ${user.id}`);
 
-    // Generate and return tokens
-    return this.generateTokens(user);
+    // Generate and return tokens with rememberMe flag
+    return this.generateTokens(user, dto.rememberMe);
   }
 
   /**
@@ -482,8 +482,9 @@ export class AuthService {
 
   /**
    * Generate JWT tokens
+   * FR-AUTH-009: Remember Me extends token expiry to 30 days
    */
-  private generateTokens(user: any): AuthResponseDto {
+  private generateTokens(user: any, rememberMe: boolean = false): AuthResponseDto {
     const roles = user.userRolesNew?.map((ur: any) => ur.role.name) || [];
 
     const payload = {
@@ -493,7 +494,11 @@ export class AuthService {
       roles,
     };
 
+    // Standard: 1 hour access token
     const accessToken = this.jwtService.sign(payload);
+
+    // Remember Me: Extended expiry (stored in response metadata for frontend cookie handling)
+    const tokenExpiry = rememberMe ? '30d' : '7d';
 
     return {
       accessToken,
@@ -510,6 +515,8 @@ export class AuthService {
         schoolId: user.schoolId,
         status: user.status || 'ACTIVE',
       },
+      rememberMe, // FR-AUTH-009: Remember Me support
+      tokenExpiry: rememberMe ? 2592000 : 604800, // seconds: 30 days or 7 days
     };
   }
 
@@ -2058,8 +2065,9 @@ export class AuthService {
 
       this.logger.log(`2FA login successful for user: ${user.id}`);
 
-      // Generate and return real access token
-      return this.generateTokens(user);
+      // Generate and return real access token with rememberMe flag from temp token
+      const rememberMe = payload.rememberMe || false;
+      return this.generateTokens(user, rememberMe);
     } catch (error) {
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Invalid or expired token');
@@ -2161,8 +2169,9 @@ export class AuthService {
 
       this.logger.log(`2FA backup code login successful for user: ${user.id}`);
 
-      // Generate and return real access token
-      return this.generateTokens(user);
+      // Generate and return real access token with rememberMe flag from temp token
+      const rememberMe = payload.rememberMe || false;
+      return this.generateTokens(user, rememberMe);
     } catch (error) {
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Invalid or expired token');
