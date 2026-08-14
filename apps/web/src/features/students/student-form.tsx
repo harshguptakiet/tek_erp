@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -93,7 +93,7 @@ export function StudentForm({ initialData, classes = [], onSubmit }: StudentForm
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Gender *</label>
-            <Select onValueChange={(value: any) => setValue('gender', value)} defaultValue={initialData?.gender}>
+            <SelectRoot onValueChange={(value: any) => setValue('gender', value)} defaultValue={initialData?.gender}>
               <SelectTrigger>
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
@@ -102,7 +102,7 @@ export function StudentForm({ initialData, classes = [], onSubmit }: StudentForm
                 <SelectItem value="FEMALE">Female</SelectItem>
                 <SelectItem value="OTHER">Other</SelectItem>
               </SelectContent>
-            </Select>
+            </SelectRoot>
           </div>
 
           <div className="space-y-2">
@@ -122,7 +122,7 @@ export function StudentForm({ initialData, classes = [], onSubmit }: StudentForm
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Class *</label>
-            <Select onValueChange={(value) => setValue('classId', value)} defaultValue={initialData?.classId}>
+            <SelectRoot onValueChange={(value) => setValue('classId', value)} defaultValue={initialData?.classId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select class" />
               </SelectTrigger>
@@ -131,7 +131,7 @@ export function StudentForm({ initialData, classes = [], onSubmit }: StudentForm
                   <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </SelectRoot>
             {errors.classId && <p className="text-sm text-red-500">{errors.classId.message}</p>}
           </div>
         </div>

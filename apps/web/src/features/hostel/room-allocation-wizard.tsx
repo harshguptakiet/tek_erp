@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -251,7 +251,7 @@ export function RoomAllocationWizard({
                   className="pl-10"
                 />
               </div>
-              <Select value={filterGender} onValueChange={setFilterGender}>
+              <SelectRoot value={filterGender} onValueChange={setFilterGender}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Gender" />
                 </SelectTrigger>
@@ -260,8 +260,8 @@ export function RoomAllocationWizard({
                   <SelectItem value="MALE">Male</SelectItem>
                   <SelectItem value="FEMALE">Female</SelectItem>
                 </SelectContent>
-              </Select>
-              <Select value={filterClass} onValueChange={setFilterClass}>
+              </SelectRoot>
+              <SelectRoot value={filterClass} onValueChange={setFilterClass}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Class" />
                 </SelectTrigger>
@@ -272,7 +272,7 @@ export function RoomAllocationWizard({
                   <SelectItem value="11">Class 11</SelectItem>
                   <SelectItem value="12">Class 12</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
 
             {selectedStudents.length > 0 && (

@@ -13,7 +13,7 @@ import { FileUploader } from '@/components/ui/file-uploader';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
-  Select,
+  SelectRoot,
   SelectContent,
   SelectItem,
   SelectTrigger,
@@ -139,7 +139,7 @@ export function AssignmentForm({
               <label className="text-sm font-medium">
                 Subject <span className="text-red-500">*</span>
               </label>
-              <Select
+              <SelectRoot
                 onValueChange={(value) => setValue('subjectId', value)}
                 defaultValue={initialData?.subjectId}
               >
@@ -153,7 +153,7 @@ export function AssignmentForm({
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
               {errors.subjectId && (
                 <p className="text-sm text-red-500">{errors.subjectId.message}</p>
               )}
@@ -163,7 +163,7 @@ export function AssignmentForm({
               <label className="text-sm font-medium">
                 Section <span className="text-red-500">*</span>
               </label>
-              <Select
+              <SelectRoot
                 onValueChange={(value) => setValue('sectionId', value)}
                 defaultValue={initialData?.sectionId}
               >
@@ -177,7 +177,7 @@ export function AssignmentForm({
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
               {errors.sectionId && (
                 <p className="text-sm text-red-500">{errors.sectionId.message}</p>
               )}

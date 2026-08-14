@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -229,7 +229,7 @@ export default function HomeworkPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
 
-              <Select
+              <SelectRoot
                 value={filterSubject}
                 onValueChange={(val) => setFilterSubject(val)}
               >
@@ -244,9 +244,9 @@ export default function HomeworkPage() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
 
-              <Select
+              <SelectRoot
                 value={filterStatus}
                 onValueChange={(val) => setFilterStatus(val as HomeworkStatus | 'ALL')}
               >
@@ -260,7 +260,7 @@ export default function HomeworkPage() {
                   <SelectItem value="GRADED">Graded</SelectItem>
                   <SelectItem value="OVERDUE">Overdue</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
           </CardContent>
         </Card>

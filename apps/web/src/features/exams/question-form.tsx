@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCreateQuestion, useUpdateQuestion } from '../exams/use-exams';
 import { useRouter } from 'next/navigation';
 import { Plus, X } from 'lucide-react';
@@ -77,7 +77,7 @@ export function QuestionForm({ initialData, subjects = [] }: QuestionFormProps) 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Subject *</label>
-              <Select onValueChange={(value) => setValue('subjectId', value)} defaultValue={initialData?.subjectId}>
+              <SelectRoot onValueChange={(value) => setValue('subjectId', value)} defaultValue={initialData?.subjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
@@ -86,13 +86,13 @@ export function QuestionForm({ initialData, subjects = [] }: QuestionFormProps) 
                     <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
               {errors.subjectId && <p className="text-sm text-red-500">{errors.subjectId.message}</p>}
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Type *</label>
-              <Select onValueChange={(value: any) => setValue('type', value)} defaultValue={initialData?.type || 'MCQ'}>
+              <SelectRoot onValueChange={(value: any) => setValue('type', value)} defaultValue={initialData?.type || 'MCQ'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -103,14 +103,14 @@ export function QuestionForm({ initialData, subjects = [] }: QuestionFormProps) 
                   <SelectItem value="LONG_ANSWER">Long Answer</SelectItem>
                   <SelectItem value="FILL_BLANK">Fill in the Blank</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Difficulty *</label>
-              <Select onValueChange={(value: any) => setValue('difficulty', value)} defaultValue={initialData?.difficulty || 'MEDIUM'}>
+              <SelectRoot onValueChange={(value: any) => setValue('difficulty', value)} defaultValue={initialData?.difficulty || 'MEDIUM'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select difficulty" />
                 </SelectTrigger>
@@ -119,7 +119,7 @@ export function QuestionForm({ initialData, subjects = [] }: QuestionFormProps) 
                   <SelectItem value="MEDIUM">Medium</SelectItem>
                   <SelectItem value="HARD">Hard</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
 
             <div className="space-y-2">

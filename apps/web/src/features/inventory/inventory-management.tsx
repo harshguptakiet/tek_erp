@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Package,
@@ -408,7 +408,7 @@ export function InventoryManagement() {
                 className="pl-10"
               />
             </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectRoot value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -420,7 +420,7 @@ export function InventoryManagement() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </SelectRoot>
             <div className="flex gap-2">
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-2" />
@@ -490,7 +490,7 @@ export function InventoryManagement() {
 
               <div>
                 <Label htmlFor="category">Category *</Label>
-                <Select
+                <SelectRoot
                   value={form.watch('category')}
                   onValueChange={(value) => form.setValue('category', value)}
                 >
@@ -504,7 +504,7 @@ export function InventoryManagement() {
                       </SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                </SelectRoot>
                 {form.formState.errors.category && (
                   <p className="text-sm text-red-600 mt-1">{form.formState.errors.category.message}</p>
                 )}

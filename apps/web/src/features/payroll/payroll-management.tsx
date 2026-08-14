@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   DollarSign,
@@ -420,7 +420,7 @@ export function PayrollManagement() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             <div className="flex flex-wrap gap-4">
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectRoot value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select Month" />
                 </SelectTrigger>
@@ -432,9 +432,9 @@ export function PayrollManagement() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
 
-              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectRoot value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Select Year" />
                 </SelectTrigger>
@@ -444,9 +444,9 @@ export function PayrollManagement() {
                   <SelectItem value="2026">2026</SelectItem>
                   <SelectItem value="2027">2027</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
 
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectRoot value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -456,7 +456,7 @@ export function PayrollManagement() {
                   <SelectItem value="PROCESSED">Processed</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
 
             <div className="flex gap-2">

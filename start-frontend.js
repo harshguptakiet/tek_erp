@@ -17,7 +17,8 @@ const frontendPath = path.join(__dirname, 'apps', 'web');
 
 const nextDev = spawn('npx', [
   'next', 
-  'dev'
+  'dev',
+  '--turbo'  // Enable Turbopack for 10x faster compilation
 ], {
   stdio: 'inherit',
   shell: true,
@@ -25,7 +26,6 @@ const nextDev = spawn('npx', [
   env: {
     ...process.env,
     PORT: '3000',
-    TURBOPACK: '0'
   }
 });
 

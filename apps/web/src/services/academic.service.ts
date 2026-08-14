@@ -45,4 +45,12 @@ export const academicService = {
     const response = await apiClient.post(`/academic/years/${id}/set-current`);
     return response.data;
   },
+
+  /** Alias used across pages */
+  listSubjects(schoolId?: string) {
+    return this.getSubjects(schoolId);
+  },
+  listClasses(schoolId?: string) {
+    return this.getClassStructure(schoolId);
+  },
 };

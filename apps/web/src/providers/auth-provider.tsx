@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setLoading, setAccessToken, logout } = useAuthStore();
 
   useEffect(() => {
-    // Check authentication status on mount
+    // Check authentication status on mount only
     const checkAuth = async () => {
       try {
         setLoading(true);
@@ -77,7 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('auth:logout', handleLogout);
     };
-  }, [pathname, router, setUser, setLoading, setAccessToken, logout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   return <>{children}</>;
 }

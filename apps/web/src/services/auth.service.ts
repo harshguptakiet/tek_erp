@@ -216,9 +216,13 @@ export const authService = {
   /**
    * Get active sessions
    */
-  async getSessions(): Promise<any[]> {
+  async getSessions(): Promise<{ sessions: any[]; currentSessionId?: string }> {
     const response = await apiClient.get('/auth/sessions');
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return { sessions: data };
+    }
+    return data;
   },
 
   /**
@@ -226,16 +230,50 @@ export const authService = {
    */
   async getLoginHistory(params?: { page?: number; limit?: number }): Promise<{ history: any[] }> {
     const response = await apiClient.get('/auth/login-history', { params });
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return { history: data };
+    }
+    return data;
   },
 
   /**
    * Get 2FA backup codes
    */
-  async getBackupCodes(): Promise<{ backupCodes: string[] }> {
+  async getBackupCodes(): Promise<{ codes: Array<{ code: string; used: boolean }>; remaining: number; backupCodes?: string[] }> {
     const response = await apiClient.get('/auth/2fa/backup-codes');
+    const data = response.data as { backupCodes?: string[]; codes?: Array<{ code: string; used: boolean }>; remaining?: number };
+    if (data.codes) {
+      return {
+        codes: data.codes,
+        remaining: data.remaining ?? data.codes.filter((c) => !c.used).length,
+        backupCodes: data.codes.map((c) => c.code),
+      };
+    }
+    const codes = (data.backupCodes ?? []).map((code) => ({ code, used: false }));
+    return {
+      codes,
+      backupCodes: data.backupCodes,
+      remaining: codes.length,
+    };
+  },
+
+  /**
+   * Regenerate backup codes
+   */
+  async regenerateBackupCodes(password?: string): Promise<{ backupCodes: string[] }> {
+    const response = await apiClient.post('/auth/2fa/backup-codes/regenerate', { password: password ?? '' });
     return response.data;
   },
+
+  /** Aliases for page compatibility */
+  registerPhone: async (data: RegisterDto & { phone: string }) =>
+    authService.register({ ...data, phone: data.phone }),
+  verifyPhoneOTP: async (phone: string, otp: string) => {
+    const response = await apiClient.post('/auth/verify-otp', { phone, otp });
+    return response.data;
+  },
+  resendVerificationEmail: async (email: string) => authService.resendVerification(email),
 
   /**
    * Check password expiry status

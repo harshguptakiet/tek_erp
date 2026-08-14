@@ -35,136 +35,136 @@ export function usePermissions(): Permission[] {
 
 /**
  * Get default permissions for a role
+ * Cached to avoid recreating arrays on every call
  */
+const ROLE_PERMISSIONS_CACHE: Record<string, Permission[]> = {
+  // ========== ADMINS (Full Access) ==========
+  'PLATFORM_ADMIN': ['*'] as Permission[],
+  'ORG_ADMIN': ['*'] as Permission[],
+  'SCHOOL_ADMIN': [
+    // Students & Parents
+    'students:view', 'students:create', 'students:update', 'students:delete', 'students:manage',
+    'parents:view', 'parents:create', 'parents:update', 'parents:edit', 'parents:read',
+    
+    // Teachers & Staff
+    'teachers:view', 'teachers:create', 'teachers:update', 'teachers:delete',
+    
+    // Academic
+    'academic:view', 'academic:manage',
+    'classes:view', 'classes:create', 'classes:update', 'classes:delete',
+    'subjects:view', 'subjects:create', 'subjects:update', 'subjects:delete',
+    
+    // Attendance & Exams
+    'attendance:view', 'attendance:mark', 'attendance:edit',
+    'exams:view', 'exams:create', 'exams:grade', 'exams:manage',
+    'assignments:view', 'assignments:create', 'assignments:grade',
+    
+    // Content & Classes
+    'content:view', 'content:create', 'content:upload', 'content:edit', 'content:delete', 'content:manage',
+    'live-classes:view', 'live-classes:create', 'live-classes:update', 'live-classes:manage',
+    
+    // Finance
+    'fees:view', 'fees:manage', 'fees:collect',
+    
+    // Reports & Analytics
+    'reports:view', 'reports:generate',
+    'analytics:view', 'analytics:read',
+    
+    // Operations
+    'timetable:create', 'timetable:update',
+    'transport:view', 'transport:manage',
+    'hostel:view', 'hostel:manage',
+    'library:view', 'library:manage',
+    'inventory:view', 'inventory:manage', 'inventory:create', 'inventory:update', 'inventory:delete',
+    'payroll:view', 'payroll:manage', 'payroll:process', 'payroll:approve',
+    
+    // Admin
+    'organization:update', 'org:settings', 'system:settings', 'admin:access', 'settings:manage', 'users:manage',
+    'certificates:generate', 'id-cards:generate',
+    'events:create', 'events:manage', 'ptm:manage',
+    'messages:read',
+  ],
+  
+  // ========== TEACHER (Teaching & Class Management) ==========
+  'TEACHER': [
+    // Can view students in their classes
+    'students:view',
+    
+    // Can view classes they teach
+    'classes:view',
+    'subjects:view',
+    
+    // Attendance for their classes
+    'attendance:view', 'attendance:mark',
+    
+    // Exams & Grading
+    'exams:view', 'exams:grade',
+    'assignments:view', 'assignments:create', 'assignments:grade',
+    
+    // Content creation
+    'content:view', 'content:create', 'content:upload',
+    
+    // Live classes
+    'live-classes:view', 'live-classes:create',
+    
+    // Communication
+    'messages:read',
+    
+    // Can view timetable
+    'academic:view',
+  ],
+  
+  // ========== STUDENT (Learning & Submissions) ==========
+  'STUDENT': [
+    // View own data
+    'attendance:view',
+    'exams:view',
+    
+    // Assignments
+    'assignments:view', 'assignments:submit',
+    
+    // Content access
+    'content:view',
+    
+    // Classes
+    'live-classes:view',
+    'academic:view',
+    
+    // Fees
+    'fees:view', 'fees:pay',
+    
+    // Communication
+    'messages:read',
+  ],
+  
+  // ========== PARENT (Child Monitoring & Payment) ==========
+  'PARENT': [
+    // View children's data
+    'students:view',
+    'parents:view',
+    
+    // Monitor progress
+    'attendance:view',
+    'exams:view',
+    'assignments:view',
+    'academic:view',
+    
+    // Fees & Payments
+    'fees:view', 'fees:pay',
+    
+    // Reports
+    'reports:view',
+    'analytics:read',
+    
+    // Communication  
+    'messages:read',
+    'ptm:manage', // Parent-teacher meetings
+  ],
+};
+
 function getRolePermissions(role: string | undefined): Permission[] {
   if (!role) return [];
-  
-  const rolePermissions: Record<string, Permission[]> = {
-    // ========== ADMINS (Full Access) ==========
-    'PLATFORM_ADMIN': ['*'] as Permission[],
-    'ORG_ADMIN': ['*'] as Permission[],
-    'SCHOOL_ADMIN': [
-      // Students & Parents
-      'students:view', 'students:create', 'students:update', 'students:delete', 'students:manage',
-      'parents:view', 'parents:create', 'parents:update', 'parents:edit', 'parents:read',
-      
-      // Teachers & Staff
-      'teachers:view', 'teachers:create', 'teachers:update', 'teachers:delete',
-      
-      // Academic
-      'academic:view', 'academic:manage',
-      'classes:view', 'classes:create', 'classes:update', 'classes:delete',
-      'subjects:view', 'subjects:create', 'subjects:update', 'subjects:delete',
-      
-      // Attendance & Exams
-      'attendance:view', 'attendance:mark', 'attendance:edit',
-      'exams:view', 'exams:create', 'exams:grade', 'exams:manage',
-      'assignments:view', 'assignments:create', 'assignments:grade',
-      
-      // Content & Classes
-      'content:view', 'content:create', 'content:upload', 'content:edit', 'content:delete', 'content:manage',
-      'live-classes:view', 'live-classes:create', 'live-classes:update', 'live-classes:manage',
-      
-      // Finance
-      'fees:view', 'fees:manage', 'fees:collect',
-      
-      // Reports & Analytics
-      'reports:view', 'reports:generate',
-      'analytics:view', 'analytics:read',
-      
-      // Operations
-      'timetable:create', 'timetable:update',
-      'transport:view', 'transport:manage',
-      'hostel:view', 'hostel:manage',
-      'library:view', 'library:manage',
-      'inventory:view', 'inventory:manage', 'inventory:create', 'inventory:update', 'inventory:delete',
-      'payroll:view', 'payroll:manage', 'payroll:process', 'payroll:approve',
-      
-      // Admin
-      'organization:update', 'org:settings', 'system:settings', 'admin:access', 'settings:manage', 'users:manage',
-      'certificates:generate', 'id-cards:generate',
-      'events:create', 'events:manage', 'ptm:manage',
-      'messages:read',
-    ],
-    
-    // ========== TEACHER (Teaching & Class Management) ==========
-    'TEACHER': [
-      // Can view students in their classes
-      'students:view',
-      
-      // Can view classes they teach
-      'classes:view',
-      'subjects:view',
-      
-      // Attendance for their classes
-      'attendance:view', 'attendance:mark',
-      
-      // Exams & Grading
-      'exams:view', 'exams:grade',
-      'assignments:view', 'assignments:create', 'assignments:grade',
-      
-      // Content creation
-      'content:view', 'content:create', 'content:upload',
-      
-      // Live classes
-      'live-classes:view', 'live-classes:create',
-      
-      // Communication
-      'messages:read',
-      
-      // Can view timetable
-      'academic:view',
-    ],
-    
-    // ========== STUDENT (Learning & Submissions) ==========
-    'STUDENT': [
-      // View own data
-      'attendance:view',
-      'exams:view',
-      
-      // Assignments
-      'assignments:view', 'assignments:submit',
-      
-      // Content access
-      'content:view',
-      
-      // Classes
-      'live-classes:view',
-      'academic:view',
-      
-      // Fees
-      'fees:view', 'fees:pay',
-      
-      // Communication
-      'messages:read',
-    ],
-    
-    // ========== PARENT (Child Monitoring & Payment) ==========
-    'PARENT': [
-      // View children's data
-      'students:view',
-      'parents:view',
-      
-      // Monitor progress
-      'attendance:view',
-      'exams:view',
-      'assignments:view',
-      'academic:view',
-      
-      // Fees & Payments
-      'fees:view', 'fees:pay',
-      
-      // Reports
-      'reports:view',
-      'analytics:read',
-      
-      // Communication  
-      'messages:read',
-      'ptm:manage', // Parent-teacher meetings
-    ],
-  };
-  
-  return rolePermissions[role] || [];
+  return ROLE_PERMISSIONS_CACHE[role] || [];
 }
 
 /**

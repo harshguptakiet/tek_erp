@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -171,7 +171,7 @@ export function LiveTrackingMap() {
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <Select value={selectedBusId || ''} onValueChange={setSelectedBusId}>
+              <SelectRoot value={selectedBusId || ''} onValueChange={setSelectedBusId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a bus to track" />
                 </SelectTrigger>
@@ -182,7 +182,7 @@ export function LiveTrackingMap() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </SelectRoot>
             </div>
 
             <Button
@@ -203,7 +203,7 @@ export function LiveTrackingMap() {
               {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
             </Button>
 
-            <Select value={mapView} onValueChange={(v: any) => setMapView(v)}>
+            <SelectRoot value={mapView} onValueChange={(v: any) => setMapView(v)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue />
               </SelectTrigger>
@@ -211,7 +211,7 @@ export function LiveTrackingMap() {
                 <SelectItem value="standard">Standard</SelectItem>
                 <SelectItem value="satellite">Satellite</SelectItem>
               </SelectContent>
-            </Select>
+            </SelectRoot>
           </div>
         </CardContent>
       </Card>

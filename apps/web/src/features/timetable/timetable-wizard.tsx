@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
-  Select,
+  SelectRoot,
   SelectContent,
   SelectItem,
   SelectTrigger,
@@ -183,7 +183,7 @@ export function TimetableWizard({
                   <label className="text-sm font-medium">
                     Class <span className="text-red-500">*</span>
                   </label>
-                  <Select onValueChange={(value) => setValue('classId', value)}>
+                  <SelectRoot onValueChange={(value) => setValue('classId', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
@@ -194,7 +194,7 @@ export function TimetableWizard({
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                   {errors.classId && (
                     <p className="text-sm text-red-500">{errors.classId.message}</p>
                   )}
@@ -202,7 +202,7 @@ export function TimetableWizard({
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Section</label>
-                  <Select onValueChange={(value) => setValue('sectionId', value)}>
+                  <SelectRoot onValueChange={(value) => setValue('sectionId', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
@@ -213,7 +213,7 @@ export function TimetableWizard({
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                 </div>
               </div>
 
@@ -221,7 +221,7 @@ export function TimetableWizard({
                 <label className="text-sm font-medium">
                   Academic Year <span className="text-red-500">*</span>
                 </label>
-                <Select onValueChange={(value) => setValue('academicYearId', value)}>
+                <SelectRoot onValueChange={(value) => setValue('academicYearId', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select academic year" />
                   </SelectTrigger>
@@ -232,7 +232,7 @@ export function TimetableWizard({
                       </SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                </SelectRoot>
                 {errors.academicYearId && (
                   <p className="text-sm text-red-500">{errors.academicYearId.message}</p>
                 )}

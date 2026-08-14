@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Download, CreditCard, Printer, QrCode } from 'lucide-react';
 
@@ -95,7 +95,7 @@ export function IDCardGenerator() {
               <div className="flex items-center justify-between">
                 <CardTitle>Student ID Cards</CardTitle>
                 <div className="flex items-center gap-4">
-                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <SelectRoot value={selectedClass} onValueChange={setSelectedClass}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -105,7 +105,7 @@ export function IDCardGenerator() {
                       <SelectItem value="10-B">Class 10-B</SelectItem>
                       <SelectItem value="11-A">Class 11-A</SelectItem>
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                   <Button
                     onClick={selectAll}
                     variant="outline"

@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectRoot, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Award, FileText, Search, Plus } from 'lucide-react';
 
@@ -116,7 +116,7 @@ export function CertificateGenerator() {
                 <form onSubmit={form.handleSubmit(handleGenerate)} className="space-y-4">
                   <div>
                     <Label htmlFor="studentId">Student *</Label>
-                    <Select
+                    <SelectRoot
                       value={form.watch('studentId')}
                       onValueChange={(value) => form.setValue('studentId', value)}
                     >
@@ -128,12 +128,12 @@ export function CertificateGenerator() {
                         <SelectItem value="S002">Priya Sharma - Class 12-B</SelectItem>
                         <SelectItem value="S003">Amit Singh - Class 9-C</SelectItem>
                       </SelectContent>
-                    </Select>
+                    </SelectRoot>
                   </div>
 
                   <div>
                     <Label htmlFor="type">Certificate Type *</Label>
-                    <Select
+                    <SelectRoot
                       value={form.watch('type')}
                       onValueChange={(value) => form.setValue('type', value)}
                     >
@@ -147,7 +147,7 @@ export function CertificateGenerator() {
                           </SelectItem>
                         ))}
                       </SelectContent>
-                    </Select>
+                    </SelectRoot>
                   </div>
 
                   <div>

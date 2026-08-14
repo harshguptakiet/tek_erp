@@ -13,6 +13,10 @@ export interface DashboardStats {
   childrenCount?: number;
   feeCollected?: number;
   pendingFees?: number;
+  stats?: Record<string, number | string>;
+  trends?: Array<{ label: string; value: number; change?: number }>;
+  topPerformers?: Array<{ id: string; name: string; score: number; class?: string }>;
+  recentActivity?: Array<{ id: string; action: string; timestamp: string; user?: string }>;
 }
 
 export const analyticsService = {
@@ -90,5 +94,19 @@ export const analyticsService = {
       responseType: 'blob',
     });
     return response.data;
+  },
+
+  /** Aliases used across dashboard pages */
+  getSystemOverview: async () => analyticsService.getDashboardOverview(),
+
+  getStudentAchievements: async (studentId?: string) => {
+    try {
+      const response = await apiClient.get('/analytics/achievements', {
+        params: studentId ? { studentId } : undefined,
+      });
+      return response.data;
+    } catch {
+      return { achievements: [], leaderboard: [] };
+    }
   },
 };

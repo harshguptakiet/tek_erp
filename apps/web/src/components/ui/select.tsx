@@ -1,5 +1,5 @@
 /**
- * Select Component - Dropdown selection component
+ * Select components — native HTML select + Radix UI primitives
  */
 
 'use client';
@@ -9,7 +9,40 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const Select = SelectPrimitive.Root;
+// ─── Native HTML Select (used by most list/filter pages) ───────────────────
+
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  error?: string;
+}
+
+const NativeSelect = React.forwardRef<HTMLSelectElement, SelectProps>(
+  ({ className, error, children, ...props }, ref) => (
+    <div className="w-full">
+      <select
+        ref={ref}
+        className={cn(
+          'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
+          'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          error && 'border-red-500 focus:ring-red-500',
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </select>
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+    </div>
+  )
+);
+NativeSelect.displayName = 'Select';
+
+/** Default export for pages using `<Select><option /></Select>` */
+export { NativeSelect as Select };
+
+// ─── Radix UI Select (used by feature forms) ────────────────────────────────
+
+const SelectRoot = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
@@ -92,4 +125,11 @@ const SelectItem = React.forwardRef<
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;
 
-export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectItem };
+export {
+  SelectRoot,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+};

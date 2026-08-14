@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
+  SelectRoot,
   SelectContent,
   SelectItem,
   SelectTrigger,
@@ -190,7 +190,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                   <label className="text-sm font-medium">
                     Content Type <span className="text-red-500">*</span>
                   </label>
-                  <Select
+                  <SelectRoot
                     onValueChange={(value) => setValue('contentType', value as any)}
                   >
                     <SelectTrigger>
@@ -203,7 +203,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                       <SelectItem value="AUDIO">Audio</SelectItem>
                       <SelectItem value="DOCUMENT">Document</SelectItem>
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                   {errors.contentType && (
                     <p className="text-sm text-red-500">{errors.contentType.message}</p>
                   )}
@@ -213,7 +213,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                   <label className="text-sm font-medium">
                     Subject <span className="text-red-500">*</span>
                   </label>
-                  <Select
+                  <SelectRoot
                     onValueChange={(value) => setValue('subjectId', value)}
                   >
                     <SelectTrigger>
@@ -226,7 +226,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                   {errors.subjectId && (
                     <p className="text-sm text-red-500">{errors.subjectId.message}</p>
                   )}
@@ -236,7 +236,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                   <label className="text-sm font-medium">
                     Class <span className="text-red-500">*</span>
                   </label>
-                  <Select
+                  <SelectRoot
                     onValueChange={(value) => setValue('classId', value)}
                   >
                     <SelectTrigger>
@@ -249,7 +249,7 @@ export function ContentUploader({ subjects = [], classes = [], onSuccess }: Cont
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
+                  </SelectRoot>
                   {errors.classId && (
                     <p className="text-sm text-red-500">{errors.classId.message}</p>
                   )}
