@@ -1,0 +1,78 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/21-erp-payroll-hr.dbml
+  %% Tables: 4
+  %% Internal relationships: 0
+  %% Table: payroll_structures
+  payroll_structures {
+    String id PK
+    String schoolId
+    String organizationId
+    String structureName
+    String designation
+    Decimal basicSalary
+    Json allowances
+    Json deductions
+    Decimal grossSalary
+    Decimal netSalary
+    DateTime effectiveFrom
+    DateTime effectiveTo
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: employee_salaries
+  employee_salaries {
+    String id PK
+    String employeeId
+    String employeeType
+    String payrollStructureId
+    String monthYear
+    Int workingDays
+    Int presentDays
+    Decimal basicSalary
+    Json allowances
+    Json bonuses
+    Json deductions
+    Json penalties
+    Decimal grossSalary
+    Decimal netSalary
+    String status
+    String approvedBy
+    DateTime approvedAt
+    DateTime paidOn
+    String paymentMethod
+    String transactionId
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: payroll_advances
+  payroll_advances {
+    String id PK
+    String employeeId
+    Decimal advanceAmount
+    String reason
+    DateTime requestedAt
+    DateTime approvedAt
+    String approvedBy
+    String status
+    DateTime disbursedAt
+    Decimal disbursedAmount
+    String repaymentMode
+    Int installments
+    Decimal installmentAmount
+    Decimal balanceAmount
+  }
+  %% Table: leave_balances
+  leave_balances {
+    String id PK
+    String employeeId
+    String employeeType
+    String leaveType
+    Int totalLeaves
+    Int usedLeaves
+    Int balanceLeaves
+    Int year
+  }
+
+  %% No internal relationships in this module

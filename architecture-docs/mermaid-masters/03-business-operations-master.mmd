@@ -1,0 +1,96 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Master view: fees, payments, subscriptions, commerce, logistics, ops
+  fee_structures {
+    string id PK
+    string schoolId
+  }
+  fee_records {
+    string id PK
+    string feeStructureId
+  }
+  fee_payments {
+    string id PK
+    string feeRecordId
+  }
+  subscriptions {
+    string id PK
+    string userId
+  }
+  payments {
+    string id PK
+    string userId
+  }
+  invoices {
+    string id PK
+    string paymentId
+  }
+  marketplace_products {
+    string id PK
+    string sellerId
+  }
+  marketplace_orders {
+    string id PK
+    string buyerId
+  }
+  hostel_blocks {
+    string id PK
+    string organizationId
+  }
+  hostel_rooms {
+    string id PK
+    string blockId
+  }
+  transport_routes {
+    string id PK
+    string organizationId
+  }
+  transport_vehicles {
+    string id PK
+    string routeId
+  }
+  inventory_categories {
+    string id PK
+    string name
+  }
+  inventory_items {
+    string id PK
+    string categoryId
+  }
+  payroll_structures {
+    string id PK
+    string organizationId
+  }
+  employee_salaries {
+    string id PK
+    string payrollStructureId
+  }
+  analytics_snapshots {
+    string id PK
+    string organizationId
+  }
+  integrations {
+    string id PK
+    string organizationId
+  }
+  webhooks {
+    string id PK
+    string integrationId
+  }
+  background_jobs {
+    string id PK
+    string organizationId
+  }
+
+  fee_structures ||--o{ fee_records : creates
+  fee_records ||--o{ fee_payments : paid_by
+  subscriptions ||--o{ payments : bills
+  payments ||--o{ invoices : generates
+  marketplace_orders ||--o{ marketplace_products : purchases
+  hostel_blocks ||--o{ hostel_rooms : contains
+  transport_routes ||--o{ transport_vehicles : runs
+  inventory_categories ||--o{ inventory_items : groups
+  payroll_structures ||--o{ employee_salaries : defines
+  integrations ||--o{ webhooks : exposes
+  integrations ||--o{ analytics_snapshots : feeds
+  background_jobs ||--o{ analytics_snapshots : processes

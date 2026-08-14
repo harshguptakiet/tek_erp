@@ -1,0 +1,170 @@
+//// ======================================================
+//// EVENTS & WORKFLOWS
+//// Module: 33-events-workflows
+//// Category: Infrastructure
+//// Tables: 9
+//// ======================================================
+
+Enum EventType {
+  USER_CREATED
+  USER_UPDATED
+  STUDENT_ENROLLED
+  ASSIGNMENT_SUBMITTED
+  EXAM_COMPLETED
+  PAYMENT_RECEIVED
+  FEE_OVERDUE
+  ATTENDANCE_MARKED
+  CONTENT_PUBLISHED
+  NOTIFICATION_SENT
+  INTEGRATION_SYNC
+  CUSTOM
+}
+
+Table domain_events [headercolor: #7F8C8D] {
+  id String [pk]
+  eventType EventType [not null]
+  eventName String [not null]
+  aggregateType String [not null]
+  aggregateId String [not null]
+  payload Json [not null]
+  userId String
+  tenantId String
+  organizationId String
+  occurredAt DateTime [default: `now()`, not null]
+  isProcessed Boolean [not null, default: false]
+  processedAt DateTime
+}
+
+Table integration_events [headercolor: #7F8C8D] {
+  id String [pk]
+  eventType String [not null]
+  targetSystem String [not null]
+  payload Json [not null]
+  status String [not null, default: 'PENDING']
+  attempts Int [not null, default: 0]
+  maxAttempts Int [not null, default: 3]
+  lastAttemptAt DateTime
+  sentAt DateTime
+  error String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table event_subscriptions [headercolor: #7F8C8D] {
+  id String [pk]
+  subscriberName String [not null]
+  eventType String [not null]
+  endpoint String
+  subscriptionType String [not null]
+  filters Json
+  isActive Boolean [not null, default: true]
+  retryPolicy Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  retries event_retries [not null]
+}
+
+Table event_retries [headercolor: #7F8C8D] {
+  id String [pk]
+  subscriptionId String [not null]
+  eventId String [not null]
+  eventType String [not null]
+  payload Json [not null]
+  attemptNumber Int [not null, default: 1]
+  maxAttempts Int [not null, default: 3]
+  status String [not null, default: 'PENDING']
+  lastError String
+  nextRetryAt DateTime
+  lastAttemptAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  subscription event_subscriptions [not null]
+}
+
+Table event_failures [headercolor: #7F8C8D] {
+  id String [pk]
+  eventId String [not null]
+  eventType String [not null]
+  subscriptionId String
+  payload Json [not null]
+  failureReason String [not null]
+  errorDetails Json
+  attempts Int [not null]
+  failedAt DateTime [default: `now()`, not null]
+  isResolved Boolean [not null, default: false]
+  resolvedAt DateTime
+  resolvedBy String
+}
+
+Table workflow_definitions [headercolor: #7F8C8D] {
+  id String [pk]
+  name String [not null]
+  workflowType String [not null]
+  entityType String [not null]
+  steps Json [not null]
+  isActive Boolean [not null, default: true]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  instances workflow_instances [not null]
+}
+
+Table workflow_instances [headercolor: #7F8C8D] {
+  id String [pk]
+  definitionId String [not null]
+  entityType String [not null]
+  entityId String [not null]
+  currentStep Int [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  stepHistory Json [not null]
+  definition workflow_definitions [not null]
+}
+
+Table approvals [headercolor: #7F8C8D] {
+  id String [pk]
+  requestType String [not null]
+  requestId String [not null]
+  requestedBy String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  currentApproverId String
+  currentLevel Int [not null, default: 1]
+  status String [not null, default: 'PENDING']
+  priority String [not null, default: 'NORMAL']
+  dueDate DateTime
+  approvalChain Json [not null]
+  completedAt DateTime
+}
+
+Table approval_history [headercolor: #7F8C8D] {
+  id String [pk]
+  approvalId String [not null]
+  level Int [not null]
+  approverId String [not null]
+  action String [not null]
+  comments String
+  attachments String[] [not null]
+  actionedAt DateTime [default: `now()`, not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: event_retries.subscriptionId > event_subscriptions.id [delete: Cascade]
+Ref: workflow_instances.definitionId > workflow_definitions.id
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 9
+//// Internal Relationships: 2
+//// Cross-Module References: 0
+//// Color: #7F8C8D
+//// Category: Infrastructure
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

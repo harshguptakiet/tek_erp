@@ -1,0 +1,5188 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table users {
+  id String [pk]
+  email String [unique]
+  phone String [unique]
+  aadhaarLast4 String
+  username String [unique]
+  passwordHash String
+  firstName String [not null]
+  lastName String [not null]
+  middleName String
+  dateOfBirth DateTime
+  gender String
+  profileImage String
+  role SystemRole [not null]
+  status UserStatus [not null, default: 'PENDING_VERIFICATION']
+  authProvider AuthProvider [not null, default: 'LOCAL']
+  twoFactorEnabled Boolean [not null, default: false]
+  twoFactorSecret String
+  passwordExpiry DateTime
+  lastPasswordChange DateTime
+  emailVerified Boolean [not null, default: false]
+  phoneVerified Boolean [not null, default: false]
+  lastLogin DateTime
+  failedLoginAttempts Int [not null, default: 0]
+  lockedUntil DateTime
+  tenantId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  userSessions user_sessions [not null]
+  userRoles user_role_mappings [not null]
+  userRolesNew user_roles [not null]
+  customPermissions custom_permissions [not null]
+  organizations organization_users [not null]
+  studentProfile student_profiles
+  teacherProfile teacher_profiles
+  parentProfile parent_profiles
+  publisherProfile publisher_profiles
+  creatorProfile creator_profiles
+  auditLogs audit_logs [not null]
+  notifications notifications [not null]
+  messages messages [not null]
+}
+
+Table user_sessions {
+  id String [pk]
+  userId String [not null]
+  token String [unique, not null]
+  refreshToken String [unique]
+  deviceInfo Json
+  ipAddress String
+  userAgent String
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  lastActivity DateTime [default: `now()`, not null]
+  user users [not null]
+}
+
+Table custom_roles {
+  id String [pk]
+  name String [not null]
+  description String
+  organizationId String
+  isSystemRole Boolean [not null, default: false]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  permissions custom_permissions [not null]
+  users user_role_mappings [not null]
+  organization organizations
+
+  indexes {
+    (name, organizationId) [unique]
+  }
+}
+
+Table custom_permissions {
+  id String [pk]
+  roleId String [not null]
+  userId String
+  resource String [not null]
+  action String [not null]
+  conditions Json
+  createdAt DateTime [default: `now()`, not null]
+  role custom_roles [not null]
+  user users
+}
+
+Table user_role_mappings {
+  id String [pk]
+  userId String [not null]
+  roleId String [not null]
+  organizationId String
+  assignedAt DateTime [default: `now()`, not null]
+  assignedBy String
+  user users [not null]
+  role custom_roles [not null]
+  organization organizations
+
+  indexes {
+    (userId, roleId, organizationId) [unique]
+  }
+}
+
+Table roles {
+  id String [pk]
+  name String [not null]
+  displayName String [not null]
+  description String
+  organizationId String
+  isSystemRole Boolean [not null, default: false]
+  isActive Boolean [not null, default: true]
+  priority Int [not null, default: 100]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations
+  permissions role_permissions [not null]
+  userRoles user_roles [not null]
+  childRoles role_inheritances [not null]
+  parentRoles role_inheritances [not null]
+
+  indexes {
+    (name, organizationId) [unique]
+  }
+}
+
+Table permission_categories {
+  id String [pk]
+  name String [unique, not null]
+  displayName String [not null]
+  description String
+  sortOrder Int [not null, default: 0]
+  permissions permissions [not null]
+}
+
+Table permission_groups {
+  id String [pk]
+  name String [unique, not null]
+  displayName String [not null]
+  description String
+  categoryId String
+  sortOrder Int [not null, default: 0]
+  permissions permissions [not null]
+}
+
+Table permissions {
+  id String [pk]
+  name String [unique, not null]
+  displayName String [not null]
+  description String
+  categoryId String
+  groupId String
+  resource String [not null]
+  action String [not null]
+  scope String [not null, default: 'ORGANIZATION']
+  isSystemPermission Boolean [not null, default: false]
+  isActive Boolean [not null, default: true]
+  riskLevel String [not null, default: 'LOW']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  category permission_categories
+  group permission_groups
+  rolePermissions role_permissions [not null]
+  dependencies permission_dependencies [not null]
+  dependents permission_dependencies [not null]
+}
+
+Table role_permissions {
+  id String [pk]
+  roleId String [not null]
+  permissionId String [not null]
+  conditions Json
+  grantedAt DateTime [default: `now()`, not null]
+  grantedBy String
+  role roles [not null]
+  permission permissions [not null]
+
+  indexes {
+    (roleId, permissionId) [unique]
+  }
+}
+
+Table permission_dependencies {
+  id String [pk]
+  permissionId String [not null]
+  requiredPermissionId String [not null]
+  isStrict Boolean [not null, default: true]
+  permission permissions [not null]
+  requiredPermission permissions [not null]
+
+  indexes {
+    (permissionId, requiredPermissionId) [unique]
+  }
+}
+
+Table role_inheritances {
+  id String [pk]
+  parentRoleId String [not null]
+  childRoleId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  parentRole roles [not null]
+  childRole roles [not null]
+
+  indexes {
+    (parentRoleId, childRoleId) [unique]
+  }
+}
+
+Table user_roles {
+  id String [pk]
+  userId String [not null]
+  roleId String [not null]
+  scopeType String
+  scopeId String
+  assignedAt DateTime [default: `now()`, not null]
+  assignedBy String
+  expiresAt DateTime
+  isActive Boolean [not null, default: true]
+  user users [not null]
+  role roles [not null]
+
+  indexes {
+    (userId, roleId, scopeType, scopeId) [unique]
+  }
+}
+
+Table user_authentications {
+  id String [pk]
+  userId String [unique, not null]
+  passwordHash String
+  passwordExpiry DateTime
+  lastPasswordChange DateTime
+  authProvider AuthProvider [not null, default: 'LOCAL']
+  googleId String [unique]
+  microsoftId String [unique]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table user_security {
+  id String [pk]
+  userId String [unique, not null]
+  twoFactorEnabled Boolean [not null, default: false]
+  twoFactorSecret String
+  failedLoginAttempts Int [not null, default: 0]
+  lockedUntil DateTime
+  passwordResetRequired Boolean [not null, default: false]
+  securityQuestions Json
+  trustedDevices String[] [not null]
+  lastSecurityAudit DateTime
+  updatedAt DateTime [not null]
+}
+
+Table user_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  firstName String [not null]
+  lastName String [not null]
+  middleName String
+  dateOfBirth DateTime
+  gender String
+  profileImage String
+  coverImage String
+  bio String
+  about String
+  bloodGroup String
+  nationality String
+  religion String
+  category String
+  fatherName String
+  motherName String
+  guardianName String
+  languages String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table user_contact_info {
+  id String [pk]
+  userId String [unique, not null]
+  email String [unique]
+  emailVerified Boolean [not null, default: false]
+  emailVerifiedAt DateTime
+  phone String [unique]
+  phoneVerified Boolean [not null, default: false]
+  phoneVerifiedAt DateTime
+  alternateEmail String
+  alternatePhone String
+  whatsappNumber String
+  emergencyContactName String
+  emergencyContactPhone String
+  emergencyContactRelation String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table user_verifications {
+  id String [pk]
+  userId String [unique, not null]
+  emailVerified Boolean [not null, default: false]
+  emailVerifiedAt DateTime
+  phoneVerified Boolean [not null, default: false]
+  phoneVerifiedAt DateTime
+  aadhaarVerified Boolean [not null, default: false]
+  aadhaarVerifiedAt DateTime
+  documentVerified Boolean [not null, default: false]
+  documentVerifiedAt DateTime
+  documentsSubmitted Json
+  verificationStatus String [not null, default: 'PENDING']
+  verifiedBy String
+  verificationNotes String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table user_login_history {
+  id String [pk]
+  userId String [not null]
+  loginAt DateTime [default: `now()`, not null]
+  logoutAt DateTime
+  ipAddress String
+  userAgent String
+  device String
+  browser String
+  os String
+  location Json
+  loginMethod String [not null, default: 'PASSWORD']
+  success Boolean [not null, default: true]
+  failureReason String
+  sessionId String
+}
+
+Table user_preferences {
+  id String [pk]
+  userId String [unique, not null]
+  language String [not null, default: 'en']
+  timezone String [not null, default: 'Asia/Kolkata']
+  dateFormat String [not null, default: 'DD/MM/YYYY']
+  timeFormat String [not null, default: '24h']
+  theme String [not null, default: 'light']
+  notificationSettings Json
+  privacySettings Json
+  contentPreferences Json
+  accessibility Json
+  updatedAt DateTime [not null]
+}
+
+Table user_sensitive_data {
+  id String [pk]
+  userId String [unique, not null]
+  aadhaarHash String [unique]
+  aadhaarEncrypted String
+  aadhaarMasked String
+  panNumber String
+  passportNumber String
+  bankAccountEncrypted Json
+  medicalConditions String[] [not null]
+  allergies String[] [not null]
+  encryptionKeyId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table countries {
+  id String [pk]
+  code String [unique, not null]
+  name String [not null]
+  phoneCode String
+  currency String
+  isActive Boolean [not null, default: true]
+  states states [not null]
+}
+
+Table states {
+  id String [pk]
+  countryId String [not null]
+  code String [not null]
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  country countries [not null]
+  districts districts [not null]
+
+  indexes {
+    (countryId, code) [unique]
+  }
+}
+
+Table districts {
+  id String [pk]
+  stateId String [not null]
+  code String [not null]
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  state states [not null]
+  blocks blocks [not null]
+
+  indexes {
+    (stateId, code) [unique]
+  }
+}
+
+Table blocks {
+  id String [pk]
+  districtId String [not null]
+  code String
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  district districts [not null]
+  villages villages [not null]
+}
+
+Table villages {
+  id String [pk]
+  blockId String [not null]
+  code String
+  name String [not null]
+  pincode String
+  isActive Boolean [not null, default: true]
+  block blocks [not null]
+}
+
+Table addresses {
+  id String [pk]
+  addressType String [not null]
+  line1 String [not null]
+  line2 String
+  landmark String
+  cityTown String [not null]
+  stateId String
+  districtId String
+  blockId String
+  villageId String
+  pincode String
+  countryId String [not null]
+  latitude Decimal
+  longitude Decimal
+  isPrimary Boolean [not null, default: false]
+  isVerified Boolean [not null, default: false]
+  entityType String [not null]
+  entityId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table tenant_hierarchy {
+  id String [pk]
+  level TenantLevel [not null]
+  parentId String
+  hierarchyPath String [not null]
+  hierarchyLevel Int [not null, default: 0]
+  entityType String [not null]
+  entityId String [not null]
+  name String [not null]
+  code String
+  isActive Boolean [not null, default: true]
+  parent tenant_hierarchy
+  children tenant_hierarchy [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (entityType, entityId) [unique]
+  }
+}
+
+Table government_entities {
+  id String [pk]
+  level String [not null]
+  name String [not null]
+  code String [unique]
+  countryId String
+  stateId String
+  districtId String
+  parentId String
+  tenantId String [unique, not null]
+  contactEmail String
+  contactPhone String
+  officerInCharge String
+  designation String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  parent government_entities
+  children government_entities [not null]
+}
+
+Table organizations {
+  id String [pk]
+  name String [not null]
+  legalName String
+  type OrganizationType [not null]
+  tier OrganizationTier [not null, default: 'BASIC']
+  registrationNumber String [unique]
+  taxId String
+  gstin String
+  email String
+  phone String
+  website String
+  countryId String
+  stateId String
+  districtId String
+  coordinates Json
+  logo String
+  banner String
+  brandingConfig Json
+  parentOrganizationId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  hierarchyLevel Int [not null, default: 0]
+  enabledModules String[] [not null]
+  customDomain String [unique]
+  maxSchools Int
+  maxStudents Int
+  maxTeachers Int
+  storageLimit Int
+  primaryContactName String
+  primaryContactEmail String
+  primaryContactPhone String
+  isActive Boolean [not null, default: true]
+  isTrial Boolean [not null, default: false]
+  trialEndsAt DateTime
+  onboardedAt DateTime [default: `now()`, not null]
+  onboardedBy String
+  dataResidency String
+  complianceFlags Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  parentOrganization organizations
+  childOrganizations organizations [not null]
+  branches branches [not null]
+  departments departments [not null]
+  users organization_users [not null]
+  customRoles custom_roles [not null]
+  userRoleMappings user_role_mappings [not null]
+  roles roles [not null]
+  schools schools [not null]
+  subscriptions subscriptions [not null]
+  licenses licenses [not null]
+}
+
+Table branches {
+  id String [pk]
+  organizationId String [not null]
+  name String [not null]
+  code String [not null]
+  branchType String [not null]
+  countryId String
+  stateId String
+  districtId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  headOfBranch String
+  contactEmail String
+  contactPhone String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations [not null]
+  departments departments [not null]
+  schools schools [not null]
+
+  indexes {
+    (organizationId, code) [unique]
+  }
+}
+
+Table departments {
+  id String [pk]
+  organizationId String [not null]
+  branchId String
+  name String [not null]
+  code String [not null]
+  departmentType String [not null]
+  parentDepartmentId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  headOfDepartment String
+  contactEmail String
+  contactPhone String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations [not null]
+  branch branches
+  parentDepartment departments
+  childDepartments departments [not null]
+
+  indexes {
+    (organizationId, code) [unique]
+  }
+}
+
+Table organization_users {
+  id String [pk]
+  organizationId String [not null]
+  userId String [not null]
+  designation String
+  department String
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  isActive Boolean [not null, default: true]
+  organization organizations [not null]
+  user users [not null]
+
+  indexes {
+    (organizationId, userId) [unique]
+  }
+}
+
+Table schools {
+  id String [pk]
+  organizationId String [not null]
+  branchId String
+  name String [not null]
+  code String [unique, not null]
+  udiseCode String [unique]
+  schoolType String
+  board Board
+  affiliationNumber String
+  recognitionNumber String
+  principalId String
+  vicePrincipalIds String[] [not null]
+  countryId String
+  stateId String
+  districtId String
+  blockId String
+  coordinates Json
+  tenantId String [unique, not null]
+  hierarchyPath String
+  email String
+  phone String
+  website String
+  totalCapacity Int
+  currentStrength Int [not null, default: 0]
+  facilities String[] [not null]
+  schoolTiming Json
+  isActive Boolean [not null, default: true]
+  accreditationStatus String
+  accreditationGrade String
+  establishedDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations [not null]
+  branch branches
+  academicYears academic_years [not null]
+  classes classes [not null]
+  students student_profiles [not null]
+  teachers teacher_profiles [not null]
+  rooms rooms [not null]
+  timeSlots time_slots [not null]
+  timetableEntries timetable_entries [not null]
+  attendance attendance [not null]
+  fees fee_structures [not null]
+  libraryBooks library_books [not null]
+  transportRoutes transport_routes [not null]
+  hostelBlocks hostel_blocks [not null]
+  events events [not null]
+}
+
+Table board_masters {
+  id String [pk]
+  code String [unique, not null]
+  name String [not null]
+  fullName String
+  country String [not null, default: 'IN']
+  stateCode String
+  website String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  curricula curricula [not null]
+}
+
+Table curricula {
+  id String [pk]
+  boardId String [not null]
+  name String [not null]
+  code String [unique, not null]
+  gradeRange Json [not null]
+  description String
+  isActive Boolean [not null, default: true]
+  effectiveFrom DateTime
+  effectiveTo DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  board board_masters [not null]
+  subjects curriculum_subjects [not null]
+}
+
+Table curriculum_subjects {
+  id String [pk]
+  curriculumId String [not null]
+  subjectId String [not null]
+  grade Int [not null]
+  isMandatory Boolean [not null, default: true]
+  isElective Boolean [not null, default: false]
+  credits Int
+  hoursPerWeek Int
+  curriculum curricula [not null]
+  subject subjects [not null]
+
+  indexes {
+    (curriculumId, subjectId, grade) [unique]
+  }
+}
+
+Table academic_years {
+  id String [pk]
+  schoolId String [not null]
+  year String [not null]
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  isCurrent Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  school schools [not null]
+  classes classes [not null]
+  enrollments student_enrollments [not null]
+
+  indexes {
+    (schoolId, year) [unique]
+  }
+}
+
+Table classes {
+  id String [pk]
+  schoolId String [not null]
+  academicYearId String [not null]
+  grade Int [not null]
+  gradeName String
+  stream String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  academicYear academic_years [not null]
+  sections sections [not null]
+  subjects class_subjects [not null]
+
+  indexes {
+    (schoolId, academicYearId, grade, stream) [unique]
+  }
+}
+
+Table sections {
+  id String [pk]
+  classId String [not null]
+  sectionName String [not null]
+  capacity Int
+  currentStrength Int [not null, default: 0]
+  classTeacherId String
+  roomNumber String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  class classes [not null]
+  enrollments student_enrollments [not null]
+  timetableEntries timetable_entries [not null]
+  sectionSubjects section_subjects [not null]
+  sectionTeachers section_teachers [not null]
+  assignments assignments [not null]
+  exams exams [not null]
+
+  indexes {
+    (classId, sectionName) [unique]
+  }
+}
+
+Table section_teachers {
+  id String [pk]
+  sectionId String [not null]
+  teacherId String [not null]
+  subjectId String
+  isPrimary Boolean [not null, default: false]
+  assignedAt DateTime [default: `now()`, not null]
+  assignedBy String
+  section sections [not null]
+
+  indexes {
+    (sectionId, teacherId, subjectId) [unique]
+  }
+}
+
+Table section_subjects {
+  id String [pk]
+  sectionId String [not null]
+  subjectId String [not null]
+  teacherId String
+  periodsPerWeek Int
+  isActive Boolean [not null, default: true]
+  section sections [not null]
+  subject subjects [not null]
+
+  indexes {
+    (sectionId, subjectId) [unique]
+  }
+}
+
+Table subjects {
+  id String [pk]
+  name String [not null]
+  code String [unique, not null]
+  description String
+  board Board
+  grade Int
+  isElective Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  classSubjects class_subjects [not null]
+  curriculumSubjects curriculum_subjects [not null]
+  sectionSubjects section_subjects [not null]
+  chapters chapters [not null]
+}
+
+Table class_subjects {
+  id String [pk]
+  classId String [not null]
+  subjectId String [not null]
+  teacherId String
+  isActive Boolean [not null, default: true]
+  class classes [not null]
+  subject subjects [not null]
+  teacher teacher_profiles
+
+  indexes {
+    (classId, subjectId) [unique]
+  }
+}
+
+Table student_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  schoolId String
+  rollNumber String
+  admissionNumber String [unique]
+  admissionDate DateTime
+  bloodGroup String
+  emergencyContact Json
+  previousSchool String
+  transportOpted Boolean [not null, default: false]
+  hostelOpted Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  school schools
+  enrollments student_enrollments [not null]
+  parents parent_students [not null]
+  attendance attendance [not null]
+  feeRecords fee_records [not null]
+  libraryIssues library_issues [not null]
+  transportAssignment transport_student_assignments
+  hostelAssignment hostel_room_assignments
+  disciplinaryRecords disciplinary_records [not null]
+  learningProgress learning_progress [not null]
+  examAttempts exam_attempts [not null]
+  assignmentSubmissions assignment_submissions [not null]
+}
+
+Table teacher_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  schoolId String
+  employeeId String [unique]
+  designation String
+  qualification String
+  experience Int
+  joiningDate DateTime
+  leavingDate DateTime
+  salary Decimal
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  school schools
+  classSubjects class_subjects [not null]
+  assignments assignments [not null]
+  exams exams [not null]
+  liveClasses live_classes [not null]
+  attendance teacher_attendance [not null]
+  leaves teacher_leaves [not null]
+}
+
+Table parent_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  occupation String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  children parent_students [not null]
+}
+
+Table parent_students {
+  id String [pk]
+  parentId String [not null]
+  studentId String [not null]
+  relationship String [not null]
+  isPrimary Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  parent parent_profiles [not null]
+  student student_profiles [not null]
+
+  indexes {
+    (parentId, studentId) [unique]
+  }
+}
+
+Table publisher_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  companyName String [not null]
+  registrationNumber String [unique]
+  taxId String
+  website String
+  description String
+  isVerified Boolean [not null, default: false]
+  verifiedAt DateTime
+  termsAccepted Boolean [not null, default: false]
+  termsAcceptedAt DateTime
+  bankDetails Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  books books [not null]
+  arMarkers ar_markers [not null]
+  monetizationPlans publisher_monetization_plans [not null]
+}
+
+Table creator_profiles {
+  id String [pk]
+  userId String [unique, not null]
+  displayName String [not null]
+  bio String
+  expertise String[] [not null]
+  isVerified Boolean [not null, default: false]
+  verifiedAt DateTime
+  termsAccepted Boolean [not null, default: false]
+  termsAcceptedAt DateTime
+  bankDetails Json
+  totalEarnings Decimal [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user users [not null]
+  contents contents [not null]
+  monetizationPlans creator_monetization_plans [not null]
+}
+
+Table student_enrollments {
+  id String [pk]
+  studentId String [not null]
+  sectionId String [not null]
+  academicYearId String [not null]
+  enrollmentDate DateTime [default: `now()`, not null]
+  status String [not null, default: 'ACTIVE']
+  rollNumber String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  student student_profiles [not null]
+  section sections [not null]
+  academicYear academic_years [not null]
+
+  indexes {
+    (studentId, academicYearId) [unique]
+  }
+}
+
+Table chapters {
+  id String [pk]
+  subjectId String [not null]
+  name String [not null]
+  code String
+  chapterNumber Int
+  description String
+  board Board
+  grade Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  subject subjects [not null]
+  topics topics [not null]
+}
+
+Table topics {
+  id String [pk]
+  chapterId String [not null]
+  name String [not null]
+  code String
+  topicNumber Int
+  description String
+  estimatedDuration Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  chapter chapters [not null]
+  subtopics subtopics [not null]
+  contents contents [not null]
+}
+
+Table subtopics {
+  id String [pk]
+  topicId String [not null]
+  name String [not null]
+  code String
+  description String
+  estimatedDuration Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  topic topics [not null]
+  subSubtopics sub_subtopics [not null]
+  contents contents [not null]
+}
+
+Table sub_subtopics {
+  id String [pk]
+  subtopicId String [not null]
+  name String [not null]
+  code String
+  description String
+  estimatedDuration Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subtopic subtopics [not null]
+  contents contents [not null]
+}
+
+Table contents {
+  id String [pk]
+  creatorId String
+  title String [not null]
+  description String
+  thumbnail String
+  contentType ContentType [not null]
+  status ContentStatus [not null, default: 'DRAFT']
+  board Board
+  grade Int
+  subjectId String
+  chapterId String
+  topicId String
+  subtopicId String
+  subSubtopicId String
+  fileUrl String
+  fileSize Int
+  fileMimeType String
+  duration Int
+  difficultyLevel DifficultyLevel
+  language String [not null, default: 'en']
+  tags String[] [not null]
+  keywords String[] [not null]
+  learningOutcomes String[] [not null]
+  viewCount Int [not null, default: 0]
+  rating Decimal
+  ratingCount Int [not null, default: 0]
+  isFree Boolean [not null, default: false]
+  price Decimal
+  publishedAt DateTime
+  archivedAt DateTime
+  versionNumber String [not null, default: '1.0']
+  previousVersionId String
+  isLocked Boolean [not null, default: false]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  creator creator_profiles
+  previousVersion contents
+  versions contents [not null]
+  topic topics
+  subtopic subtopics
+  subSubtopic sub_subtopics
+  arAssets ar_contents [not null]
+  vrAssets vr_contents [not null]
+  subscriptionAccess subscription_contents [not null]
+  learningProgress learning_progress [not null]
+  contentReviews content_reviews [not null]
+}
+
+Table content_reviews {
+  id String [pk]
+  contentId String [not null]
+  userId String [not null]
+  rating Int [not null]
+  comment String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  content contents [not null]
+
+  indexes {
+    (contentId, userId) [unique]
+  }
+}
+
+Table content_versions {
+  id String [pk]
+  contentId String [not null]
+  versionNumber String [not null]
+  versionType String [not null]
+  title String [not null]
+  description String
+  thumbnail String
+  fileUrl String
+  fileSize Int
+  fileMimeType String
+  metadata Json [not null]
+  status WorkflowStatus [not null]
+  changedBy String [not null]
+  changeNotes String
+  isPublished Boolean [not null, default: false]
+  publishedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table content_drafts {
+  id String [pk]
+  contentId String
+  createdBy String [not null]
+  title String [not null]
+  description String
+  thumbnail String
+  contentType ContentType [not null]
+  fileUrl String
+  metadata Json
+  lastSavedAt DateTime [default: `now()`, not null]
+  isSubmitted Boolean [not null, default: false]
+  submittedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table content_workflows {
+  id String [pk]
+  contentId String [not null]
+  status WorkflowStatus [not null]
+  submittedBy String [not null]
+  submittedAt DateTime [default: `now()`, not null]
+  assignedTo String
+  assignedAt DateTime
+  reviewedBy String
+  reviewedAt DateTime
+  approvedBy String
+  approvedAt DateTime
+  rejectedBy String
+  rejectedAt DateTime
+  rejectionReason String
+  publishedBy String
+  publishedAt DateTime
+  comments Json
+  currentStep String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table books {
+  id String [pk]
+  publisherId String [not null]
+  title String [not null]
+  isbn String [unique]
+  edition String
+  board Board
+  grade Int
+  subject String
+  coverImage String
+  description String
+  totalPages Int
+  publishedDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  publisher publisher_profiles [not null]
+  diagrams diagrams [not null]
+}
+
+Table diagrams {
+  id String [pk]
+  bookId String [not null]
+  title String
+  imageUrl String [not null]
+  pageNumber Int
+  chapterName String
+  resolution String
+  fileSize Int
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  book books [not null]
+  arMarker ar_markers
+}
+
+Table ar_markers {
+  id String [pk]
+  publisherId String [not null]
+  diagramId String [unique]
+  markerCode String [unique, not null]
+  markerImage String [not null]
+  title String
+  description String
+  isActive Boolean [not null, default: true]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  publisher publisher_profiles [not null]
+  diagram diagrams
+  arContents ar_contents [not null]
+}
+
+Table ar_contents {
+  id String [pk]
+  contentId String [not null]
+  markerId String
+  assetType String [not null]
+  assetUrl String [not null]
+  thumbnailUrl String
+  fileSize Int
+  format String
+  optimized Boolean [not null, default: false]
+  compressionLevel String
+  lodLevels Json
+  targetLevel String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  content contents [not null]
+  marker ar_markers
+}
+
+Table vr_contents {
+  id String [pk]
+  contentId String [not null]
+  experimentName String
+  assetType String [not null]
+  assetUrl String [not null]
+  thumbnailUrl String
+  fileSize Int
+  format String
+  optimized Boolean [not null, default: false]
+  supportedHeadsets String[] [not null]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  content contents [not null]
+  vrLogs vr_usage_logs [not null]
+}
+
+Table vr_usage_logs {
+  id String [pk]
+  vrContentId String [not null]
+  userId String [not null]
+  sessionId String [not null]
+  headsetType String
+  startTime DateTime [not null]
+  endTime DateTime
+  duration Int
+  interactions Json
+  completionRate Decimal
+  createdAt DateTime [default: `now()`, not null]
+  vrContent vr_contents [not null]
+}
+
+Table subscriptions {
+  id String [pk]
+  organizationId String
+  userId String
+  tier SubscriptionTier [not null]
+  status SubscriptionStatus [not null, default: 'PENDING']
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  gracePeriodDays Int [not null, default: 7]
+  autoRenew Boolean [not null, default: false]
+  price Decimal [not null]
+  currency String [not null, default: 'INR']
+  billingCycle String [not null]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  cancelledAt DateTime
+  deletedAt DateTime
+  organization organizations
+  contentAccess subscription_contents [not null]
+  payments payments [not null]
+}
+
+Table licenses {
+  id String [pk]
+  organizationId String [not null]
+  licenseType String [not null]
+  totalSeats Int [not null]
+  usedSeats Int [not null, default: 0]
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  isActive Boolean [not null, default: true]
+  pricingModel String [not null]
+  price Decimal [not null]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  organization organizations [not null]
+  assignments license_assignments [not null]
+}
+
+Table license_assignments {
+  id String [pk]
+  licenseId String [not null]
+  userId String [not null]
+  assignedAt DateTime [default: `now()`, not null]
+  assignedBy String
+  revokedAt DateTime
+  license licenses [not null]
+
+  indexes {
+    (licenseId, userId) [unique]
+  }
+}
+
+Table subscription_contents {
+  id String [pk]
+  subscriptionId String [not null]
+  contentId String [not null]
+  grantedAt DateTime [default: `now()`, not null]
+  subscription subscriptions [not null]
+  content contents [not null]
+
+  indexes {
+    (subscriptionId, contentId) [unique]
+  }
+}
+
+Table payments {
+  id String [pk]
+  subscriptionId String
+  userId String
+  organizationId String
+  amount Decimal [not null]
+  currency String [not null, default: 'INR']
+  paymentMethod PaymentMethod [not null]
+  status PaymentStatus [not null, default: 'PENDING']
+  gatewayTransactionId String [unique]
+  gatewayResponse Json
+  paidAt DateTime
+  failedAt DateTime
+  refundedAt DateTime
+  invoice Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  subscription subscriptions
+  attempts payment_attempts [not null]
+  refunds payment_refunds [not null]
+}
+
+Table payment_attempts {
+  id String [pk]
+  paymentId String [not null]
+  attemptNumber Int [not null]
+  amount Decimal [not null]
+  paymentGateway String [not null]
+  gatewayRequest Json
+  gatewayResponse Json
+  status String [not null]
+  errorCode String
+  errorMessage String
+  attemptedAt DateTime [default: `now()`, not null]
+  payment payments [not null]
+}
+
+Table payment_refunds {
+  id String [pk]
+  paymentId String [not null]
+  refundAmount Decimal [not null]
+  refundReason String [not null]
+  refundType String [not null]
+  status String [not null, default: 'PENDING']
+  gatewayRefundId String
+  gatewayResponse Json
+  requestedBy String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  processedAt DateTime
+  completedAt DateTime
+  payment payments [not null]
+}
+
+Table payment_reconciliations {
+  id String [pk]
+  reconciliationDate DateTime [not null]
+  gateway String [not null]
+  totalPayments Int [not null, default: 0]
+  totalAmount Decimal [not null]
+  successfulPayments Int [not null, default: 0]
+  successfulAmount Decimal [not null]
+  failedPayments Int [not null, default: 0]
+  refundedPayments Int [not null, default: 0]
+  refundedAmount Decimal [not null]
+  discrepancies Json
+  status String [not null, default: 'PENDING']
+  reconciledBy String
+  reconciledAt DateTime
+  gatewayReport String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table payment_gateway_logs {
+  id String [pk]
+  gateway String [not null]
+  endpoint String [not null]
+  httpMethod String [not null]
+  requestHeaders Json
+  requestBody Json
+  responseStatus Int
+  responseHeaders Json
+  responseBody Json
+  duration Int
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table publisher_monetization_plans {
+  id String [pk]
+  publisherId String [not null]
+  planType String [not null]
+  maxUploads Int
+  maxStorage Int
+  platformCommissionPercent Decimal [not null]
+  isActive Boolean [not null, default: true]
+  startDate DateTime [default: `now()`, not null]
+  endDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  publisher publisher_profiles [not null]
+}
+
+Table creator_monetization_plans {
+  id String [pk]
+  creatorId String [not null]
+  planType String [not null]
+  maxUploads Int
+  maxStorage Int
+  platformCommissionPercent Decimal [not null]
+  isActive Boolean [not null, default: true]
+  startDate DateTime [default: `now()`, not null]
+  endDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  creator creator_profiles [not null]
+}
+
+Table content_purchases {
+  id String [pk]
+  contentId String [not null]
+  userId String [not null]
+  purchasePrice Decimal [not null]
+  platformFee Decimal [not null]
+  creatorEarnings Decimal [not null]
+  purchasedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (contentId, userId) [unique]
+  }
+}
+
+Table payouts {
+  id String [pk]
+  userId String [not null]
+  amount Decimal [not null]
+  currency String [not null, default: 'INR']
+  status String [not null]
+  payoutMethod String [not null]
+  transactionId String
+  initiatedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  metadata Json
+}
+
+Table question_bank {
+  id String [pk]
+  creatorId String
+  question String [not null]
+  questionType QuestionType [not null]
+  options Json
+  correctAnswer Json [not null]
+  explanation String
+  board Board
+  grade Int
+  subjectId String
+  chapterId String
+  topicId String
+  difficultyLevel DifficultyLevel
+  bloomsTaxonomy String
+  marks Decimal [not null]
+  negativeMarks Decimal
+  estimatedTime Int
+  boardExamFrequency Int
+  lastAppearedYear Int
+  hasImage Boolean [not null, default: false]
+  hasVideo Boolean [not null, default: false]
+  hasAR Boolean [not null, default: false]
+  hasVR Boolean [not null, default: false]
+  mediaUrls String[] [not null]
+  tags String[] [not null]
+  keywords String[] [not null]
+  usageCount Int [not null, default: 0]
+  isPublic Boolean [not null, default: false]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  examQuestions exam_questions [not null]
+}
+
+Table exams {
+  id String [pk]
+  teacherId String
+  sectionId String
+  title String [not null]
+  description String
+  examType ExamType [not null]
+  board Board
+  grade Int
+  subjectId String
+  totalMarks Decimal [not null]
+  passingMarks Decimal
+  duration Int [not null]
+  hasNegativeMarking Boolean [not null, default: false]
+  randomizeQuestions Boolean [not null, default: false]
+  randomizeOptions Boolean [not null, default: false]
+  showResultsImmediately Boolean [not null, default: true]
+  showCorrectAnswers Boolean [not null, default: true]
+  allowReview Boolean [not null, default: true]
+  blueprint Json
+  startTime DateTime
+  endTime DateTime
+  isPublished Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  teacher teacher_profiles
+  section sections
+  questions exam_questions [not null]
+  attempts exam_attempts [not null]
+  assignments exam_assignments [not null]
+}
+
+Table exam_questions {
+  id String [pk]
+  examId String [not null]
+  questionBankId String
+  questionOrder Int [not null]
+  question String [not null]
+  questionType QuestionType [not null]
+  options Json
+  correctAnswer Json [not null]
+  explanation String
+  marks Decimal [not null]
+  negativeMarks Decimal
+  sectionName String
+  exam exams [not null]
+  questionBank question_bank
+  answers exam_answers [not null]
+
+  indexes {
+    (examId, questionOrder) [unique]
+  }
+}
+
+Table exam_assignments {
+  id String [pk]
+  examId String [not null]
+  studentId String
+  classId String
+  groupName String
+  assignedAt DateTime [default: `now()`, not null]
+  assignedBy String
+  exam exams [not null]
+}
+
+Table exam_attempts {
+  id String [pk]
+  examId String [not null]
+  studentId String [not null]
+  attemptNumber Int [not null, default: 1]
+  startedAt DateTime [default: `now()`, not null]
+  submittedAt DateTime
+  timeTaken Int
+  totalMarks Decimal
+  obtainedMarks Decimal
+  percentage Decimal
+  rank Int
+  isPassed Boolean
+  evaluatedAt DateTime
+  evaluatedBy String
+  exam exams [not null]
+  student student_profiles [not null]
+  answers exam_answers [not null]
+
+  indexes {
+    (examId, studentId, attemptNumber) [unique]
+  }
+}
+
+Table exam_answers {
+  id String [pk]
+  attemptId String [not null]
+  questionId String [not null]
+  answer Json [not null]
+  isCorrect Boolean
+  marksAwarded Decimal
+  timeTaken Int
+  feedback String
+  attempt exam_attempts [not null]
+  question exam_questions [not null]
+
+  indexes {
+    (attemptId, questionId) [unique]
+  }
+}
+
+Table assignments {
+  id String [pk]
+  teacherId String [not null]
+  sectionId String
+  title String [not null]
+  description String
+  subjectId String
+  topicId String
+  maxMarks Decimal
+  dueDate DateTime
+  attachments String[] [not null]
+  allowLateSubmission Boolean [not null, default: true]
+  isPublished Boolean [not null, default: false]
+  publishedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  teacher teacher_profiles [not null]
+  section sections
+  submissions assignment_submissions [not null]
+}
+
+Table assignment_submissions {
+  id String [pk]
+  assignmentId String [not null]
+  studentId String [not null]
+  submittedAt DateTime [default: `now()`, not null]
+  submissionFiles String[] [not null]
+  submissionText String
+  status AssignmentStatus [not null, default: 'SUBMITTED']
+  marksObtained Decimal
+  feedback String
+  gradedAt DateTime
+  gradedBy String
+  assignment assignments [not null]
+  student student_profiles [not null]
+
+  indexes {
+    (assignmentId, studentId) [unique]
+  }
+}
+
+Table live_classes {
+  id String [pk]
+  teacherId String [not null]
+  title String [not null]
+  description String
+  classMode ClassMode [not null]
+  classId String
+  subjectId String
+  topicId String
+  scheduledStart DateTime [not null]
+  scheduledEnd DateTime [not null]
+  actualStart DateTime
+  actualEnd DateTime
+  status ClassStatus [not null, default: 'SCHEDULED']
+  maxParticipants Int [not null, default: 200]
+  meetingUrl String
+  meetingId String
+  meetingPassword String
+  metaverseRoomId String
+  recordingUrl String
+  enableChat Boolean [not null, default: true]
+  enableScreenShare Boolean [not null, default: true]
+  enableWhiteboard Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  teacher teacher_profiles [not null]
+  participants live_class_participants [not null]
+  recordings class_recordings [not null]
+}
+
+Table live_class_participants {
+  id String [pk]
+  liveClassId String [not null]
+  userId String [not null]
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  duration Int
+  isMuted Boolean [not null, default: false]
+  isVideoOff Boolean [not null, default: false]
+  isRemoved Boolean [not null, default: false]
+  liveClass live_classes [not null]
+
+  indexes {
+    (liveClassId, userId) [unique]
+  }
+}
+
+Table class_recordings {
+  id String [pk]
+  liveClassId String [not null]
+  recordingUrl String [not null]
+  duration Int
+  fileSize Int
+  perspective String
+  createdAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  liveClass live_classes [not null]
+}
+
+Table metaverse_rooms {
+  id String [pk]
+  name String [not null]
+  roomUrl String [not null]
+  capacity Int [not null, default: 30]
+  environmentConfig Json
+  spatialAudioEnabled Boolean [not null, default: true]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table three_d_models {
+  id String [pk]
+  title String [not null]
+  description String
+  modelUrl String [not null]
+  thumbnailUrl String
+  format String [not null]
+  fileSize Int
+  polyCount Int
+  optimized Boolean [not null, default: false]
+  lodLevels Json
+  subjectId String
+  topicId String
+  tags String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table learning_progress {
+  id String [pk]
+  studentId String [not null]
+  contentId String [not null]
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  lastAccessedAt DateTime [default: `now()`, not null]
+  timeSpent Int [not null, default: 0]
+  progressPercent Decimal [not null, default: 0]
+  interactionCount Int [not null, default: 0]
+  masteryLevel String
+  metadata Json
+  student student_profiles [not null]
+  content contents [not null]
+
+  indexes {
+    (studentId, contentId) [unique]
+  }
+}
+
+Table usage_logs {
+  id String [pk]
+  userId String [not null]
+  sessionId String [not null]
+  activityType String [not null]
+  resourceType String
+  resourceId String
+  deviceInfo Json
+  ipAddress String
+  duration Int
+  metadata Json
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table performance_metrics {
+  id String [pk]
+  studentId String [not null]
+  metricType String [not null]
+  subjectId String
+  topicId String
+  score Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+  metadata Json
+}
+
+Table rankings {
+  id String [pk]
+  studentId String [not null]
+  examId String
+  scope RankingScope [not null]
+  rank Int [not null]
+  totalParticipants Int [not null]
+  percentile Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+  metadata Json
+}
+
+Table attendance_devices {
+  id String [pk]
+  schoolId String [not null]
+  deviceId String [unique, not null]
+  deviceName String [not null]
+  deviceType String [not null]
+  location String
+  roomId String
+  ipAddress String
+  macAddress String
+  isActive Boolean [not null, default: true]
+  lastSyncAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  biometricLogs biometric_attendance_logs [not null]
+}
+
+Table attendance {
+  id String [pk]
+  studentId String [not null]
+  schoolId String [not null]
+  sectionId String
+  date DateTime [not null]
+  period Int
+  status AttendanceStatus [not null]
+  method AttendanceMethod [not null, default: 'MANUAL']
+  checkInTime DateTime
+  checkOutTime DateTime
+  location Json
+  deviceId String
+  remarks String
+  markedBy String
+  markedAt DateTime [default: `now()`, not null]
+  correctionRequested Boolean [not null, default: false]
+  correctionReason String
+  correctedBy String
+  correctedAt DateTime
+  biometricLogId String
+  student student_profiles [not null]
+  school schools [not null]
+
+  indexes {
+    (studentId, date, period) [unique]
+  }
+}
+
+Table teacher_attendance {
+  id String [pk]
+  teacherId String [not null]
+  schoolId String
+  date DateTime [not null]
+  status AttendanceStatus [not null]
+  method AttendanceMethod [not null, default: 'MANUAL']
+  checkInTime DateTime
+  checkOutTime DateTime
+  location Json
+  deviceId String
+  remarks String
+  markedBy String
+  markedAt DateTime [default: `now()`, not null]
+  biometricLogId String
+  teacher teacher_profiles [not null]
+
+  indexes {
+    (teacherId, date) [unique]
+  }
+}
+
+Table biometric_attendance_logs {
+  id String [pk]
+  deviceId String [not null]
+  userId String [not null]
+  userType String [not null]
+  biometricType String [not null]
+  biometricData String
+  matchScore Decimal
+  timestamp DateTime [default: `now()`, not null]
+  isVerified Boolean [not null, default: true]
+  processed Boolean [not null, default: false]
+  processedAt DateTime
+  device attendance_devices [not null]
+}
+
+Table rooms {
+  id String [pk]
+  schoolId String [not null]
+  roomNumber String [not null]
+  roomName String
+  roomType String [not null, default: 'CLASSROOM']
+  floor String
+  building String
+  capacity Int
+  facilities String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  timetableEntries timetable_entries [not null]
+
+  indexes {
+    (schoolId, roomNumber) [unique]
+  }
+}
+
+Table time_slots {
+  id String [pk]
+  schoolId String [not null]
+  slotName String [not null]
+  slotNumber Int [not null]
+  startTime String [not null]
+  endTime String [not null]
+  duration Int [not null]
+  isBreak Boolean [not null, default: false]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  timetableEntries timetable_entries [not null]
+
+  indexes {
+    (schoolId, slotNumber, effectiveFrom) [unique]
+  }
+}
+
+Table timetable_entries {
+  id String [pk]
+  schoolId String [not null]
+  sectionId String [not null]
+  academicYearId String [not null]
+  dayOfWeek DayOfWeek [not null]
+  timeSlotId String [not null]
+  subjectId String
+  teacherId String
+  roomId String
+  isSubstitution Boolean [not null, default: false]
+  substitutionReason String
+  originalTeacherId String
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  notes String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  section sections [not null]
+  timeSlot time_slots [not null]
+  room rooms
+
+  indexes {
+    (schoolId, sectionId, dayOfWeek, timeSlotId, effectiveFrom) [unique]
+  }
+}
+
+Table fee_structures {
+  id String [pk]
+  schoolId String [not null]
+  name String [not null]
+  description String
+  grade Int
+  amount Decimal [not null]
+  currency String [not null, default: 'INR']
+  frequency String [not null]
+  dueDate DateTime
+  lateFeeAmount Decimal
+  lateFeeDays Int
+  isActive Boolean [not null, default: true]
+  academicYear String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+  feeRecords fee_records [not null]
+}
+
+Table fee_records {
+  id String [pk]
+  studentId String [not null]
+  feeStructureId String [not null]
+  totalAmount Decimal [not null]
+  paidAmount Decimal [not null, default: 0]
+  balanceAmount Decimal [not null]
+  discountAmount Decimal [not null, default: 0]
+  discountReason String
+  lateFeeAmount Decimal [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  dueDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  student student_profiles [not null]
+  feeStructure fee_structures [not null]
+  payments fee_payments [not null]
+}
+
+Table fee_payments {
+  id String [pk]
+  feeRecordId String [not null]
+  amount Decimal [not null]
+  paymentMethod PaymentMethod [not null]
+  paymentDate DateTime [not null]
+  transactionId String
+  receiptNumber String [unique]
+  remarks String
+  createdAt DateTime [default: `now()`, not null]
+  feeRecord fee_records [not null]
+}
+
+Table fee_concessions {
+  id String [pk]
+  studentId String [not null]
+  feeStructureId String
+  concessionType String [not null]
+  concessionAmount Decimal [not null]
+  concessionPercent Decimal
+  reason String
+  approvedBy String [not null]
+  approvedAt DateTime [default: `now()`, not null]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table fee_installments {
+  id String [pk]
+  feeRecordId String [not null]
+  installmentNumber Int [not null]
+  installmentAmount Decimal [not null]
+  dueDate DateTime [not null]
+  paidDate DateTime
+  paidAmount Decimal [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table fee_refunds {
+  id String [pk]
+  studentId String [not null]
+  feePaymentId String
+  refundAmount Decimal [not null]
+  refundReason String [not null]
+  requestedBy String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  approvedBy String
+  approvedAt DateTime
+  refundMethod String
+  refundDate DateTime
+  status String [not null, default: 'PENDING']
+  transactionId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table fee_waivers {
+  id String [pk]
+  studentId String [not null]
+  feeStructureId String [not null]
+  waiverPercent Decimal [not null]
+  waiverAmount Decimal [not null]
+  waiverReason String [not null]
+  waiverCategory String [not null]
+  supportingDocs String[] [not null]
+  requestedBy String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  approvedBy String
+  approvedAt DateTime
+  status String [not null, default: 'PENDING']
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table scholarships {
+  id String [pk]
+  schoolId String
+  scholarshipName String [not null]
+  scholarshipType String [not null]
+  provider String [not null]
+  amount Decimal [not null]
+  amountType String [not null]
+  eligibilityCriteria Json [not null]
+  totalSlots Int
+  availableSlots Int
+  applicationStart DateTime [not null]
+  applicationEnd DateTime [not null]
+  disbursementSchedule Json
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  applications scholarship_applications [not null]
+}
+
+Table scholarship_applications {
+  id String [pk]
+  scholarshipId String [not null]
+  studentId String [not null]
+  applicationData Json [not null]
+  documents String[] [not null]
+  status String [not null, default: 'PENDING']
+  appliedAt DateTime [default: `now()`, not null]
+  reviewedAt DateTime
+  reviewedBy String
+  reviewComments String
+  approvedAmount Decimal
+  disbursedAmount Decimal [not null, default: 0]
+  scholarship scholarships [not null]
+}
+
+Table transport_fees {
+  id String [pk]
+  studentId String [not null]
+  routeId String [not null]
+  monthYear String [not null]
+  feeAmount Decimal [not null]
+  paidAmount Decimal [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  dueDate DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table library_books {
+  id String [pk]
+  schoolId String [not null]
+  isbn String
+  title String [not null]
+  author String
+  publisher String
+  edition String
+  publicationYear Int
+  category String
+  subCategory String
+  language String
+  totalCopies Int [not null]
+  availableCopies Int [not null]
+  issuedCopies Int [not null, default: 0]
+  damagedCopies Int [not null, default: 0]
+  lostCopies Int [not null, default: 0]
+  location String
+  deweyDecimal String
+  coverImage String
+  description String
+  purchaseDate DateTime
+  purchasePrice Decimal
+  condition String
+  isActive Boolean [not null, default: true]
+  isReferenceOnly Boolean [not null, default: false]
+  tags String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  issues library_issues [not null]
+  reservations library_reservations [not null]
+}
+
+Table library_issues {
+  id String [pk]
+  bookId String [not null]
+  userId String [not null]
+  userType String [not null]
+  issueDate DateTime [not null]
+  dueDate DateTime [not null]
+  returnDate DateTime
+  renewalCount Int [not null, default: 0]
+  maxRenewals Int [not null, default: 2]
+  fineAmount Decimal [not null, default: 0]
+  finePaid Boolean [not null, default: false]
+  isReturned Boolean [not null, default: false]
+  isOverdue Boolean [not null, default: false]
+  condition String
+  damageRemarks String
+  remarks String
+  issuedBy String
+  returnedTo String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  book library_books [not null]
+  student student_profiles
+}
+
+Table library_reservations {
+  id String [pk]
+  bookId String [not null]
+  userId String [not null]
+  userType String [not null]
+  reservedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime [not null]
+  status String [not null, default: 'ACTIVE']
+  notifiedAt DateTime
+  book library_books [not null]
+}
+
+Table library_members {
+  id String [pk]
+  userId String [unique, not null]
+  userType String [not null]
+  membershipNumber String [unique, not null]
+  membershipType String [not null]
+  maxBooksAllowed Int [not null, default: 3]
+  maxDays Int [not null, default: 14]
+  isActive Boolean [not null, default: true]
+  joinedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+}
+
+Table ai_recommendations {
+  id String [pk]
+  userId String [not null]
+  recommendationType String [not null]
+  recommendations Json [not null]
+  modelVersion String
+  confidence Decimal
+  reasons Json
+  isAccepted Boolean
+  acceptedAt DateTime
+  clickedItems String[] [not null]
+  generatedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+}
+
+Table ai_predictions {
+  id String [pk]
+  studentId String [not null]
+  predictionType String [not null]
+  subjectId String
+  examId String
+  predictedValue Json [not null]
+  confidence Decimal [not null]
+  actualValue Json
+  features Json
+  modelVersion String [not null]
+  predictedAt DateTime [default: `now()`, not null]
+}
+
+Table chatbot_conversations {
+  id String [pk]
+  userId String [not null]
+  sessionId String [not null]
+  conversationData Json [not null]
+  startedAt DateTime [default: `now()`, not null]
+  endedAt DateTime
+  totalMessages Int [not null, default: 0]
+  satisfaction Int
+  feedback String
+}
+
+Table chatbot_messages {
+  id String [pk]
+  conversationId String [not null]
+  role String [not null]
+  content String [not null]
+  intent String
+  entities Json
+  confidence Decimal
+  isHelpful Boolean
+  feedback String
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table content_embeddings {
+  id String [pk]
+  contentId String [unique, not null]
+  embeddingModel String [not null]
+  embedding String [not null]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table student_learning_styles {
+  id String [pk]
+  studentId String [unique, not null]
+  visualScore Decimal [not null]
+  auditoryScore Decimal [not null]
+  kinestheticScore Decimal [not null]
+  readingWritingScore Decimal [not null]
+  preferredContentTypes String[] [not null]
+  optimalStudyTime String
+  attentionSpan Int
+  analysisDate DateTime [default: `now()`, not null]
+  lastUpdated DateTime [not null]
+}
+
+Table ai_prompts {
+  id String [pk]
+  userId String [not null]
+  promptText String [not null]
+  promptType String [not null]
+  context Json
+  responseText String
+  responseTime Int
+  modelUsed String
+  tokensUsed Int
+  wasSuccessful Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table ai_feedback {
+  id String [pk]
+  entityType String [not null]
+  entityId String [not null]
+  userId String [not null]
+  rating Int
+  isHelpful Boolean
+  feedbackText String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table vector_indexes {
+  id String [pk]
+  indexName String [unique, not null]
+  indexType String [not null]
+  dimension Int [not null]
+  totalVectors Int [not null, default: 0]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  embeddings vector_embeddings [not null]
+}
+
+Table vector_embeddings {
+  id String [pk]
+  indexId String [not null]
+  entityType String [not null]
+  entityId String [not null]
+  embedding String [not null]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  index vector_indexes [not null]
+
+  indexes {
+    (indexId, entityType, entityId) [unique]
+  }
+}
+
+Table document_chunks {
+  id String [pk]
+  documentId String [not null]
+  documentType String [not null]
+  chunkIndex Int [not null]
+  chunkText String [not null]
+  embeddingId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table retrieval_queries {
+  id String [pk]
+  userId String [not null]
+  query String [not null]
+  retrievedChunks Json [not null]
+  wasHelpful Boolean
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table token_usage {
+  id String [pk]
+  userId String [not null]
+  organizationId String
+  modelProvider String [not null]
+  modelName String [not null]
+  modelVersion String
+  promptTokens Int [not null]
+  completionTokens Int [not null]
+  totalTokens Int [not null]
+  cost Decimal
+  requestType String [not null]
+  entityType String
+  entityId String
+  responseTime Int
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table model_providers {
+  id String [pk]
+  name String [unique, not null]
+  displayName String [not null]
+  apiEndpoint String
+  availableModels Json [not null]
+  isActive Boolean [not null, default: true]
+  rateLimits Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table prompt_templates {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  templateText String [not null]
+  category String [not null]
+  variables String[] [not null]
+  modelProvider String
+  modelName String
+  temperature Decimal
+  maxTokens Int
+  version Int [not null, default: 1]
+  isActive Boolean [not null, default: true]
+  usageCount Int [not null, default: 0]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table inference_logs {
+  id String [pk]
+  modelProvider String [not null]
+  modelName String [not null]
+  inputText String
+  outputText String
+  promptTokens Int [not null]
+  completionTokens Int [not null]
+  responseTime Int [not null]
+  success Boolean [not null, default: true]
+  errorMessage String
+  userId String
+  organizationId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table hostel_blocks {
+  id String [pk]
+  schoolId String [not null]
+  blockName String [not null]
+  blockNumber String
+  blockType String
+  totalFloors Int [not null, default: 1]
+  totalRooms Int [not null]
+  totalCapacity Int [not null]
+  wardenName String
+  wardenPhone String
+  wardenId String
+  facilities String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  rooms hostel_rooms [not null]
+  fees hostel_fees [not null]
+}
+
+Table hostel_rooms {
+  id String [pk]
+  blockId String [not null]
+  roomNumber String [not null]
+  roomType String [not null, default: 'STANDARD']
+  capacity Int [not null]
+  occupied Int [not null, default: 0]
+  floor Int
+  facilities String[] [not null]
+  monthlyRent Decimal
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  block hostel_blocks [not null]
+  assignments hostel_room_assignments [not null]
+  maintenanceRecords hostel_maintenance [not null]
+
+  indexes {
+    (blockId, roomNumber) [unique]
+  }
+}
+
+Table hostel_room_assignments {
+  id String [pk]
+  studentId String [unique, not null]
+  roomId String [not null]
+  bedNumber String
+  assignedAt DateTime [default: `now()`, not null]
+  vacatedAt DateTime
+  status String [not null, default: 'ACTIVE']
+  monthlyRent Decimal [not null]
+  securityDeposit Decimal
+  student student_profiles [not null]
+  room hostel_rooms [not null]
+}
+
+Table hostel_fees {
+  id String [pk]
+  blockId String [not null]
+  feeType String [not null]
+  amount Decimal [not null]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  block hostel_blocks [not null]
+}
+
+Table hostel_maintenance {
+  id String [pk]
+  roomId String [not null]
+  issueType String [not null]
+  description String [not null]
+  reportedBy String [not null]
+  reportedAt DateTime [default: `now()`, not null]
+  assignedTo String
+  assignedAt DateTime
+  status String [not null, default: 'PENDING']
+  completedAt DateTime
+  completedBy String
+  cost Decimal
+  room hostel_rooms [not null]
+}
+
+Table inventory_categories {
+  id String [pk]
+  name String [not null]
+  description String
+  parentId String
+  parent inventory_categories
+  children inventory_categories [not null]
+  items inventory_items [not null]
+}
+
+Table inventory_items {
+  id String [pk]
+  schoolId String
+  organizationId String
+  itemName String [not null]
+  itemCode String [unique]
+  barcode String [unique]
+  categoryId String
+  description String
+  quantity Int [not null, default: 0]
+  unit String
+  minimumStock Int
+  reorderLevel Int
+  maximumStock Int
+  location String
+  unitPrice Decimal
+  totalValue Decimal
+  isConsumable Boolean [not null, default: false]
+  isAsset Boolean [not null, default: false]
+  purchaseDate DateTime
+  expiryDate DateTime
+  supplierId String
+  warrantyPeriod Int
+  warrantyExpiry DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  category inventory_categories
+  transactions inventory_transactions [not null]
+  requisitions inventory_requisitions [not null]
+}
+
+Table inventory_transactions {
+  id String [pk]
+  itemId String [not null]
+  transactionType String [not null]
+  quantity Int [not null]
+  fromLocation String
+  toLocation String
+  reference String
+  unitPrice Decimal
+  totalValue Decimal
+  performedBy String [not null]
+  approvedBy String
+  reason String
+  remarks String
+  transactionDate DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+  item inventory_items [not null]
+}
+
+Table inventory_requisitions {
+  id String [pk]
+  itemId String [not null]
+  requestedBy String [not null]
+  requestedFor String
+  quantity Int [not null]
+  purpose String [not null]
+  status String [not null, default: 'PENDING']
+  requestedAt DateTime [default: `now()`, not null]
+  approvedAt DateTime
+  approvedBy String
+  issuedAt DateTime
+  issuedBy String
+  issuedQuantity Int
+  rejectedAt DateTime
+  rejectionReason String
+  item inventory_items [not null]
+}
+
+Table suppliers {
+  id String [pk]
+  supplierName String [not null]
+  supplierCode String [unique]
+  contactPerson String
+  email String
+  phone String
+  category String
+  gstNumber String
+  panNumber String
+  bankDetails Json
+  rating Decimal
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table payroll_structures {
+  id String [pk]
+  schoolId String
+  organizationId String
+  structureName String [not null]
+  designation String
+  basicSalary Decimal [not null]
+  allowances Json [not null]
+  deductions Json [not null]
+  grossSalary Decimal [not null]
+  netSalary Decimal [not null]
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table employee_salaries {
+  id String [pk]
+  employeeId String [not null]
+  employeeType String [not null]
+  payrollStructureId String
+  monthYear String [not null]
+  workingDays Int [not null]
+  presentDays Int [not null]
+  basicSalary Decimal [not null]
+  allowances Json [not null]
+  bonuses Json
+  deductions Json [not null]
+  penalties Json
+  grossSalary Decimal [not null]
+  netSalary Decimal [not null]
+  status String [not null, default: 'DRAFT']
+  approvedBy String
+  approvedAt DateTime
+  paidOn DateTime
+  paymentMethod String
+  transactionId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (employeeId, monthYear) [unique]
+  }
+}
+
+Table payroll_advances {
+  id String [pk]
+  employeeId String [not null]
+  advanceAmount Decimal [not null]
+  reason String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  approvedAt DateTime
+  approvedBy String
+  status String [not null, default: 'PENDING']
+  disbursedAt DateTime
+  disbursedAmount Decimal
+  repaymentMode String
+  installments Int
+  installmentAmount Decimal
+  balanceAmount Decimal [not null, default: 0]
+}
+
+Table teacher_leaves {
+  id String [pk]
+  teacherId String [not null]
+  leaveType String [not null]
+  startDate DateTime [not null]
+  endDate DateTime [not null]
+  totalDays Int [not null]
+  reason String
+  attachments String[] [not null]
+  status String [not null, default: 'PENDING']
+  appliedAt DateTime [default: `now()`, not null]
+  approvedBy String
+  approvedAt DateTime
+  rejectedBy String
+  rejectedAt DateTime
+  rejectionReason String
+  cancelledAt DateTime
+  cancellationReason String
+  substituteTeacherId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  teacher teacher_profiles [not null]
+}
+
+Table leave_balances {
+  id String [pk]
+  employeeId String [not null]
+  employeeType String [not null]
+  leaveType String [not null]
+  totalLeaves Int [not null]
+  usedLeaves Int [not null, default: 0]
+  balanceLeaves Int [not null]
+  year Int [not null]
+
+  indexes {
+    (employeeId, leaveType, year) [unique]
+  }
+}
+
+Table transport_routes {
+  id String [pk]
+  schoolId String [not null]
+  routeName String [not null]
+  routeNumber String [not null]
+  startPoint String [not null]
+  endPoint String [not null]
+  totalDistance Decimal
+  estimatedTime Int
+  pickupTime String
+  dropTime String
+  vehicleId String
+  driverId String
+  attendantId String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  school schools [not null]
+  vehicle transport_vehicles
+  stops transport_route_stops [not null]
+  assignments transport_student_assignments [not null]
+  trips transport_trips [not null]
+}
+
+Table transport_route_stops {
+  id String [pk]
+  routeId String [not null]
+  stopName String [not null]
+  stopSequence Int [not null]
+  address String
+  landmark String
+  latitude Decimal
+  longitude Decimal
+  pickupTime String
+  dropTime String
+  fare Decimal
+  isActive Boolean [not null, default: true]
+  route transport_routes [not null]
+
+  indexes {
+    (routeId, stopSequence) [unique]
+  }
+}
+
+Table transport_vehicles {
+  id String [pk]
+  schoolId String
+  organizationId String
+  vehicleNumber String [unique, not null]
+  vehicleType String [not null]
+  make String
+  model String
+  year Int
+  capacity Int [not null]
+  registrationNumber String [unique]
+  insuranceNumber String
+  insuranceExpiry DateTime
+  fitnessExpiry DateTime
+  pollutionExpiry DateTime
+  gpsDeviceId String [unique]
+  gpsDeviceIMEI String [unique]
+  gpsProvider String
+  rfidReaderId String [unique]
+  rfidReaderSerial String
+  lastKnownLat Decimal
+  lastKnownLng Decimal
+  lastTrackedAt DateTime
+  currentSpeed Decimal
+  fuelLevel Decimal
+  status String [not null, default: 'IDLE']
+  maintenanceSchedule Json
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  routes transport_routes [not null]
+  gpsLogs vehicle_gps_logs [not null]
+  maintenanceRecords vehicle_maintenance [not null]
+  trips transport_trips [not null]
+}
+
+Table vehicle_gps_logs {
+  id String [pk]
+  vehicleId String [not null]
+  latitude Decimal [not null]
+  longitude Decimal [not null]
+  speed Decimal
+  heading Decimal
+  altitude Decimal
+  accuracy Decimal
+  ignitionOn Boolean
+  fuelLevel Decimal
+  timestamp DateTime [default: `now()`, not null]
+  vehicle transport_vehicles [not null]
+}
+
+Table vehicle_maintenance {
+  id String [pk]
+  vehicleId String [not null]
+  maintenanceType String [not null]
+  description String [not null]
+  cost Decimal [not null]
+  serviceDate DateTime [not null]
+  nextServiceDate DateTime
+  serviceProvider String
+  invoiceNumber String
+  odometer Int
+  status String [not null, default: 'SCHEDULED']
+  vehicle transport_vehicles [not null]
+}
+
+Table transport_student_assignments {
+  id String [pk]
+  studentId String [unique, not null]
+  routeId String [not null]
+  stopId String
+  rfidCardNumber String [unique]
+  rfidCardIssued DateTime
+  assignedAt DateTime [default: `now()`, not null]
+  unassignedAt DateTime
+  status String [not null, default: 'ACTIVE']
+  student student_profiles [not null]
+  route transport_routes [not null]
+  attendanceRecords transport_attendance [not null]
+}
+
+Table transport_attendance {
+  id String [pk]
+  assignmentId String [not null]
+  tripId String
+  date DateTime [not null]
+  tripType String [not null]
+  boardedAt DateTime
+  boardedLocation Json
+  alightedAt DateTime
+  alightedLocation Json
+  status String [not null]
+  rfidScanIn DateTime
+  rfidScanOut DateTime
+  verifiedBy String
+  parentNotified Boolean [not null, default: false]
+  notifiedAt DateTime
+  assignment transport_student_assignments [not null]
+  trip transport_trips
+}
+
+Table transport_trips {
+  id String [pk]
+  routeId String [not null]
+  vehicleId String [not null]
+  date DateTime [not null]
+  tripType String [not null]
+  driverId String [not null]
+  attendantId String
+  plannedStartTime String [not null]
+  plannedEndTime String [not null]
+  actualStartTime DateTime
+  actualEndTime DateTime
+  startOdometer Int
+  endOdometer Int
+  distance Decimal
+  status String [not null, default: 'SCHEDULED']
+  incidents Json
+  route transport_routes [not null]
+  vehicle transport_vehicles [not null]
+  attendance transport_attendance [not null]
+}
+
+Table events {
+  id String [pk]
+  schoolId String [not null]
+  title String [not null]
+  description String
+  eventType String [not null]
+  startDate DateTime [not null]
+  endDate DateTime
+  location String
+  isAllDay Boolean [not null, default: false]
+  notifyUsers Boolean [not null, default: false]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+}
+
+Table disciplinary_records {
+  id String [pk]
+  studentId String [not null]
+  incidentDate DateTime [not null]
+  incidentType String [not null]
+  description String [not null]
+  actionTaken String
+  recordedBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  student student_profiles [not null]
+}
+
+Table notifications {
+  id String [pk]
+  userId String [not null]
+  title String [not null]
+  message String [not null]
+  type String [not null]
+  channels NotificationChannel[] [not null]
+  priority NotificationPriority [not null, default: 'MEDIUM']
+  resourceType String
+  resourceId String
+  isRead Boolean [not null, default: false]
+  readAt DateTime
+  scheduledAt DateTime
+  sentAt DateTime
+  templateId String
+  templateData Json
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  user users [not null]
+  deliveries notification_deliveries [not null]
+}
+
+Table notification_deliveries {
+  id String [pk]
+  notificationId String [not null]
+  channel String [not null]
+  recipient String [not null]
+  status String [not null, default: 'PENDING']
+  attempts Int [not null, default: 0]
+  sentAt DateTime
+  deliveredAt DateTime
+  openedAt DateTime
+  clickedAt DateTime
+  error String
+  gatewayId String
+  gatewayResponse Json
+  notification notifications [not null]
+}
+
+Table conversations {
+  id String [pk]
+  conversationType String [not null]
+  name String
+  description String
+  avatarUrl String
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  lastMessageAt DateTime
+  lastMessagePreview String
+  isArchived Boolean [not null, default: false]
+  metadata Json
+  participants message_participants [not null]
+  messages messages [not null]
+}
+
+Table message_participants {
+  id String [pk]
+  conversationId String [not null]
+  userId String [not null]
+  role String [not null, default: 'MEMBER']
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  lastReadAt DateTime
+  isMuted Boolean [not null, default: false]
+  isPinned Boolean [not null, default: false]
+  conversation conversations [not null]
+
+  indexes {
+    (conversationId, userId) [unique]
+  }
+}
+
+Table messages {
+  id String [pk]
+  conversationId String [not null]
+  senderId String [not null]
+  recipientId String
+  groupId String
+  subject String
+  body String [not null]
+  messageType String [not null, default: 'TEXT']
+  replyToId String
+  isEdited Boolean [not null, default: false]
+  editedAt DateTime
+  isDeleted Boolean [not null, default: false]
+  deletedAt DateTime
+  deletedFor String[] [not null]
+  sentAt DateTime [default: `now()`, not null]
+  metadata Json
+  sender users [not null]
+  conversation conversations [not null]
+  replyTo messages
+  replies messages [not null]
+  attachments message_attachments [not null]
+  reactions message_reactions [not null]
+  readReceipts message_read_receipts [not null]
+}
+
+Table message_attachments {
+  id String [pk]
+  messageId String [not null]
+  fileName String [not null]
+  fileUrl String [not null]
+  fileType String [not null]
+  fileSize Int [not null]
+  thumbnailUrl String
+  uploadedAt DateTime [default: `now()`, not null]
+  message messages [not null]
+}
+
+Table message_read_receipts {
+  id String [pk]
+  messageId String [not null]
+  userId String [not null]
+  readAt DateTime [default: `now()`, not null]
+  message messages [not null]
+
+  indexes {
+    (messageId, userId) [unique]
+  }
+}
+
+Table message_reactions {
+  id String [pk]
+  messageId String [not null]
+  userId String [not null]
+  emoji String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  message messages [not null]
+
+  indexes {
+    (messageId, userId, emoji) [unique]
+  }
+}
+
+Table pinned_messages {
+  id String [pk]
+  conversationId String [not null]
+  messageId String [not null]
+  pinnedBy String [not null]
+  pinnedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (conversationId, messageId) [unique]
+  }
+}
+
+Table message_groups {
+  id String [pk]
+  name String [not null]
+  description String
+  createdBy String [not null]
+  members String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table announcements {
+  id String [pk]
+  schoolId String
+  organizationId String
+  title String [not null]
+  content String [not null]
+  targetRoleIds String[] [not null]
+  targetClasses String[] [not null]
+  attachments String[] [not null]
+  publishedAt DateTime
+  expiresAt DateTime
+  isPinned Boolean [not null, default: false]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table audit_logs {
+  id String [pk]
+  userId String
+  tenantId String
+  organizationId String
+  schoolId String
+  action String [not null]
+  tableName String [not null]
+  recordId String
+  columnName String
+  oldValue String
+  newValue String
+  resource String
+  resourceId String
+  changes Json
+  ipAddress String
+  userAgent String
+  device String
+  browser String
+  os String
+  location Json
+  reason String
+  metadata Json
+  apiEndpoint String
+  httpMethod String
+  riskLevel String
+  flagged Boolean [not null, default: false]
+  timestamp DateTime [default: `now()`, not null]
+  user users
+}
+
+Table system_config {
+  id String [pk]
+  organizationId String [unique]
+  logo String
+  banner String
+  favicon String
+  primaryColor String
+  secondaryColor String
+  accentColor String
+  companyName String
+  tagline String
+  customDomain String
+  features Json
+  smtpConfig Json
+  smsConfig Json
+  paymentGatewayConfig Json
+  analyticsConfig Json
+  maintenanceMode Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table sync_logs {
+  id String [pk]
+  organizationId String [not null]
+  syncType String [not null]
+  dataType String [not null]
+  recordCount Int [not null, default: 0]
+  status String [not null]
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  error String
+  metadata Json
+}
+
+Table government_dashboards {
+  id String [pk]
+  level String [not null]
+  stateCode String
+  districtCode String
+  metrics Json [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table analytics_reports {
+  id String [pk]
+  organizationId String
+  schoolId String
+  reportType String [not null]
+  reportName String [not null]
+  filters Json
+  data Json [not null]
+  generatedBy String [not null]
+  generatedAt DateTime [default: `now()`, not null]
+  format String [not null, default: 'JSON']
+  fileUrl String
+  isScheduled Boolean [not null, default: false]
+  schedule Json
+}
+
+Table student_analytics {
+  id String [pk]
+  studentId String [unique, not null]
+  overallGPA Decimal
+  overallPercentage Decimal
+  attendancePercent Decimal
+  strengths String[] [not null]
+  weaknesses String[] [not null]
+  learningStyle String
+  engagementScore Decimal
+  predictedPerformance Json
+  recommendations Json
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table teacher_analytics {
+  id String [pk]
+  teacherId String [unique, not null]
+  averageStudentScore Decimal
+  classCompletionRate Decimal
+  syllabusCompletionRate Decimal
+  attendancePercent Decimal
+  studentSatisfaction Decimal
+  assignmentsCreated Int [not null, default: 0]
+  examsCreated Int [not null, default: 0]
+  gradingTurnaround Decimal
+  professionalDevelopmentHours Int [not null, default: 0]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table school_analytics {
+  id String [pk]
+  schoolId String [not null]
+  academicYearId String
+  totalStudents Int [not null, default: 0]
+  totalTeachers Int [not null, default: 0]
+  averageAttendance Decimal
+  passPercentage Decimal
+  averageGPA Decimal
+  revenueCollected Decimal
+  outstandingFees Decimal
+  infraUtilization Decimal
+  studentTeacherRatio Decimal
+  calculatedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (schoolId, academicYearId) [unique]
+  }
+}
+
+Table search_queries {
+  id String [pk]
+  userId String
+  query String [not null]
+  filters Json
+  resultsCount Int [not null, default: 0]
+  clickedResultId String
+  clickPosition Int
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table content_recommendations {
+  id String [pk]
+  userId String [not null]
+  contentId String [not null]
+  recommendationType String [not null]
+  score Decimal [not null]
+  viewed Boolean [not null, default: false]
+  clicked Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table trending_content {
+  id String [pk]
+  contentId String [not null]
+  timeWindow String [not null]
+  viewCount Int [not null, default: 0]
+  uniqueViews Int [not null, default: 0]
+  engagementScore Decimal [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (contentId, timeWindow) [unique]
+  }
+}
+
+Table marketplace_products {
+  id String [pk]
+  contentId String
+  publisherId String
+  creatorId String
+  productName String [not null]
+  description String
+  productType String [not null]
+  price Decimal [not null]
+  currency String [not null, default: 'INR']
+  discountPercent Decimal
+  discountedPrice Decimal
+  isActive Boolean [not null, default: true]
+  isFeatured Boolean [not null, default: false]
+  salesCount Int [not null, default: 0]
+  revenueGenerated Decimal [not null, default: 0]
+  rating Decimal
+  reviewCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  orders marketplace_orders [not null]
+}
+
+Table marketplace_orders {
+  id String [pk]
+  productId String [not null]
+  buyerId String [not null]
+  quantity Int [not null, default: 1]
+  totalAmount Decimal [not null]
+  platformFee Decimal [not null]
+  sellerEarnings Decimal [not null]
+  status String [not null, default: 'PENDING']
+  paymentId String
+  orderedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  product marketplace_products [not null]
+}
+
+Table payout_requests {
+  id String [pk]
+  userId String [not null]
+  requestedAmount Decimal [not null]
+  availableBalance Decimal [not null]
+  status String [not null, default: 'PENDING']
+  bankAccountDetails Json
+  requestedAt DateTime [default: `now()`, not null]
+  processedAt DateTime
+  completedAt DateTime
+  transactionId String
+  rejectionReason String
+}
+
+Table password_reset_tokens {
+  id String [pk]
+  userId String [not null]
+  token String [unique, not null]
+  expiresAt DateTime [not null]
+  usedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table two_factor_backup_codes {
+  id String [pk]
+  userId String [not null]
+  code String [unique, not null]
+  isUsed Boolean [not null, default: false]
+  usedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table login_attempts {
+  id String [pk]
+  email String
+  phone String
+  username String
+  success Boolean [not null]
+  ipAddress String
+  userAgent String
+  location Json
+  failureReason String
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table device_tokens {
+  id String [pk]
+  userId String [not null]
+  token String [unique, not null]
+  deviceType String [not null]
+  deviceId String
+  deviceName String
+  isActive Boolean [not null, default: true]
+  lastUsedAt DateTime [default: `now()`, not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table lesson_plans {
+  id String [pk]
+  teacherId String [not null]
+  subjectId String
+  topicId String
+  title String [not null]
+  objectives String[] [not null]
+  duration Int [not null]
+  activities Json
+  resources String[] [not null]
+  assessment Json
+  homework String
+  plannedFor DateTime
+  completedAt DateTime
+  effectiveness Decimal
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table syllabus_progress {
+  id String [pk]
+  classId String [not null]
+  subjectId String [not null]
+  topicId String
+  completedPercentage Decimal [not null, default: 0]
+  lastTaughtDate DateTime
+  updatedAt DateTime [not null]
+
+  indexes {
+    (classId, subjectId, topicId) [unique]
+  }
+}
+
+Table student_groups {
+  id String [pk]
+  schoolId String [not null]
+  groupName String [not null]
+  groupType String [not null]
+  color String
+  motto String
+  emblem String
+  captainId String
+  viceCaptainId String
+  members String[] [not null]
+  points Int [not null, default: 0]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table academic_calendar {
+  id String [pk]
+  schoolId String [not null]
+  academicYearId String [not null]
+  eventName String [not null]
+  eventType String [not null]
+  startDate DateTime [not null]
+  endDate DateTime
+  description String
+  isHoliday Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table question_tags {
+  id String [pk]
+  name String [unique, not null]
+  category String
+  usageCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table exam_blueprints {
+  id String [pk]
+  name String [not null]
+  board Board
+  grade Int
+  subjectId String
+  distribution Json [not null]
+  totalMarks Decimal [not null]
+  duration Int [not null]
+  difficultyDistribution Json
+  isTemplate Boolean [not null, default: false]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table grading_rubrics {
+  id String [pk]
+  name String [not null]
+  description String
+  criteria Json [not null]
+  totalPoints Decimal [not null]
+  isPublic Boolean [not null, default: false]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table student_report_cards {
+  id String [pk]
+  studentId String [not null]
+  academicYearId String [not null]
+  term String
+  grades Json [not null]
+  overallGrade String
+  overallPercentage Decimal
+  overallGPA Decimal
+  classRank Int
+  totalStudents Int
+  attendancePercent Decimal
+  teacherRemarks Json
+  principalRemarks String
+  coScholastic Json
+  generatedAt DateTime [default: `now()`, not null]
+  fileUrl String
+
+  indexes {
+    (studentId, academicYearId, term) [unique]
+  }
+}
+
+Table notification_templates {
+  id String [pk]
+  name String [not null]
+  templateType String [not null]
+  subject String
+  body String [not null]
+  variables String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table notification_preferences {
+  id String [pk]
+  userId String [unique, not null]
+  emailEnabled Boolean [not null, default: true]
+  smsEnabled Boolean [not null, default: true]
+  pushEnabled Boolean [not null, default: true]
+  whatsappEnabled Boolean [not null, default: false]
+  preferences Json
+  updatedAt DateTime [not null]
+}
+
+Table sms_logs {
+  id String [pk]
+  userId String
+  phone String [not null]
+  message String [not null]
+  status String [not null]
+  gateway String
+  gatewayId String
+  sentAt DateTime [default: `now()`, not null]
+  deliveredAt DateTime
+  cost Decimal
+}
+
+Table email_logs {
+  id String [pk]
+  userId String
+  email String [not null]
+  subject String [not null]
+  body String [not null]
+  status String [not null]
+  provider String
+  providerId String
+  sentAt DateTime [default: `now()`, not null]
+  deliveredAt DateTime
+  openedAt DateTime
+}
+
+Table content_collections {
+  id String [pk]
+  name String [not null]
+  description String
+  createdBy String [not null]
+  contentIds String[] [not null]
+  isPublic Boolean [not null, default: false]
+  viewCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table learning_paths {
+  id String [pk]
+  name String [not null]
+  description String
+  board Board
+  grade Int
+  subjectId String
+  steps Json [not null]
+  estimatedDuration Int
+  difficulty DifficultyLevel
+  enrollmentCount Int [not null, default: 0]
+  completionRate Decimal
+  isPublic Boolean [not null, default: false]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table learning_path_enrollments {
+  id String [pk]
+  pathId String [not null]
+  studentId String [not null]
+  currentStep Int [not null, default: 0]
+  completedSteps Int[] [not null]
+  progressPercent Decimal [not null, default: 0]
+  enrolledAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+
+  indexes {
+    (pathId, studentId) [unique]
+  }
+}
+
+Table content_moderation {
+  id String [pk]
+  contentId String [not null]
+  moderatedBy String [not null]
+  decision String [not null]
+  reason String
+  feedback String
+  moderatedAt DateTime [default: `now()`, not null]
+}
+
+Table background_jobs {
+  id String [pk]
+  jobType String [not null]
+  status String [not null, default: 'PENDING']
+  payload Json
+  result Json
+  attempts Int [not null, default: 0]
+  maxAttempts Int [not null, default: 3]
+  priority Int [not null, default: 5]
+  scheduledAt DateTime
+  startedAt DateTime
+  completedAt DateTime
+  nextRetryAt DateTime
+  lastError String
+  errorHistory Json
+  isDeadLetter Boolean [not null, default: false]
+  deadLetterAt DateTime
+  deadLetterReason String
+  executionTime Int
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  executions job_executions [not null]
+}
+
+Table job_executions {
+  id String [pk]
+  jobId String [not null]
+  attemptNumber Int [not null]
+  status String [not null]
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  executionTime Int
+  error String
+  stackTrace String
+  result Json
+  job background_jobs [not null]
+}
+
+Table cache_entries {
+  id String [pk]
+  key String [unique, not null]
+  value String [not null]
+  ttl Int
+  expiresAt DateTime
+  tags String[] [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table system_metrics {
+  id String [pk]
+  metricType String [not null]
+  value Decimal [not null]
+  unit String
+  tags Json
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table error_logs {
+  id String [pk]
+  errorType String [not null]
+  errorMessage String [not null]
+  stackTrace String
+  userId String
+  requestPath String
+  requestMethod String
+  requestBody Json
+  userAgent String
+  ipAddress String
+  resolved Boolean [not null, default: false]
+  resolvedAt DateTime
+  resolvedBy String
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table feature_flags {
+  id String [pk]
+  flagName String [unique, not null]
+  description String
+  isEnabled Boolean [not null, default: false]
+  enabledFor String[] [not null]
+  rolloutPercent Decimal
+  conditions Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  rollouts feature_rollouts [not null]
+}
+
+Table feature_rollouts {
+  id String [pk]
+  featureFlagId String [not null]
+  rolloutStage String [not null]
+  targetAudience String
+  targetIds String[] [not null]
+  rolloutPercent Decimal [not null, default: 0]
+  startDate DateTime [not null]
+  endDate DateTime
+  status String [not null, default: 'SCHEDULED']
+  metrics Json
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  featureFlag feature_flags [not null]
+}
+
+Table experiments {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  hypothesis String
+  experimentType String [not null]
+  variants Json [not null]
+  targetAudience Json
+  sampleSize Int
+  trafficAllocation Json
+  startDate DateTime [not null]
+  endDate DateTime
+  status String [not null, default: 'DRAFT']
+  winningVariant String
+  results Json
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  abTests ab_tests [not null]
+}
+
+Table ab_tests {
+  id String [pk]
+  experimentId String [not null]
+  userId String [not null]
+  variant String [not null]
+  assignedAt DateTime [default: `now()`, not null]
+  converted Boolean [not null, default: false]
+  convertedAt DateTime
+  metrics Json
+  experiment experiments [not null]
+
+  indexes {
+    (experimentId, userId) [unique]
+  }
+}
+
+Table api_keys {
+  id String [pk]
+  organizationId String
+  userId String
+  key String [unique, not null]
+  name String
+  scopes String[] [not null]
+  rateLimit Int
+  isActive Boolean [not null, default: true]
+  lastUsedAt DateTime
+  expiresAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table webhooks {
+  id String [pk]
+  organizationId String [not null]
+  url String [not null]
+  events String[] [not null]
+  secret String
+  isActive Boolean [not null, default: true]
+  lastTriggeredAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deliveries webhook_deliveries [not null]
+}
+
+Table webhook_deliveries {
+  id String [pk]
+  webhookId String [not null]
+  event String [not null]
+  payload Json [not null]
+  status String [not null]
+  attempts Int [not null, default: 0]
+  responseStatus Int
+  responseBody String
+  deliveredAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  webhook webhooks [not null]
+}
+
+Table api_rate_limits {
+  id String [pk]
+  organizationId String
+  userId String
+  apiKeyId String
+  endpoint String
+  requestsPerMinute Int
+  requestsPerHour Int
+  requestsPerDay Int
+  burstLimit Int
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table api_usage {
+  id String [pk]
+  organizationId String
+  userId String
+  apiKeyId String
+  endpoint String [not null]
+  method String [not null]
+  statusCode Int [not null]
+  responseTime Int [not null]
+  ipAddress String
+  userAgent String
+  requestSize Int
+  responseSize Int
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table api_quotas {
+  id String [pk]
+  organizationId String
+  userId String
+  quotaType String [not null]
+  maxQuota Int [not null]
+  usedQuota Int [not null, default: 0]
+  resetPeriod String [not null]
+  lastResetAt DateTime [default: `now()`, not null]
+  nextResetAt DateTime [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (organizationId, userId, quotaType) [unique]
+  }
+}
+
+Table badges {
+  id String [pk]
+  name String [not null]
+  description String
+  iconUrl String
+  criteria Json [not null]
+  points Int [not null, default: 0]
+  rarity String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  awards badge_awards [not null]
+}
+
+Table badge_awards {
+  id String [pk]
+  badgeId String [not null]
+  userId String [not null]
+  awardedFor String
+  awardedAt DateTime [default: `now()`, not null]
+  badge badges [not null]
+
+  indexes {
+    (badgeId, userId) [unique]
+  }
+}
+
+Table leaderboards {
+  id String [pk]
+  name String [not null]
+  scope String [not null]
+  metricType String [not null]
+  filters Json
+  entries Json [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+}
+
+Table student_points {
+  id String [pk]
+  studentId String [unique, not null]
+  totalPoints Int [not null, default: 0]
+  pointsBreakdown Json
+  currentStreak Int [not null, default: 0]
+  longestStreak Int [not null, default: 0]
+  lastEarnedAt DateTime
+  updatedAt DateTime [not null]
+}
+
+Table points_transactions {
+  id String [pk]
+  studentId String [not null]
+  points Int [not null]
+  reason String [not null]
+  resourceType String
+  resourceId String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table media_folders {
+  id String [pk]
+  name String [not null]
+  parentId String
+  ownerId String [not null]
+  ownerType String [not null]
+  isPublic Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  parent media_folders
+  children media_folders [not null]
+  media media [not null]
+}
+
+Table media {
+  id String [pk]
+  fileName String [not null]
+  originalName String [not null]
+  fileUrl String [not null]
+  thumbnailUrl String
+  mediaType MediaType [not null]
+  category MediaCategory [not null]
+  mimeType String [not null]
+  fileSize Int [not null]
+  folderId String
+  uploadedBy String [not null]
+  isPublic Boolean [not null, default: false]
+  width Int
+  height Int
+  duration Int
+  version Int [not null, default: 1]
+  previousVersionId String
+  tags String[] [not null]
+  downloadCount Int [not null, default: 0]
+  viewCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  folder media_folders
+  previousVersion media
+  versions media [not null]
+  permissions media_permissions [not null]
+}
+
+Table media_permissions {
+  id String [pk]
+  mediaId String [not null]
+  userId String
+  roleId String
+  organizationId String
+  canView Boolean [not null, default: true]
+  canDownload Boolean [not null, default: false]
+  canEdit Boolean [not null, default: false]
+  canDelete Boolean [not null, default: false]
+  canShare Boolean [not null, default: false]
+  expiresAt DateTime
+  grantedBy String [not null]
+  grantedAt DateTime [default: `now()`, not null]
+  media media [not null]
+}
+
+Table platform_settings {
+  id String [pk]
+  settingKey String [unique, not null]
+  settingValue String [not null]
+  valueType String [not null]
+  category String
+  description String
+  isPublic Boolean [not null, default: false]
+  isEncrypted Boolean [not null, default: false]
+  updatedBy String
+  updatedAt DateTime [not null]
+}
+
+Table organization_settings {
+  id String [pk]
+  organizationId String [not null]
+  settingKey String [not null]
+  settingValue String [not null]
+  valueType String [not null]
+  category String
+  overridesPlatform Boolean [not null, default: false]
+  updatedBy String
+  updatedAt DateTime [not null]
+
+  indexes {
+    (organizationId, settingKey) [unique]
+  }
+}
+
+Table school_settings {
+  id String [pk]
+  schoolId String [not null]
+  settingKey String [not null]
+  settingValue String [not null]
+  valueType String [not null]
+  category String
+  updatedBy String
+  updatedAt DateTime [not null]
+
+  indexes {
+    (schoolId, settingKey) [unique]
+  }
+}
+
+Table integrations {
+  id String [pk]
+  organizationId String
+  integrationType IntegrationType [not null]
+  providerName String [not null]
+  config Json [not null]
+  isActive Boolean [not null, default: true]
+  isTest Boolean [not null, default: false]
+  lastSyncAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table oauth_tokens {
+  id String [pk]
+  userId String [not null]
+  provider String [not null]
+  accessToken String [not null]
+  refreshToken String
+  tokenType String
+  expiresAt DateTime
+  scope String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table external_mappings {
+  id String [pk]
+  internalEntityType String [not null]
+  internalEntityId String [not null]
+  externalSystem String [not null]
+  externalId String [not null]
+  mappingData Json
+  isActive Boolean [not null, default: true]
+  lastSyncedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (internalEntityType, internalEntityId, externalSystem) [unique]
+  }
+}
+
+Table domain_events {
+  id String [pk]
+  eventType EventType [not null]
+  eventName String [not null]
+  aggregateType String [not null]
+  aggregateId String [not null]
+  payload Json [not null]
+  userId String
+  tenantId String
+  organizationId String
+  occurredAt DateTime [default: `now()`, not null]
+  isProcessed Boolean [not null, default: false]
+  processedAt DateTime
+}
+
+Table integration_events {
+  id String [pk]
+  eventType String [not null]
+  targetSystem String [not null]
+  payload Json [not null]
+  status String [not null, default: 'PENDING']
+  attempts Int [not null, default: 0]
+  maxAttempts Int [not null, default: 3]
+  lastAttemptAt DateTime
+  sentAt DateTime
+  error String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table event_subscriptions {
+  id String [pk]
+  subscriberName String [not null]
+  eventType String [not null]
+  endpoint String
+  subscriptionType String [not null]
+  filters Json
+  isActive Boolean [not null, default: true]
+  retryPolicy Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  retries event_retries [not null]
+}
+
+Table event_retries {
+  id String [pk]
+  subscriptionId String [not null]
+  eventId String [not null]
+  eventType String [not null]
+  payload Json [not null]
+  attemptNumber Int [not null, default: 1]
+  maxAttempts Int [not null, default: 3]
+  status String [not null, default: 'PENDING']
+  lastError String
+  nextRetryAt DateTime
+  lastAttemptAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  subscription event_subscriptions [not null]
+}
+
+Table event_failures {
+  id String [pk]
+  eventId String [not null]
+  eventType String [not null]
+  subscriptionId String
+  payload Json [not null]
+  failureReason String [not null]
+  errorDetails Json
+  attempts Int [not null]
+  failedAt DateTime [default: `now()`, not null]
+  isResolved Boolean [not null, default: false]
+  resolvedAt DateTime
+  resolvedBy String
+}
+
+Table workflow_definitions {
+  id String [pk]
+  name String [not null]
+  workflowType String [not null]
+  entityType String [not null]
+  steps Json [not null]
+  isActive Boolean [not null, default: true]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  instances workflow_instances [not null]
+}
+
+Table workflow_instances {
+  id String [pk]
+  definitionId String [not null]
+  entityType String [not null]
+  entityId String [not null]
+  currentStep Int [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  stepHistory Json [not null]
+  definition workflow_definitions [not null]
+}
+
+Table syllabus_versions {
+  id String [pk]
+  curriculumId String [not null]
+  version String [not null]
+  versionName String
+  effectiveFrom DateTime [not null]
+  effectiveTo DateTime
+  changes Json
+  isActive Boolean [not null, default: true]
+  approvedBy String
+  approvedAt DateTime
+  syllabus Json [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table learning_outcomes {
+  id String [pk]
+  code String [unique, not null]
+  description String [not null]
+  curriculumId String
+  subjectId String
+  topicId String
+  bloomsLevel String
+  competencies String[] [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table competencies {
+  id String [pk]
+  code String [unique, not null]
+  name String [not null]
+  description String
+  category String
+  parentId String
+  isActive Boolean [not null, default: true]
+  parent competencies
+  children competencies [not null]
+}
+
+Table government_reports {
+  id String [pk]
+  reportType String [not null]
+  reportingPeriod String [not null]
+  schoolId String
+  districtId String
+  stateId String
+  data Json [not null]
+  status String [not null, default: 'DRAFT']
+  submittedBy String
+  submittedAt DateTime
+  approvedBy String
+  approvedAt DateTime
+  fileUrl String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table compliance_checks {
+  id String [pk]
+  checkType String [not null]
+  entityType String [not null]
+  entityId String [not null]
+  status String [not null]
+  findings Json
+  score Decimal
+  checkedBy String
+  checkedAt DateTime [default: `now()`, not null]
+  nextCheckDue DateTime
+}
+
+Table archival_policies {
+  id String [pk]
+  entityType String [unique, not null]
+  retentionDays Int [not null]
+  archiveAfterDays Int [not null]
+  deleteAfterDays Int
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table archived_data {
+  id String [pk]
+  entityType String [not null]
+  entityId String [not null]
+  data Json [not null]
+  archivedAt DateTime [default: `now()`, not null]
+  deleteAt DateTime
+}
+
+Table search_indexes {
+  id String [pk]
+  entityType String [not null]
+  entityId String [not null]
+  searchableText String [not null]
+  title String
+  description String
+  metadata Json
+  popularity Int [not null, default: 0]
+  lastAccessedAt DateTime
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (entityType, entityId) [unique]
+  }
+}
+
+Table search_keywords {
+  id String [pk]
+  keyword String [unique, not null]
+  searchCount Int [not null, default: 0]
+  relatedKeywords String[] [not null]
+  lastSearchedAt DateTime [default: `now()`, not null]
+}
+
+Table search_analytics {
+  id String [pk]
+  userId String
+  query String [not null]
+  resultsCount Int [not null]
+  clickedResults Json
+  refinements Int [not null, default: 0]
+  timeSpent Int
+  wasSuccessful Boolean
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table recent_searches {
+  id String [pk]
+  userId String [not null]
+  query String [not null]
+  entityType String
+  searchedAt DateTime [default: `now()`, not null]
+}
+
+Table search_facets {
+  id String [pk]
+  facetType String [not null]
+  facetKey String [not null]
+  facetValue String [not null]
+  displayName String [not null]
+  count Int [not null, default: 0]
+  sortOrder Int [not null, default: 0]
+  isActive Boolean [not null, default: true]
+
+  indexes {
+    (facetType, facetKey, facetValue) [unique]
+  }
+}
+
+Table synonyms {
+  id String [pk]
+  term String [unique, not null]
+  synonyms String[] [not null]
+  category String
+  isActive Boolean [not null, default: true]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table search_suggestions {
+  id String [pk]
+  query String [unique, not null]
+  suggestion String [not null]
+  searchCount Int [not null, default: 0]
+  clickCount Int [not null, default: 0]
+  relevanceScore Decimal [not null, default: 1]
+  isActive Boolean [not null, default: true]
+  lastSearchedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table analytics_snapshots {
+  id String [pk]
+  snapshotType String [not null]
+  snapshotDate DateTime [not null]
+  entityType String [not null]
+  entityId String
+  metrics Json [not null]
+  createdAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (snapshotType, snapshotDate, entityType, entityId) [unique]
+  }
+}
+
+Table metric_definitions {
+  id String [pk]
+  metricKey String [unique, not null]
+  metricName String [not null]
+  description String
+  category String [not null]
+  calculationFormula String
+  unit String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  kpis kpis [not null]
+}
+
+Table kpis {
+  id String [pk]
+  metricId String [not null]
+  name String [not null]
+  targetValue Decimal [not null]
+  currentValue Decimal [not null]
+  threshold Json
+  entityType String
+  entityId String
+  period String [not null]
+  periodDate DateTime [not null]
+  status String [not null, default: 'ON_TRACK']
+  metric metric_definitions [not null]
+}
+
+Table dashboard_cache {
+  id String [pk]
+  dashboardKey String [unique, not null]
+  userId String
+  organizationId String
+  cacheData Json [not null]
+  expiresAt DateTime [not null]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table sync_history {
+  id String [pk]
+  integrationId String [not null]
+  externalSystem String [not null]
+  syncType String [not null]
+  entityType String [not null]
+  recordsProcessed Int [not null, default: 0]
+  recordsSuccess Int [not null, default: 0]
+  recordsFailed Int [not null, default: 0]
+  status String [not null, default: 'PENDING']
+  startedAt DateTime [default: `now()`, not null]
+  completedAt DateTime
+  error String
+  metadata Json
+}
+
+Table sync_failures {
+  id String [pk]
+  syncHistoryId String [not null]
+  entityType String [not null]
+  entityId String
+  errorMessage String [not null]
+  errorDetails Json
+  retryCount Int [not null, default: 0]
+  maxRetries Int [not null, default: 3]
+  nextRetryAt DateTime
+  isResolved Boolean [not null, default: false]
+  resolvedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table user_settings {
+  id String [pk]
+  userId String [not null]
+  settingKey String [not null]
+  settingValue String [not null]
+  valueType String [not null]
+  category String
+  updatedAt DateTime [not null]
+
+  indexes {
+    (userId, settingKey) [unique]
+  }
+}
+
+Table activity_logs {
+  id String [pk]
+  userId String
+  activityType String [not null]
+  page String
+  action String
+  metadata Json
+  ipAddress String
+  userAgent String
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table session_analytics {
+  id String [pk]
+  userId String
+  sessionId String [not null]
+  startTime DateTime [default: `now()`, not null]
+  endTime DateTime
+  duration Int
+  pagesViewed Int [not null, default: 0]
+  actionsPerformed Int [not null, default: 0]
+  device String
+  browser String
+  os String
+  referrer String
+}
+
+Table approvals {
+  id String [pk]
+  requestType String [not null]
+  requestId String [not null]
+  requestedBy String [not null]
+  requestedAt DateTime [default: `now()`, not null]
+  currentApproverId String
+  currentLevel Int [not null, default: 1]
+  status String [not null, default: 'PENDING']
+  priority String [not null, default: 'NORMAL']
+  dueDate DateTime
+  approvalChain Json [not null]
+  completedAt DateTime
+}
+
+Table approval_history {
+  id String [pk]
+  approvalId String [not null]
+  level Int [not null]
+  approverId String [not null]
+  action String [not null]
+  comments String
+  attachments String[] [not null]
+  actionedAt DateTime [default: `now()`, not null]
+}
+
+Table certificate_templates {
+  id String [pk]
+  name String [not null]
+  certificateType String [not null]
+  templateHtml String [not null]
+  templateCss String
+  variables String[] [not null]
+  signaturePositions Json
+  isActive Boolean [not null, default: true]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  certificates certificates [not null]
+}
+
+Table certificates {
+  id String [pk]
+  templateId String [not null]
+  recipientId String [not null]
+  recipientType String [not null]
+  certificateNumber String [unique, not null]
+  title String [not null]
+  description String
+  issuedFor String
+  data Json [not null]
+  generatedPdfUrl String
+  issuedBy String [not null]
+  issuedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+  isRevoked Boolean [not null, default: false]
+  revokedAt DateTime
+  revokedReason String
+  verificationCode String [unique, not null]
+  template certificate_templates [not null]
+}
+
+Table id_card_templates {
+  id String [pk]
+  name String [not null]
+  cardType String [not null]
+  schoolId String
+  organizationId String
+  templateFront String [not null]
+  templateBack String
+  dimensions Json [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  idCards id_cards [not null]
+}
+
+Table id_cards {
+  id String [pk]
+  templateId String [not null]
+  holderId String [not null]
+  holderType String [not null]
+  cardNumber String [unique, not null]
+  data Json [not null]
+  qrCode String
+  barcode String
+  photoUrl String
+  validFrom DateTime [not null]
+  validUntil DateTime [not null]
+  status String [not null, default: 'ACTIVE']
+  generatedPdfUrl String
+  issuedAt DateTime [default: `now()`, not null]
+  template id_card_templates [not null]
+}
+
+Enum SystemRole {
+  PLATFORM_ADMIN
+  GOVERNMENT
+  ORG_OWNER
+  ORG_ADMIN
+  SCHOOL_ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+  PUBLISHER
+  CREATOR
+  GUEST
+}
+
+Enum AuthProvider {
+  LOCAL
+  GOOGLE
+  MICROSOFT
+  AADHAAR
+  SCHOOL_ID
+}
+
+Enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  DELETED
+}
+
+Enum TenantLevel {
+  PLATFORM
+  GOVERNMENT_NATIONAL
+  GOVERNMENT_STATE
+  GOVERNMENT_DISTRICT
+  ORGANIZATION
+  SCHOOL
+  BRANCH
+  DEPARTMENT
+}
+
+Enum OrganizationType {
+  MINISTRY
+  STATE_DEPARTMENT
+  DISTRICT_OFFICE
+  SCHOOL
+  COLLEGE
+  UNIVERSITY
+  COACHING_CENTER
+  INSTITUTION_GROUP
+  EDTECH_COMPANY
+}
+
+Enum OrganizationTier {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+  GOVERNMENT
+}
+
+Enum Board {
+  CBSE
+  ICSE
+  STATE_BOARD
+  IB
+  IGCSE
+  NIOS
+  OTHER
+}
+
+Enum ContentType {
+  AR
+  VR
+  VIDEO
+  PDF
+  BOOK
+  THREE_D_MODEL
+  TWO_D_IMAGE
+  GAME
+  ANIMATION
+  PPT
+  DOCUMENT
+  QUIZ
+  SIMULATION
+  AUDIO
+  INTERACTIVE
+}
+
+Enum ContentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+Enum DifficultyLevel {
+  BEGINNER
+  EASY
+  MEDIUM
+  HARD
+  ADVANCED
+  EXPERT
+}
+
+Enum WorkflowStatus {
+  DRAFT
+  PENDING_REVIEW
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  ARCHIVED
+  SUSPENDED
+}
+
+Enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+  PENDING
+}
+
+Enum SubscriptionTier {
+  FREE
+  AR_ONLY
+  VR_ONLY
+  AR_VR_BUNDLE
+  LMS_ONLY
+  COMPETITIVE_EXAM
+  FULL_ACCESS
+  CUSTOM
+}
+
+Enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+Enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  NET_BANKING
+  WALLET
+  RAZORPAY
+  STRIPE
+  PAYPAL
+  BANK_TRANSFER
+  CASH
+  CHEQUE
+}
+
+Enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  FILL_IN_BLANK
+  SHORT_ANSWER
+  LONG_ANSWER
+  MATCH_FOLLOWING
+  DIAGRAM_BASED
+}
+
+Enum ExamType {
+  QUIZ
+  MOCK_TEST
+  ASSIGNMENT
+  MID_TERM
+  FINAL_EXAM
+  COMPETITIVE_EXAM
+  PRACTICE_TEST
+}
+
+Enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  SUBMITTED
+  GRADED
+  OVERDUE
+}
+
+Enum ClassMode {
+  TRADITIONAL_VIDEO
+  METAVERSE
+}
+
+Enum ClassStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+Enum RankingScope {
+  CLASS
+  SCHOOL
+  DISTRICT
+  STATE
+  NATIONAL
+  GLOBAL
+}
+
+Enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+}
+
+Enum AttendanceMethod {
+  MANUAL
+  BIOMETRIC_FINGERPRINT
+  BIOMETRIC_FACE
+  RFID_CARD
+  QR_CODE
+  GPS_LOCATION
+  ONLINE_CLASS
+  MOBILE_APP
+}
+
+Enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+Enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+  WHATSAPP
+}
+
+Enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+Enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  PDF
+  SPREADSHEET
+  PRESENTATION
+  ARCHIVE
+  OTHER
+}
+
+Enum MediaCategory {
+  PROFILE_PHOTO
+  ASSIGNMENT
+  SUBMISSION
+  CERTIFICATE
+  REPORT
+  QUESTION_PAPER
+  ANSWER_SHEET
+  CONTENT
+  ANNOUNCEMENT
+  ID_CARD
+  LESSON_MATERIAL
+  OTHER
+}
+
+Enum IntegrationType {
+  PAYMENT_GATEWAY
+  SMS_PROVIDER
+  EMAIL_PROVIDER
+  VIDEO_CONFERENCE
+  CLOUD_STORAGE
+  ANALYTICS
+  SSO
+  LMS
+  ERP
+  GOVERNMENT_API
+  CUSTOM
+}
+
+Enum EventType {
+  USER_CREATED
+  USER_UPDATED
+  STUDENT_ENROLLED
+  ASSIGNMENT_SUBMITTED
+  EXAM_COMPLETED
+  PAYMENT_RECEIVED
+  FEE_OVERDUE
+  ATTENDANCE_MARKED
+  CONTENT_PUBLISHED
+  NOTIFICATION_SENT
+  INTEGRATION_SYNC
+  CUSTOM
+}
+
+Ref: user_sessions.userId > users.id [delete: Cascade]
+
+Ref: custom_roles.organizationId > organizations.id [delete: Cascade]
+
+Ref: custom_permissions.roleId > custom_roles.id [delete: Cascade]
+
+Ref: custom_permissions.userId > users.id [delete: Cascade]
+
+Ref: user_role_mappings.userId > users.id [delete: Cascade]
+
+Ref: user_role_mappings.roleId > custom_roles.id [delete: Cascade]
+
+Ref: user_role_mappings.organizationId > organizations.id
+
+Ref: roles.organizationId > organizations.id [delete: Cascade]
+
+Ref: permissions.categoryId > permission_categories.id [delete: Set Null]
+
+Ref: permissions.groupId > permission_groups.id [delete: Set Null]
+
+Ref: role_permissions.roleId > roles.id [delete: Cascade]
+
+Ref: role_permissions.permissionId > permissions.id [delete: Cascade]
+
+Ref: permission_dependencies.permissionId > permissions.id [delete: Cascade]
+
+Ref: permission_dependencies.requiredPermissionId > permissions.id [delete: Cascade]
+
+Ref: role_inheritances.parentRoleId > roles.id [delete: Cascade]
+
+Ref: role_inheritances.childRoleId > roles.id [delete: Cascade]
+
+Ref: user_roles.userId > users.id [delete: Cascade]
+
+Ref: user_roles.roleId > roles.id [delete: Cascade]
+
+Ref: states.countryId > countries.id [delete: Restrict]
+
+Ref: districts.stateId > states.id [delete: Restrict]
+
+Ref: blocks.districtId > districts.id [delete: Restrict]
+
+Ref: villages.blockId > blocks.id [delete: Restrict]
+
+Ref: tenant_hierarchy.parentId - tenant_hierarchy.id
+
+Ref: government_entities.parentId - government_entities.id
+
+Ref: organizations.parentOrganizationId - organizations.id
+
+Ref: branches.organizationId > organizations.id [delete: Cascade]
+
+Ref: departments.organizationId > organizations.id [delete: Cascade]
+
+Ref: departments.branchId > branches.id [delete: Cascade]
+
+Ref: departments.parentDepartmentId - departments.id [delete: Restrict]
+
+Ref: organization_users.organizationId > organizations.id [delete: Cascade]
+
+Ref: organization_users.userId > users.id [delete: Cascade]
+
+Ref: schools.organizationId > organizations.id [delete: Cascade]
+
+Ref: schools.branchId > branches.id [delete: Restrict]
+
+Ref: curricula.boardId > board_masters.id [delete: Cascade]
+
+Ref: curriculum_subjects.curriculumId > curricula.id [delete: Cascade]
+
+Ref: curriculum_subjects.subjectId > subjects.id [delete: Cascade]
+
+Ref: academic_years.schoolId > schools.id [delete: Cascade]
+
+Ref: classes.schoolId > schools.id [delete: Cascade]
+
+Ref: classes.academicYearId > academic_years.id [delete: Cascade]
+
+Ref: sections.classId > classes.id [delete: Cascade]
+
+Ref: section_teachers.sectionId > sections.id [delete: Cascade]
+
+Ref: section_subjects.sectionId > sections.id [delete: Cascade]
+
+Ref: section_subjects.subjectId > subjects.id [delete: Cascade]
+
+Ref: class_subjects.classId > classes.id [delete: Cascade]
+
+Ref: class_subjects.subjectId > subjects.id [delete: Cascade]
+
+Ref: class_subjects.teacherId > teacher_profiles.id
+
+Ref: student_profiles.userId - users.id [delete: Cascade]
+
+Ref: student_profiles.schoolId > schools.id [delete: Restrict]
+
+Ref: teacher_profiles.userId - users.id [delete: Cascade]
+
+Ref: teacher_profiles.schoolId > schools.id [delete: Restrict]
+
+Ref: parent_profiles.userId - users.id [delete: Cascade]
+
+Ref: parent_students.parentId > parent_profiles.id [delete: Cascade]
+
+Ref: parent_students.studentId > student_profiles.id [delete: Cascade]
+
+Ref: publisher_profiles.userId - users.id [delete: Cascade]
+
+Ref: creator_profiles.userId - users.id [delete: Cascade]
+
+Ref: student_enrollments.studentId > student_profiles.id [delete: Cascade]
+
+Ref: student_enrollments.sectionId > sections.id [delete: Cascade]
+
+Ref: student_enrollments.academicYearId > academic_years.id [delete: Cascade]
+
+Ref: chapters.subjectId > subjects.id [delete: Cascade]
+
+Ref: topics.chapterId > chapters.id [delete: Cascade]
+
+Ref: subtopics.topicId > topics.id [delete: Cascade]
+
+Ref: sub_subtopics.subtopicId > subtopics.id [delete: Cascade]
+
+Ref: contents.creatorId > creator_profiles.id
+
+Ref: contents.previousVersionId - contents.id
+
+Ref: contents.topicId > topics.id
+
+Ref: contents.subtopicId > subtopics.id
+
+Ref: contents.subSubtopicId > sub_subtopics.id
+
+Ref: content_reviews.contentId > contents.id [delete: Cascade]
+
+Ref: books.publisherId > publisher_profiles.id [delete: Cascade]
+
+Ref: diagrams.bookId > books.id [delete: Cascade]
+
+Ref: ar_markers.publisherId > publisher_profiles.id [delete: Cascade]
+
+Ref: ar_markers.diagramId - diagrams.id
+
+Ref: ar_contents.contentId > contents.id [delete: Cascade]
+
+Ref: ar_contents.markerId > ar_markers.id
+
+Ref: vr_contents.contentId > contents.id [delete: Cascade]
+
+Ref: vr_usage_logs.vrContentId > vr_contents.id [delete: Cascade]
+
+Ref: subscriptions.organizationId > organizations.id
+
+Ref: licenses.organizationId > organizations.id [delete: Cascade]
+
+Ref: license_assignments.licenseId > licenses.id [delete: Cascade]
+
+Ref: subscription_contents.subscriptionId > subscriptions.id [delete: Cascade]
+
+Ref: subscription_contents.contentId > contents.id [delete: Cascade]
+
+Ref: payments.subscriptionId > subscriptions.id
+
+Ref: payment_attempts.paymentId > payments.id [delete: Cascade]
+
+Ref: payment_refunds.paymentId > payments.id [delete: Cascade]
+
+Ref: publisher_monetization_plans.publisherId > publisher_profiles.id [delete: Cascade]
+
+Ref: creator_monetization_plans.creatorId > creator_profiles.id [delete: Cascade]
+
+Ref: exams.teacherId > teacher_profiles.id
+
+Ref: exams.sectionId > sections.id
+
+Ref: exam_questions.examId > exams.id [delete: Cascade]
+
+Ref: exam_questions.questionBankId > question_bank.id
+
+Ref: exam_assignments.examId > exams.id [delete: Cascade]
+
+Ref: exam_attempts.examId > exams.id [delete: Cascade]
+
+Ref: exam_attempts.studentId > student_profiles.id [delete: Cascade]
+
+Ref: exam_answers.attemptId > exam_attempts.id [delete: Cascade]
+
+Ref: exam_answers.questionId > exam_questions.id [delete: Cascade]
+
+Ref: assignments.teacherId > teacher_profiles.id [delete: Cascade]
+
+Ref: assignments.sectionId > sections.id
+
+Ref: assignment_submissions.assignmentId > assignments.id [delete: Cascade]
+
+Ref: assignment_submissions.studentId > student_profiles.id [delete: Cascade]
+
+Ref: live_classes.teacherId > teacher_profiles.id [delete: Cascade]
+
+Ref: live_class_participants.liveClassId > live_classes.id [delete: Cascade]
+
+Ref: class_recordings.liveClassId > live_classes.id [delete: Cascade]
+
+Ref: learning_progress.studentId > student_profiles.id [delete: Cascade]
+
+Ref: learning_progress.contentId > contents.id [delete: Cascade]
+
+Ref: attendance.studentId > student_profiles.id [delete: Cascade]
+
+Ref: attendance.schoolId > schools.id [delete: Cascade]
+
+Ref: teacher_attendance.teacherId > teacher_profiles.id [delete: Cascade]
+
+Ref: biometric_attendance_logs.deviceId > attendance_devices.id
+
+Ref: rooms.schoolId > schools.id [delete: Cascade]
+
+Ref: time_slots.schoolId > schools.id [delete: Cascade]
+
+Ref: timetable_entries.schoolId > schools.id [delete: Cascade]
+
+Ref: timetable_entries.sectionId > sections.id [delete: Cascade]
+
+Ref: timetable_entries.timeSlotId > time_slots.id [delete: Cascade]
+
+Ref: timetable_entries.roomId > rooms.id
+
+Ref: fee_structures.schoolId > schools.id [delete: Cascade]
+
+Ref: fee_records.studentId > student_profiles.id [delete: Cascade]
+
+Ref: fee_records.feeStructureId > fee_structures.id [delete: Cascade]
+
+Ref: fee_payments.feeRecordId > fee_records.id [delete: Cascade]
+
+Ref: scholarship_applications.scholarshipId > scholarships.id [delete: Cascade]
+
+Ref: library_books.schoolId > schools.id [delete: Cascade]
+
+Ref: library_issues.bookId > library_books.id [delete: Cascade]
+
+Ref: library_issues.userId > student_profiles.id [delete: Cascade]
+
+Ref: library_reservations.bookId > library_books.id [delete: Cascade]
+
+Ref: vector_embeddings.indexId > vector_indexes.id [delete: Cascade]
+
+Ref: hostel_blocks.schoolId > schools.id [delete: Cascade]
+
+Ref: hostel_rooms.blockId > hostel_blocks.id [delete: Cascade]
+
+Ref: hostel_room_assignments.studentId - student_profiles.id [delete: Cascade]
+
+Ref: hostel_room_assignments.roomId > hostel_rooms.id [delete: Cascade]
+
+Ref: hostel_fees.blockId > hostel_blocks.id [delete: Cascade]
+
+Ref: hostel_maintenance.roomId > hostel_rooms.id [delete: Cascade]
+
+Ref: inventory_categories.parentId - inventory_categories.id
+
+Ref: inventory_items.categoryId > inventory_categories.id
+
+Ref: inventory_transactions.itemId > inventory_items.id [delete: Cascade]
+
+Ref: inventory_requisitions.itemId > inventory_items.id [delete: Cascade]
+
+Ref: teacher_leaves.teacherId > teacher_profiles.id [delete: Cascade]
+
+Ref: transport_routes.schoolId > schools.id [delete: Cascade]
+
+Ref: transport_routes.vehicleId > transport_vehicles.id
+
+Ref: transport_route_stops.routeId > transport_routes.id [delete: Cascade]
+
+Ref: vehicle_gps_logs.vehicleId > transport_vehicles.id [delete: Cascade]
+
+Ref: vehicle_maintenance.vehicleId > transport_vehicles.id [delete: Cascade]
+
+Ref: transport_student_assignments.studentId - student_profiles.id [delete: Cascade]
+
+Ref: transport_student_assignments.routeId > transport_routes.id [delete: Cascade]
+
+Ref: transport_attendance.assignmentId > transport_student_assignments.id [delete: Cascade]
+
+Ref: transport_attendance.tripId > transport_trips.id
+
+Ref: transport_trips.routeId > transport_routes.id [delete: Cascade]
+
+Ref: transport_trips.vehicleId > transport_vehicles.id [delete: Cascade]
+
+Ref: events.schoolId > schools.id [delete: Cascade]
+
+Ref: disciplinary_records.studentId > student_profiles.id [delete: Cascade]
+
+Ref: notifications.userId > users.id [delete: Cascade]
+
+Ref: notification_deliveries.notificationId > notifications.id [delete: Cascade]
+
+Ref: message_participants.conversationId > conversations.id [delete: Cascade]
+
+Ref: messages.senderId > users.id [delete: Cascade]
+
+Ref: messages.conversationId > conversations.id [delete: Cascade]
+
+Ref: messages.replyToId - messages.id
+
+Ref: message_attachments.messageId > messages.id [delete: Cascade]
+
+Ref: message_read_receipts.messageId > messages.id [delete: Cascade]
+
+Ref: message_reactions.messageId > messages.id [delete: Cascade]
+
+Ref: audit_logs.userId > users.id
+
+Ref: marketplace_orders.productId > marketplace_products.id [delete: Cascade]
+
+Ref: job_executions.jobId > background_jobs.id [delete: Cascade]
+
+Ref: feature_rollouts.featureFlagId > feature_flags.id [delete: Cascade]
+
+Ref: ab_tests.experimentId > experiments.id [delete: Cascade]
+
+Ref: webhook_deliveries.webhookId > webhooks.id [delete: Cascade]
+
+Ref: badge_awards.badgeId > badges.id [delete: Cascade]
+
+Ref: media_folders.parentId - media_folders.id
+
+Ref: media.folderId > media_folders.id
+
+Ref: media.previousVersionId - media.id
+
+Ref: media_permissions.mediaId > media.id [delete: Cascade]
+
+Ref: event_retries.subscriptionId > event_subscriptions.id [delete: Cascade]
+
+Ref: workflow_instances.definitionId > workflow_definitions.id
+
+Ref: competencies.parentId - competencies.id
+
+Ref: kpis.metricId > metric_definitions.id
+
+Ref: certificates.templateId > certificate_templates.id
+
+Ref: id_cards.templateId > id_card_templates.id

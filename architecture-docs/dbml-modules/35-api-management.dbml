@@ -1,0 +1,92 @@
+//// ======================================================
+//// API MANAGEMENT
+//// Module: 35-api-management
+//// Category: Infrastructure
+//// Tables: 5
+//// ======================================================
+
+Table api_rate_limits [headercolor: #7F8C8D] {
+  id String [pk]
+  organizationId String
+  userId String
+  apiKeyId String
+  endpoint String
+  requestsPerMinute Int
+  requestsPerHour Int
+  requestsPerDay Int
+  burstLimit Int
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table api_usage [headercolor: #7F8C8D] {
+  id String [pk]
+  organizationId String
+  userId String
+  apiKeyId String
+  endpoint String [not null]
+  method String [not null]
+  statusCode Int [not null]
+  responseTime Int [not null]
+  ipAddress String
+  userAgent String
+  requestSize Int
+  responseSize Int
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table api_quotas [headercolor: #7F8C8D] {
+  id String [pk]
+  organizationId String
+  userId String
+  quotaType String [not null]
+  maxQuota Int [not null]
+  usedQuota Int [not null, default: 0]
+  resetPeriod String [not null]
+  lastResetAt DateTime [default: `now()`, not null]
+  nextResetAt DateTime [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (organizationId, userId, quotaType) [unique]
+  }
+}
+
+Table api_keys [headercolor: #7F8C8D] {
+  id String [pk]
+  organizationId String
+  userId String
+  key String [unique, not null]
+  name String
+  scopes String[] [not null]
+  rateLimit Int
+  isActive Boolean [not null, default: true]
+  lastUsedAt DateTime
+  expiresAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+// No internal relationships defined
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 5
+//// Internal Relationships: 0
+//// Cross-Module References: 0
+//// Color: #7F8C8D
+//// Category: Infrastructure
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

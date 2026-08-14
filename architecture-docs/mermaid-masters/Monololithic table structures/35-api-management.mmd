@@ -1,0 +1,66 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/35-api-management.dbml
+  %% Tables: 4
+  %% Internal relationships: 0
+  %% Table: api_rate_limits
+  api_rate_limits {
+    String id PK
+    String organizationId
+    String userId
+    String apiKeyId
+    String endpoint
+    Int requestsPerMinute
+    Int requestsPerHour
+    Int requestsPerDay
+    Int burstLimit
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: api_usage
+  api_usage {
+    String id PK
+    String organizationId
+    String userId
+    String apiKeyId
+    String endpoint
+    String method
+    Int statusCode
+    Int responseTime
+    String ipAddress
+    String userAgent
+    Int requestSize
+    Int responseSize
+    DateTime timestamp
+  }
+  %% Table: api_quotas
+  api_quotas {
+    String id PK
+    String organizationId
+    String userId
+    String quotaType
+    Int maxQuota
+    Int usedQuota
+    String resetPeriod
+    DateTime lastResetAt
+    DateTime nextResetAt
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: api_keys
+  api_keys {
+    String id PK
+    String organizationId
+    String userId
+    String key UK
+    String name
+    Int rateLimit
+    Boolean isActive
+    DateTime lastUsedAt
+    DateTime expiresAt
+    DateTime createdAt
+  }
+
+  %% No internal relationships in this module

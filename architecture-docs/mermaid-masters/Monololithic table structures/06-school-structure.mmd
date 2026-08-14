@@ -1,0 +1,136 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/06-school-structure.dbml
+  %% Tables: 8
+  %% Internal relationships: 6
+  %% Table: schools
+  schools {
+    String id PK
+    String organizationId
+    String branchId
+    String name
+    String code UK
+    String udiseCode UK
+    String schoolType
+    Board board
+    String affiliationNumber
+    String recognitionNumber
+    String principalId
+    String countryId
+    String stateId
+    String districtId
+    String blockId
+    Json coordinates
+    String tenantId UK
+    String hierarchyPath
+    String email
+    String phone
+    String website
+    Int totalCapacity
+    Int currentStrength
+    Json schoolTiming
+    Boolean isActive
+    String accreditationStatus
+    String accreditationGrade
+    DateTime establishedDate
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: academic_years
+  academic_years {
+    String id PK
+    String schoolId
+    String year
+    DateTime startDate
+    DateTime endDate
+    Boolean isCurrent
+    DateTime createdAt
+  }
+  %% Table: classes
+  classes {
+    String id PK
+    String schoolId
+    String academicYearId
+    Int grade
+    String gradeName
+    String stream
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: sections
+  sections {
+    String id PK
+    String classId
+    String sectionName
+    Int capacity
+    Int currentStrength
+    String classTeacherId
+    String roomNumber
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: board_masters
+  board_masters {
+    String id PK
+    String code UK
+    String name
+    String fullName
+    String country
+    String stateCode
+    String website
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: curricula
+  curricula {
+    String id PK
+    String boardId
+    String name
+    String code UK
+    Json gradeRange
+    String description
+    Boolean isActive
+    DateTime effectiveFrom
+    DateTime effectiveTo
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: curriculum_subjects
+  curriculum_subjects {
+    String id PK
+    String curriculumId
+    String subjectId
+    Int grade
+    Boolean isMandatory
+    Boolean isElective
+    Int credits
+    Int hoursPerWeek
+  }
+  %% Table: academic_calendar
+  academic_calendar {
+    String id PK
+    String schoolId
+    String academicYearId
+    String eventName
+    String eventType
+    DateTime startDate
+    DateTime endDate
+    String description
+    Boolean isHoliday
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  board_masters ||--o{ curricula : boardId Cascade
+  curricula ||--o{ curriculum_subjects : curriculumId Cascade
+  schools ||--o{ academic_years : schoolId Cascade
+  schools ||--o{ classes : schoolId Cascade
+  academic_years ||--o{ classes : academicYearId Cascade
+  classes ||--o{ sections : classId Cascade

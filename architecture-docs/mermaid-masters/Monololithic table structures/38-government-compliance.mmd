@@ -1,0 +1,67 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/38-government-compliance.dbml
+  %% Tables: 5
+  %% Internal relationships: 0
+  %% Table: government_dashboards
+  government_dashboards {
+    String id PK
+    String level
+    String stateCode
+    String districtCode
+    Json metrics
+    DateTime calculatedAt
+  }
+  %% Table: government_reports
+  government_reports {
+    String id PK
+    String reportType
+    String reportingPeriod
+    String schoolId
+    String districtId
+    String stateId
+    Json data
+    String status
+    String submittedBy
+    DateTime submittedAt
+    String approvedBy
+    DateTime approvedAt
+    String fileUrl
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: compliance_checks
+  compliance_checks {
+    String id PK
+    String checkType
+    String entityType
+    String entityId
+    String status
+    Json findings
+    Decimal score
+    String checkedBy
+    DateTime checkedAt
+    DateTime nextCheckDue
+  }
+  %% Table: archival_policies
+  archival_policies {
+    String id PK
+    String entityType UK
+    Int retentionDays
+    Int archiveAfterDays
+    Int deleteAfterDays
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: archived_data
+  archived_data {
+    String id PK
+    String entityType
+    String entityId
+    Json data
+    DateTime archivedAt
+    DateTime deleteAt
+  }
+
+  %% No internal relationships in this module

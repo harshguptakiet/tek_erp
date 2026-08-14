@@ -1,0 +1,144 @@
+//// ======================================================
+//// AI CHATBOT
+//// Module: 23-ai-chatbot
+//// Category: Platform Services
+//// Tables: 8
+//// ======================================================
+
+Table chatbot_conversations [headercolor: #E74C3C] {
+  id String [pk]
+  userId String [not null]
+  sessionId String [not null]
+  conversationData Json [not null]
+  startedAt DateTime [default: `now()`, not null]
+  endedAt DateTime
+  totalMessages Int [not null, default: 0]
+  satisfaction Int
+  feedback String
+}
+
+Table chatbot_messages [headercolor: #E74C3C] {
+  id String [pk]
+  conversationId String [not null]
+  role String [not null]
+  content String [not null]
+  intent String
+  entities Json
+  confidence Decimal
+  isHelpful Boolean
+  feedback String
+  timestamp DateTime [default: `now()`, not null]
+}
+
+Table ai_prompts [headercolor: #E74C3C] {
+  id String [pk]
+  userId String [not null]
+  promptText String [not null]
+  promptType String [not null]
+  context Json
+  responseText String
+  responseTime Int
+  modelUsed String
+  tokensUsed Int
+  wasSuccessful Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table ai_feedback [headercolor: #E74C3C] {
+  id String [pk]
+  entityType String [not null]
+  entityId String [not null]
+  userId String [not null]
+  rating Int
+  isHelpful Boolean
+  feedbackText String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table token_usage [headercolor: #E74C3C] {
+  id String [pk]
+  userId String [not null]
+  organizationId String
+  modelProvider String [not null]
+  modelName String [not null]
+  modelVersion String
+  promptTokens Int [not null]
+  completionTokens Int [not null]
+  totalTokens Int [not null]
+  cost Decimal
+  requestType String [not null]
+  entityType String
+  entityId String
+  responseTime Int
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table model_providers [headercolor: #E74C3C] {
+  id String [pk]
+  name String [unique, not null]
+  displayName String [not null]
+  apiEndpoint String
+  availableModels Json [not null]
+  isActive Boolean [not null, default: true]
+  rateLimits Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table prompt_templates [headercolor: #E74C3C] {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  templateText String [not null]
+  category String [not null]
+  variables String[] [not null]
+  modelProvider String
+  modelName String
+  temperature Decimal
+  maxTokens Int
+  version Int [not null, default: 1]
+  isActive Boolean [not null, default: true]
+  usageCount Int [not null, default: 0]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table inference_logs [headercolor: #E74C3C] {
+  id String [pk]
+  modelProvider String [not null]
+  modelName String [not null]
+  inputText String
+  outputText String
+  promptTokens Int [not null]
+  completionTokens Int [not null]
+  responseTime Int [not null]
+  success Boolean [not null, default: true]
+  errorMessage String
+  userId String
+  organizationId String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+// No internal relationships defined
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 8
+//// Internal Relationships: 0
+//// Cross-Module References: 0
+//// Color: #E74C3C
+//// Category: Platform Services
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

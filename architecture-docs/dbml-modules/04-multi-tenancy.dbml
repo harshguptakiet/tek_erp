@@ -1,0 +1,248 @@
+//// ======================================================
+//// MULTI-TENANT HIERARCHY
+//// Module: 04-multi-tenancy
+//// Category: Foundation
+//// Tables: 6
+//// ======================================================
+
+Enum TenantLevel {
+  PLATFORM
+  GOVERNMENT_NATIONAL
+  GOVERNMENT_STATE
+  GOVERNMENT_DISTRICT
+  ORGANIZATION
+  SCHOOL
+  BRANCH
+  DEPARTMENT
+}
+
+Enum OrganizationType {
+  MINISTRY
+  STATE_DEPARTMENT
+  DISTRICT_OFFICE
+  SCHOOL
+  COLLEGE
+  UNIVERSITY
+  COACHING_CENTER
+  INSTITUTION_GROUP
+  EDTECH_COMPANY
+}
+
+Enum OrganizationTier {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+  GOVERNMENT
+}
+
+Table organizations [headercolor: #4A90E2] {
+  id String [pk]
+  name String [not null]
+  legalName String
+  type OrganizationType [not null]
+  tier OrganizationTier [not null, default: 'BASIC']
+  registrationNumber String [unique]
+  taxId String
+  gstin String
+  email String
+  phone String
+  website String
+  countryId String
+  stateId String
+  districtId String
+  coordinates Json
+  logo String
+  banner String
+  brandingConfig Json
+  parentOrganizationId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  hierarchyLevel Int [not null, default: 0]
+  enabledModules String[] [not null]
+  customDomain String [unique]
+  maxSchools Int
+  maxStudents Int
+  maxTeachers Int
+  storageLimit Int
+  primaryContactName String
+  primaryContactEmail String
+  primaryContactPhone String
+  isActive Boolean [not null, default: true]
+  isTrial Boolean [not null, default: false]
+  trialEndsAt DateTime
+  onboardedAt DateTime [default: `now()`, not null]
+  onboardedBy String
+  dataResidency String
+  complianceFlags Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  parentOrganization organizations
+  childOrganizations organizations [not null]
+  branches branches [not null]
+  departments departments [not null]
+  users organization_users [not null]
+  customRoles custom_roles [not null]
+  userRoleMappings user_role_mappings [not null]
+  roles roles [not null]
+  schools schools [not null]
+  subscriptions subscriptions [not null]
+  licenses licenses [not null]
+}
+
+Table branches [headercolor: #4A90E2] {
+  id String [pk]
+  organizationId String [not null]
+  name String [not null]
+  code String [not null]
+  branchType String [not null]
+  countryId String
+  stateId String
+  districtId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  headOfBranch String
+  contactEmail String
+  contactPhone String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations [not null]
+  departments departments [not null]
+  schools schools [not null]
+
+  indexes {
+    (organizationId, code) [unique]
+  }
+}
+
+Table departments [headercolor: #4A90E2] {
+  id String [pk]
+  organizationId String [not null]
+  branchId String
+  name String [not null]
+  code String [not null]
+  departmentType String [not null]
+  parentDepartmentId String
+  tenantId String [unique, not null]
+  hierarchyPath String
+  headOfDepartment String
+  contactEmail String
+  contactPhone String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  organization organizations [not null]
+  branch branches
+  parentDepartment departments
+  childDepartments departments [not null]
+
+  indexes {
+    (organizationId, code) [unique]
+  }
+}
+
+Table organization_users [headercolor: #4A90E2] {
+  id String [pk]
+  organizationId String [not null]
+  userId String [not null]
+  designation String
+  department String
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  isActive Boolean [not null, default: true]
+  organization organizations [not null]
+  user users [not null]
+
+  indexes {
+    (organizationId, userId) [unique]
+  }
+}
+
+Table tenant_hierarchy [headercolor: #4A90E2] {
+  id String [pk]
+  level TenantLevel [not null]
+  parentId String
+  hierarchyPath String [not null]
+  hierarchyLevel Int [not null, default: 0]
+  entityType String [not null]
+  entityId String [not null]
+  name String [not null]
+  code String
+  isActive Boolean [not null, default: true]
+  parent tenant_hierarchy
+  children tenant_hierarchy [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (entityType, entityId) [unique]
+  }
+}
+
+Table government_entities [headercolor: #4A90E2] {
+  id String [pk]
+  level String [not null]
+  name String [not null]
+  code String [unique]
+  countryId String
+  stateId String
+  districtId String
+  parentId String
+  tenantId String [unique, not null]
+  contactEmail String
+  contactPhone String
+  officerInCharge String
+  designation String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  parent government_entities
+  children government_entities [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: tenant_hierarchy.parentId - tenant_hierarchy.id
+Ref: government_entities.parentId - government_entities.id
+Ref: organizations.parentOrganizationId - organizations.id
+Ref: branches.organizationId > organizations.id [delete: Cascade]
+Ref: departments.organizationId > organizations.id [delete: Cascade]
+Ref: departments.branchId > branches.id [delete: Cascade]
+Ref: departments.parentDepartmentId - departments.id [delete: Restrict]
+Ref: organization_users.organizationId > organizations.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (8)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: custom_roles.organizationId > organizations.id [delete: Cascade] (cross-module)
+// Ref: user_role_mappings.organizationId > organizations.id (cross-module)
+// Ref: roles.organizationId > organizations.id [delete: Cascade] (cross-module)
+// Ref: organization_users.userId > users.id [delete: Cascade] (cross-module)
+// Ref: schools.organizationId > organizations.id [delete: Cascade] (cross-module)
+// Ref: schools.branchId > branches.id [delete: Restrict] (cross-module)
+// Ref: subscriptions.organizationId > organizations.id (cross-module)
+// Ref: licenses.organizationId > organizations.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 6
+//// Internal Relationships: 8
+//// Cross-Module References: 8
+//// Color: #4A90E2
+//// Category: Foundation
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

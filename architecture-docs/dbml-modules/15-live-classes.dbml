@@ -1,0 +1,113 @@
+//// ======================================================
+//// LIVE CLASSES
+//// Module: 15-live-classes
+//// Category: Content & Learning
+//// Tables: 4
+//// ======================================================
+
+Table live_classes [headercolor: #E67E22] {
+  id String [pk]
+  teacherId String [not null]
+  title String [not null]
+  description String
+  classMode ClassMode [not null]
+  classId String
+  subjectId String
+  topicId String
+  scheduledStart DateTime [not null]
+  scheduledEnd DateTime [not null]
+  actualStart DateTime
+  actualEnd DateTime
+  status ClassStatus [not null, default: 'SCHEDULED']
+  maxParticipants Int [not null, default: 200]
+  meetingUrl String
+  meetingId String
+  meetingPassword String
+  metaverseRoomId String
+  recordingUrl String
+  enableChat Boolean [not null, default: true]
+  enableScreenShare Boolean [not null, default: true]
+  enableWhiteboard Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  teacher teacher_profiles [not null]
+  participants live_class_participants [not null]
+  recordings class_recordings [not null]
+}
+
+Table live_class_participants [headercolor: #E67E22] {
+  id String [pk]
+  liveClassId String [not null]
+  userId String [not null]
+  joinedAt DateTime [default: `now()`, not null]
+  leftAt DateTime
+  duration Int
+  isMuted Boolean [not null, default: false]
+  isVideoOff Boolean [not null, default: false]
+  isRemoved Boolean [not null, default: false]
+  liveClass live_classes [not null]
+
+  indexes {
+    (liveClassId, userId) [unique]
+  }
+}
+
+Table class_recordings [headercolor: #E67E22] {
+  id String [pk]
+  liveClassId String [not null]
+  recordingUrl String [not null]
+  duration Int
+  fileSize Int
+  perspective String
+  createdAt DateTime [default: `now()`, not null]
+  deletedAt DateTime
+  liveClass live_classes [not null]
+}
+
+Table events [headercolor: #E67E22] {
+  id String [pk]
+  schoolId String [not null]
+  title String [not null]
+  description String
+  eventType String [not null]
+  startDate DateTime [not null]
+  endDate DateTime
+  location String
+  isAllDay Boolean [not null, default: false]
+  notifyUsers Boolean [not null, default: false]
+  createdBy String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  school schools [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: live_class_participants.liveClassId > live_classes.id [delete: Cascade]
+Ref: class_recordings.liveClassId > live_classes.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (2)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: live_classes.teacherId > teacher_profiles.id [delete: Cascade] (cross-module)
+// Ref: events.schoolId > schools.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 4
+//// Internal Relationships: 2
+//// Cross-Module References: 2
+//// Color: #E67E22
+//// Category: Content & Learning
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views
