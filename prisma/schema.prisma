@@ -102,6 +102,7 @@ model User {
   creatorProfile    CreatorProfile?
   tokenBlacklist    TokenBlacklist[]
   securityEvents    SecurityEvent[]
+  passwordHistory   PasswordHistory[]
 
   auditLogs     AuditLog[]
   notifications Notification[]
@@ -210,6 +211,20 @@ model SecurityEvent {
   @@index([createdAt])
   @@index([severity])
   @@map("security_events")
+}
+
+// Password History for preventing password reuse (last 5 passwords)
+model PasswordHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  passwordHash String   // Hashed password
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("password_history")
 }
 
 // Custom Role-Based Access Control (for B2B dynamic roles)

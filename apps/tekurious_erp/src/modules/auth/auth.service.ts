@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
+import { PasswordValidator } from './utils/password-validator';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
 
@@ -33,6 +34,9 @@ export class AuthService {
     if (existingUser) {
       throw new BadRequestException('User with this email already exists');
     }
+
+    // Validate password against security policy
+    PasswordValidator.validateOrThrow(dto.password, dto.email, dto.firstName, dto.lastName);
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -212,6 +216,12 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: {
+        passwordHistory: {
+          orderBy: { createdAt: 'desc' },
+          take: 5, // Last 5 passwords
+        },
+      },
     });
 
     if (!user || !user.passwordHash) {
@@ -228,8 +238,33 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
+    // Validate new password against policy
+    PasswordValidator.validateOrThrow(dto.newPassword, user.email!, user.firstName, user.lastName);
+
+    // Check if new password is same as current
+    const isSameAsCurrent = await bcrypt.compare(dto.newPassword, user.passwordHash);
+    if (isSameAsCurrent) {
+      throw new BadRequestException('New password must be different from current password');
+    }
+
+    // Check password history (prevent reuse of last 5 passwords)
+    const passwordHashes = user.passwordHistory.map(ph => ph.passwordHash);
+    const isInHistory = await PasswordValidator.isInPasswordHistory(dto.newPassword, passwordHashes);
+    
+    if (isInHistory) {
+      throw new BadRequestException('Cannot reuse any of your last 5 passwords. Please choose a different password.');
+    }
+
     // Hash new password
     const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    // Save current password to history before updating
+    await this.prisma.passwordHistory.create({
+      data: {
+        userId: userId,
+        passwordHash: user.passwordHash,
+      },
+    });
 
     // Update password
     await this.prisma.user.update({
@@ -239,6 +274,21 @@ export class AuthService {
         lastPasswordChange: new Date(),
       },
     });
+
+    // Clean up old password history (keep only last 5)
+    const allHistory = await this.prisma.passwordHistory.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (allHistory.length > 5) {
+      const toDelete = allHistory.slice(5);
+      await this.prisma.passwordHistory.deleteMany({
+        where: {
+          id: { in: toDelete.map(h => h.id) },
+        },
+      });
+    }
 
     // SECURITY: Blacklist all user's tokens (force re-login on all devices)
     await this.securityService.blacklistAllUserTokens(userId, 'PASSWORD_CHANGE');
@@ -506,13 +556,46 @@ export class AuthService {
         throw new BadRequestException('Invalid token type');
       }
 
-      // Find user
+      // Find user with password history
       const user = await this.prisma.user.findUnique({
         where: { id: payload.userId },
+        include: {
+          passwordHistory: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
+        },
       });
 
       if (!user) {
         throw new BadRequestException('User not found');
+      }
+
+      // Validate new password
+      PasswordValidator.validateOrThrow(dto.newPassword, user.email!, user.firstName, user.lastName);
+
+      // Check if new password is same as current
+      if (user.passwordHash) {
+        const isSameAsCurrent = await bcrypt.compare(dto.newPassword, user.passwordHash);
+        if (isSameAsCurrent) {
+          throw new BadRequestException('New password must be different from current password');
+        }
+
+        // Check password history
+        const passwordHashes = user.passwordHistory.map(ph => ph.passwordHash);
+        const isInHistory = await PasswordValidator.isInPasswordHistory(dto.newPassword, passwordHashes);
+        
+        if (isInHistory) {
+          throw new BadRequestException('Cannot reuse any of your last 5 passwords. Please choose a different password.');
+        }
+
+        // Save current password to history
+        await this.prisma.passwordHistory.create({
+          data: {
+            userId: user.id,
+            passwordHash: user.passwordHash,
+          },
+        });
       }
 
       // Hash new password
@@ -526,6 +609,21 @@ export class AuthService {
           lastPasswordChange: new Date(),
         },
       });
+
+      // Clean up old password history
+      const allHistory = await this.prisma.passwordHistory.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (allHistory.length > 5) {
+        const toDelete = allHistory.slice(5);
+        await this.prisma.passwordHistory.deleteMany({
+          where: {
+            id: { in: toDelete.map(h => h.id) },
+          },
+        });
+      }
 
       // Emit event
       await this.eventBus.publish('password.reset_completed', {
