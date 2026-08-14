@@ -6,6 +6,7 @@ import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
+import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { PasswordValidator } from './utils/password-validator';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
@@ -22,6 +23,7 @@ export class AuthService {
     private securityService: SecurityService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
+    private suspiciousActivityService: SuspiciousActivityService,
   ) {}
 
   /**
@@ -173,6 +175,22 @@ export class AuthService {
 
     // Record successful login
     await this.recordLoginAttempt(dto.email, true, dto.ipAddress, dto.userAgent);
+
+    // FR-AUTH-026: Check for suspicious activity
+    if (dto.ipAddress && dto.userAgent) {
+      try {
+        await this.suspiciousActivityService.analyzeLogin({
+          userId: user.id,
+          email: user.email!,
+          firstName: user.firstName,
+          ipAddress: dto.ipAddress,
+          userAgent: dto.userAgent,
+        });
+      } catch (error) {
+        this.logger.error(`Suspicious activity check failed: ${error.message}`);
+        // Continue with login even if check fails
+      }
+    }
 
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {

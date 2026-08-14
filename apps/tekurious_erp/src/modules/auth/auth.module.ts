@@ -8,12 +8,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MicrosoftStrategy } from './strategies/microsoft.strategy';
-import { JwtAuthGuard, RolesGuard, CsrfGuard } from './guards';
+import { JwtAuthGuard, RolesGuard, CsrfGuard, PermissionsGuard } from './guards';
 import { OtpService } from './services/otp.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SessionService } from './services/session.service';
 import { SecurityService } from './services/security.service';
 import { EmailService } from './services/email.service';
+import { SuspiciousActivityService } from './services/suspicious-activity.service';
 
 @Module({
   imports: [
@@ -39,12 +40,14 @@ import { EmailService } from './services/email.service';
     JwtAuthGuard,
     RolesGuard,
     CsrfGuard,
+    PermissionsGuard,
     OtpService,
     TwoFactorService,
     SessionService,
     SecurityService,
     EmailService,
+    SuspiciousActivityService,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, SecurityService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, PermissionsGuard, SecurityService],
 })
 export class AuthModule {}
