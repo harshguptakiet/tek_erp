@@ -163,10 +163,10 @@ npx prisma db seed
 Name: tekurious-frontend
 Region: Same as backend
 Branch: master (or main)
-Root Directory: apps/web
+Root Directory: .
 Runtime: Node
-Build Command: npm install && npx next build
-Start Command: npx next start
+Build Command: cd apps/web && npm install && npx next build
+Start Command: cd apps/web && npx next start
 Plan: Starter ($7/month) or Free
 ```
 
