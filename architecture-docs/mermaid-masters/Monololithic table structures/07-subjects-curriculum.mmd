@@ -1,0 +1,123 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/07-subjects-curriculum.dbml
+  %% Tables: 9
+  %% Internal relationships: 5
+  %% Table: subjects
+  subjects {
+    String id PK
+    String name
+    String code UK
+    String description
+    Board board
+    Int grade
+    Boolean isElective
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: chapters
+  chapters {
+    String id PK
+    String subjectId
+    String name
+    String code
+    Int chapterNumber
+    String description
+    Board board
+    Int grade
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: topics
+  topics {
+    String id PK
+    String chapterId
+    String name
+    String code
+    Int topicNumber
+    String description
+    Int estimatedDuration
+    DateTime createdAt
+    DateTime updatedAt
+    DateTime deletedAt
+  }
+  %% Table: subtopics
+  subtopics {
+    String id PK
+    String topicId
+    String name
+    String code
+    String description
+    Int estimatedDuration
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: sub_subtopics
+  sub_subtopics {
+    String id PK
+    String subtopicId
+    String name
+    String code
+    String description
+    Int estimatedDuration
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: syllabus_versions
+  syllabus_versions {
+    String id PK
+    String curriculumId
+    String version
+    String versionName
+    DateTime effectiveFrom
+    DateTime effectiveTo
+    Json changes
+    Boolean isActive
+    String approvedBy
+    DateTime approvedAt
+    Json syllabus
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: learning_outcomes
+  learning_outcomes {
+    String id PK
+    String code UK
+    String description
+    String curriculumId
+    String subjectId
+    String topicId
+    String bloomsLevel
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: competencies
+  competencies {
+    String id PK
+    String code UK
+    String name
+    String description
+    String category
+    String parentId
+    Boolean isActive
+  }
+  %% Table: syllabus_progress
+  syllabus_progress {
+    String id PK
+    String classId
+    String subjectId
+    String topicId
+    Decimal completedPercentage
+    DateTime lastTaughtDate
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  subjects ||--o{ chapters : subjectId Cascade
+  chapters ||--o{ topics : chapterId Cascade
+  topics ||--o{ subtopics : topicId Cascade
+  subtopics ||--o{ sub_subtopics : subtopicId Cascade
+  competencies ||--|| competencies : parentId

@@ -1,0 +1,47 @@
+# Mermaid Module Diagrams
+
+Generated from the DBML module files in `dbml-modules/`.
+
+Each file is a self-contained Mermaid ER diagram with the module tables and only the internal relationships rendered.
+
+## Files
+
+- [01-authentication.mmd](./01-authentication.mmd)
+- [02-rbac-permissions.mmd](./02-rbac-permissions.mmd)
+- [03-user-management.mmd](./03-user-management.mmd)
+- [04-multi-tenancy.mmd](./04-multi-tenancy.mmd)
+- [05-geography-address.mmd](./05-geography-address.mmd)
+- [06-school-structure.mmd](./06-school-structure.mmd)
+- [07-subjects-curriculum.mmd](./07-subjects-curriculum.mmd)
+- [08-student-teacher.mmd](./08-student-teacher.mmd)
+- [09-timetable-rooms.mmd](./09-timetable-rooms.mmd)
+- [10-attendance.mmd](./10-attendance.mmd)
+- [11-content-media.mmd](./11-content-media.mmd)
+- [12-assessment-exams.mmd](./12-assessment-exams.mmd)
+- [13-assignments-grades.mmd](./13-assignments-grades.mmd)
+- [14-arvr-learning.mmd](./14-arvr-learning.mmd)
+- [15-live-classes.mmd](./15-live-classes.mmd)
+- [16-fee-management.mmd](./16-fee-management.mmd)
+- [17-payments-billing.mmd](./17-payments-billing.mmd)
+- [18-subscriptions.mmd](./18-subscriptions.mmd)
+- [19-erp-hostel-library.mmd](./19-erp-hostel-library.mmd)
+- [20-erp-transport-inventory.mmd](./20-erp-transport-inventory.mmd)
+- [21-erp-payroll-hr.mmd](./21-erp-payroll-hr.mmd)
+- [22-marketplace.mmd](./22-marketplace.mmd)
+- [23-ai-chatbot.mmd](./23-ai-chatbot.mmd)
+- [24-ai-recommendations.mmd](./24-ai-recommendations.mmd)
+- [25-ai-embeddings.mmd](./25-ai-embeddings.mmd)
+- [26-notifications.mmd](./26-notifications.mmd)
+- [27-messaging-chat.mmd](./27-messaging-chat.mmd)
+- [28-analytics-reporting.mmd](./28-analytics-reporting.mmd)
+- [29-search-discovery.mmd](./29-search-discovery.mmd)
+- [30-certificates-ids.mmd](./30-certificates-ids.mmd)
+- [31-audit-logging.mmd](./31-audit-logging.mmd)
+- [32-integration-apis.mmd](./32-integration-apis.mmd)
+- [33-events-workflows.mmd](./33-events-workflows.mmd)
+- [34-system-config.mmd](./34-system-config.mmd)
+- [35-api-management.mmd](./35-api-management.mmd)
+- [36-background-jobs.mmd](./36-background-jobs.mmd)
+- [37-gamification.mmd](./37-gamification.mmd)
+- [38-government-compliance.mmd](./38-government-compliance.mmd)
+- [39-learning-paths.mmd](./39-learning-paths.mmd)

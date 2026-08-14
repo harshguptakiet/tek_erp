@@ -1,0 +1,112 @@
+//// ======================================================
+//// GEOGRAPHY & ADDRESSES
+//// Module: 05-geography-address
+//// Category: Foundation
+//// Tables: 6
+//// ======================================================
+
+Table countries [headercolor: #4A90E2] {
+  id String [pk]
+  code String [unique, not null]
+  name String [not null]
+  phoneCode String
+  currency String
+  isActive Boolean [not null, default: true]
+  states states [not null]
+}
+
+Table states [headercolor: #4A90E2] {
+  id String [pk]
+  countryId String [not null]
+  code String [not null]
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  country countries [not null]
+  districts districts [not null]
+
+  indexes {
+    (countryId, code) [unique]
+  }
+}
+
+Table districts [headercolor: #4A90E2] {
+  id String [pk]
+  stateId String [not null]
+  code String [not null]
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  state states [not null]
+  blocks blocks [not null]
+
+  indexes {
+    (stateId, code) [unique]
+  }
+}
+
+Table blocks [headercolor: #4A90E2] {
+  id String [pk]
+  districtId String [not null]
+  code String
+  name String [not null]
+  isActive Boolean [not null, default: true]
+  district districts [not null]
+  villages villages [not null]
+}
+
+Table villages [headercolor: #4A90E2] {
+  id String [pk]
+  blockId String [not null]
+  code String
+  name String [not null]
+  pincode String
+  isActive Boolean [not null, default: true]
+  block blocks [not null]
+}
+
+Table addresses [headercolor: #4A90E2] {
+  id String [pk]
+  addressType String [not null]
+  line1 String [not null]
+  line2 String
+  landmark String
+  cityTown String [not null]
+  stateId String
+  districtId String
+  blockId String
+  villageId String
+  pincode String
+  countryId String [not null]
+  latitude Decimal
+  longitude Decimal
+  isPrimary Boolean [not null, default: false]
+  isVerified Boolean [not null, default: false]
+  entityType String [not null]
+  entityId String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: states.countryId > countries.id [delete: Restrict]
+Ref: districts.stateId > states.id [delete: Restrict]
+Ref: blocks.districtId > districts.id [delete: Restrict]
+Ref: villages.blockId > blocks.id [delete: Restrict]
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 6
+//// Internal Relationships: 4
+//// Cross-Module References: 0
+//// Color: #4A90E2
+//// Category: Foundation
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

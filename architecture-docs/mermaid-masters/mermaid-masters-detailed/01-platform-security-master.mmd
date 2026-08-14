@@ -1,0 +1,101 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Detailed master: identity, tenancy, auth, permissions, config, audit
+  users {
+    string id PK
+    string email
+    string role
+    string tenantId
+  }
+  user_sessions {
+    string id PK
+    string userId
+  }
+  user_authentications {
+    string id PK
+    string userId
+  }
+  user_security {
+    string id PK
+    string userId
+  }
+  organizations {
+    string id PK
+    string name
+  }
+  organization_users {
+    string id PK
+    string userId
+    string organizationId
+  }
+  organization_settings {
+    string id PK
+    string organizationId
+  }
+  platform_settings {
+    string id PK
+    string key
+  }
+  feature_flags {
+    string id PK
+    string name
+  }
+  roles {
+    string id PK
+    string name
+  }
+  permissions {
+    string id PK
+    string name
+  }
+  role_permissions {
+    string id PK
+    string roleId
+    string permissionId
+  }
+  user_role_mappings {
+    string id PK
+    string userId
+    string roleId
+  }
+  audit_logs {
+    string id PK
+    string userId
+  }
+  activity_logs {
+    string id PK
+    string userId
+  }
+  user_login_history {
+    string id PK
+    string userId
+  }
+  session_analytics {
+    string id PK
+    string userId
+  }
+  error_logs {
+    string id PK
+    string userId
+  }
+  api_keys {
+    string id PK
+    string organizationId
+  }
+
+  organizations ||--o{ organization_users : owns
+  organizations ||--o{ organization_settings : configures
+  organizations ||--o{ api_keys : issues
+  users ||--o{ user_sessions : opens
+  users ||--|| user_authentications : authenticates
+  users ||--|| user_security : secures
+  users ||--o{ organization_users : belongs_to
+  users ||--o{ user_role_mappings : assigned
+  roles ||--o{ user_role_mappings : grants
+  roles ||--o{ role_permissions : includes
+  permissions ||--o{ role_permissions : assigned
+  users ||--o{ audit_logs : generates
+  users ||--o{ activity_logs : performs
+  users ||--o{ user_login_history : logs_in
+  users ||--o{ session_analytics : tracked_by
+  users ||--o{ error_logs : triggers

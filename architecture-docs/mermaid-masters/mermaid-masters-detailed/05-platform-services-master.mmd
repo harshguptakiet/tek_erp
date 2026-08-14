@@ -1,0 +1,303 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Detailed master: chatbot, recommendations, notifications, messaging, analytics, search, integrations, workflows, jobs
+  chatbot_conversations {
+    string id PK
+    string userId
+  }
+  chatbot_messages {
+    string id PK
+    string conversationId
+  }
+  ai_prompts {
+    string id PK
+    string conversationId
+  }
+  ai_feedback {
+    string id PK
+    string conversationId
+  }
+  token_usage {
+    string id PK
+    string conversationId
+  }
+  model_providers {
+    string id PK
+    string name
+  }
+  prompt_templates {
+    string id PK
+    string modelProviderId
+  }
+  inference_logs {
+    string id PK
+    string modelProviderId
+  }
+  ai_recommendations {
+    string id PK
+    string studentId
+  }
+  ai_predictions {
+    string id PK
+    string studentId
+  }
+  student_learning_styles {
+    string id PK
+    string studentId
+  }
+  notifications {
+    string id PK
+    string userId
+  }
+  notification_templates {
+    string id PK
+    string name
+  }
+  notification_preferences {
+    string id PK
+    string userId
+  }
+  notification_deliveries {
+    string id PK
+    string notificationId
+  }
+  sms_logs {
+    string id PK
+    string notificationId
+  }
+  email_logs {
+    string id PK
+    string notificationId
+  }
+  conversations {
+    string id PK
+    string createdBy
+  }
+  messages {
+    string id PK
+    string conversationId
+  }
+  message_participants {
+    string id PK
+    string conversationId
+  }
+  message_attachments {
+    string id PK
+    string messageId
+  }
+  message_read_receipts {
+    string id PK
+    string messageId
+  }
+  message_reactions {
+    string id PK
+    string messageId
+  }
+  pinned_messages {
+    string id PK
+    string messageId
+  }
+  announcements {
+    string id PK
+    string createdBy
+  }
+  analytics_snapshots {
+    string id PK
+    string organizationId
+  }
+  metric_definitions {
+    string id PK
+    string name
+  }
+  kpis {
+    string id PK
+    string metricDefinitionId
+  }
+  dashboard_cache {
+    string id PK
+    string organizationId
+  }
+  analytics_reports {
+    string id PK
+    string organizationId
+  }
+  school_analytics {
+    string id PK
+    string schoolId
+  }
+  student_analytics {
+    string id PK
+    string studentId
+  }
+  teacher_analytics {
+    string id PK
+    string teacherId
+  }
+  search_indexes {
+    string id PK
+    string sourceType
+  }
+  search_keywords {
+    string id PK
+    string indexId
+  }
+  search_analytics {
+    string id PK
+    string queryId
+  }
+  recent_searches {
+    string id PK
+    string userId
+  }
+  search_facets {
+    string id PK
+    string indexId
+  }
+  synonyms {
+    string id PK
+    string term
+  }
+  search_suggestions {
+    string id PK
+    string keywordId
+  }
+  search_queries {
+    string id PK
+    string userId
+  }
+  integrations {
+    string id PK
+    string organizationId
+  }
+  oauth_tokens {
+    string id PK
+    string integrationId
+  }
+  external_mappings {
+    string id PK
+    string integrationId
+  }
+  sync_history {
+    string id PK
+    string integrationId
+  }
+  sync_failures {
+    string id PK
+    string syncHistoryId
+  }
+  sync_logs {
+    string id PK
+    string syncHistoryId
+  }
+  webhooks {
+    string id PK
+    string integrationId
+  }
+  webhook_deliveries {
+    string id PK
+    string webhookId
+  }
+  domain_events {
+    string id PK
+    string sourceType
+  }
+  integration_events {
+    string id PK
+    string integrationId
+  }
+  event_subscriptions {
+    string id PK
+    string eventId
+  }
+  event_retries {
+    string id PK
+    string eventId
+  }
+  event_failures {
+    string id PK
+    string eventId
+  }
+  workflow_definitions {
+    string id PK
+    string name
+  }
+  workflow_instances {
+    string id PK
+    string workflowDefinitionId
+  }
+  approvals {
+    string id PK
+    string workflowInstanceId
+  }
+  approval_history {
+    string id PK
+    string approvalId
+  }
+  background_jobs {
+    string id PK
+    string organizationId
+  }
+  job_executions {
+    string id PK
+    string backgroundJobId
+  }
+  cache_entries {
+    string id PK
+    string backgroundJobId
+  }
+  system_metrics {
+    string id PK
+    string backgroundJobId
+  }
+  health_checks {
+    string id PK
+    string backgroundJobId
+  }
+
+  chatbot_conversations ||--o{ chatbot_messages : contains
+  chatbot_conversations ||--o{ ai_prompts : prompts
+  chatbot_conversations ||--o{ ai_feedback : feedback
+  chatbot_conversations ||--o{ token_usage : usage
+  model_providers ||--o{ prompt_templates : templates
+  model_providers ||--o{ inference_logs : logs
+  ai_recommendations ||--o{ ai_predictions : predicts
+  ai_recommendations ||--o{ student_learning_styles : classifies
+  notifications ||--o{ notification_preferences : preference
+  notifications ||--o{ notification_deliveries : delivers
+  notifications ||--o{ sms_logs : sms
+  notifications ||--o{ email_logs : email
+  conversations ||--o{ messages : contains
+  conversations ||--o{ message_participants : participants
+  messages ||--o{ message_attachments : attachments
+  messages ||--o{ message_read_receipts : reads
+  messages ||--o{ message_reactions : reactions
+  messages ||--o{ pinned_messages : pins
+  conversations ||--o{ announcements : announces
+  analytics_snapshots ||--o{ dashboard_cache : cached_as
+  analytics_snapshots ||--o{ analytics_reports : reported_as
+  analytics_snapshots ||--o{ school_analytics : school_view
+  analytics_snapshots ||--o{ student_analytics : student_view
+  analytics_snapshots ||--o{ teacher_analytics : teacher_view
+  search_indexes ||--o{ search_keywords : keywords
+  search_indexes ||--o{ search_facets : facets
+  search_keywords ||--o{ search_suggestions : suggests
+  search_queries ||--o{ search_analytics : tracked_in
+  search_queries ||--o{ recent_searches : recent
+  search_queries ||--o{ synonyms : normalized_by
+  integrations ||--o{ oauth_tokens : auth
+  integrations ||--o{ external_mappings : maps
+  integrations ||--o{ sync_history : syncs
+  sync_history ||--o{ sync_failures : failures
+  sync_history ||--o{ sync_logs : logs
+  integrations ||--o{ webhooks : hooks
+  webhooks ||--o{ webhook_deliveries : deliveries
+  domain_events ||--o{ event_subscriptions : subscriptions
+  domain_events ||--o{ event_retries : retries
+  domain_events ||--o{ event_failures : failures
+  workflow_definitions ||--o{ workflow_instances : instances
+  workflow_instances ||--o{ approvals : approvals
+  approvals ||--o{ approval_history : history
+  background_jobs ||--o{ job_executions : execution
+  background_jobs ||--o{ cache_entries : cache
+  background_jobs ||--o{ system_metrics : metrics
+  background_jobs ||--o{ health_checks : health

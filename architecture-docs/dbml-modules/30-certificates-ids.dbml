@@ -1,0 +1,98 @@
+//// ======================================================
+//// CERTIFICATES & ID CARDS
+//// Module: 30-certificates-ids
+//// Category: Academic Core
+//// Tables: 4
+//// ======================================================
+
+Table certificates [headercolor: #50C878] {
+  id String [pk]
+  templateId String [not null]
+  recipientId String [not null]
+  recipientType String [not null]
+  certificateNumber String [unique, not null]
+  title String [not null]
+  description String
+  issuedFor String
+  data Json [not null]
+  generatedPdfUrl String
+  issuedBy String [not null]
+  issuedAt DateTime [default: `now()`, not null]
+  expiresAt DateTime
+  isRevoked Boolean [not null, default: false]
+  revokedAt DateTime
+  revokedReason String
+  verificationCode String [unique, not null]
+  template certificate_templates [not null]
+}
+
+Table certificate_templates [headercolor: #50C878] {
+  id String [pk]
+  name String [not null]
+  certificateType String [not null]
+  templateHtml String [not null]
+  templateCss String
+  variables String[] [not null]
+  signaturePositions Json
+  isActive Boolean [not null, default: true]
+  createdBy String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  certificates certificates [not null]
+}
+
+Table id_cards [headercolor: #50C878] {
+  id String [pk]
+  templateId String [not null]
+  holderId String [not null]
+  holderType String [not null]
+  cardNumber String [unique, not null]
+  data Json [not null]
+  qrCode String
+  barcode String
+  photoUrl String
+  validFrom DateTime [not null]
+  validUntil DateTime [not null]
+  status String [not null, default: 'ACTIVE']
+  generatedPdfUrl String
+  issuedAt DateTime [default: `now()`, not null]
+  template id_card_templates [not null]
+}
+
+Table id_card_templates [headercolor: #50C878] {
+  id String [pk]
+  name String [not null]
+  cardType String [not null]
+  schoolId String
+  organizationId String
+  templateFront String [not null]
+  templateBack String
+  dimensions Json [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  idCards id_cards [not null]
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: certificates.templateId > certificate_templates.id
+Ref: id_cards.templateId > id_card_templates.id
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 4
+//// Internal Relationships: 2
+//// Cross-Module References: 0
+//// Color: #50C878
+//// Category: Academic Core
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

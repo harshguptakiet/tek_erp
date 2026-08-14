@@ -1,0 +1,209 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Detailed master: content, media, AR/VR, assessment, assignments, live classes, AI support
+  contents {
+    string id PK
+    string schoolId
+  }
+  content_versions {
+    string id PK
+    string contentId
+  }
+  content_drafts {
+    string id PK
+    string contentId
+  }
+  content_workflows {
+    string id PK
+    string contentId
+  }
+  books {
+    string id PK
+    string contentId
+  }
+  diagrams {
+    string id PK
+    string contentId
+  }
+  media {
+    string id PK
+    string contentId
+  }
+  media_folders {
+    string id PK
+    string parentId
+  }
+  media_permissions {
+    string id PK
+    string mediaId
+  }
+  content_reviews {
+    string id PK
+    string contentId
+  }
+  content_collections {
+    string id PK
+    string name
+  }
+  content_moderation {
+    string id PK
+    string contentId
+  }
+  trending_content {
+    string id PK
+    string contentId
+  }
+  ar_markers {
+    string id PK
+    string contentId
+  }
+  ar_contents {
+    string id PK
+    string markerId
+  }
+  vr_contents {
+    string id PK
+    string contentId
+  }
+  vr_usage_logs {
+    string id PK
+    string vrContentId
+  }
+  three_d_models {
+    string id PK
+    string contentId
+  }
+  metaverse_rooms {
+    string id PK
+    string contentId
+  }
+  exams {
+    string id PK
+    string classId
+  }
+  exam_questions {
+    string id PK
+    string examId
+  }
+  exam_answers {
+    string id PK
+    string questionId
+  }
+  exam_attempts {
+    string id PK
+    string examId
+  }
+  exam_assignments {
+    string id PK
+    string examId
+  }
+  question_bank {
+    string id PK
+    string categoryId
+  }
+  question_categories {
+    string id PK
+    string name
+  }
+  question_tags {
+    string id PK
+    string questionId
+  }
+  question_options {
+    string id PK
+    string questionId
+  }
+  assignments {
+    string id PK
+    string classId
+  }
+  assignment_submissions {
+    string id PK
+    string assignmentId
+  }
+  assignment_evaluations {
+    string id PK
+    string submissionId
+  }
+  grade_books {
+    string id PK
+    string classId
+  }
+  student_report_cards {
+    string id PK
+    string studentId
+  }
+  performance_metrics {
+    string id PK
+    string studentId
+  }
+  disciplinary_records {
+    string id PK
+    string studentId
+  }
+  live_classes {
+    string id PK
+    string sectionId
+  }
+  live_class_participants {
+    string id PK
+    string liveClassId
+  }
+  class_recordings {
+    string id PK
+    string liveClassId
+  }
+  events {
+    string id PK
+    string liveClassId
+  }
+  ai_recommendations {
+    string id PK
+    string studentId
+  }
+  ai_predictions {
+    string id PK
+    string studentId
+  }
+  student_learning_styles {
+    string id PK
+    string studentId
+  }
+
+  contents ||--o{ content_versions : versions
+  contents ||--o{ content_drafts : drafts
+  contents ||--o{ content_workflows : workflow
+  contents ||--o{ books : published_as
+  contents ||--o{ diagrams : illustrates
+  contents ||--o{ media : attaches
+  media_folders ||--o{ media : contains
+  media ||--o{ media_permissions : controlled_by
+  contents ||--o{ content_reviews : reviewed_by
+  contents ||--o{ content_collections : grouped_into
+  contents ||--o{ content_moderation : moderated_by
+  contents ||--o{ trending_content : ranked_in
+  contents ||--o{ ar_markers : tagged_with
+  ar_markers ||--o{ ar_contents : activates
+  contents ||--o{ vr_contents : rendered_as
+  vr_contents ||--o{ vr_usage_logs : used_in
+  contents ||--o{ three_d_models : modeled_by
+  contents ||--o{ metaverse_rooms : hosted_in
+  exams ||--o{ exam_questions : contains
+  exam_questions ||--o{ exam_answers : answered_by
+  exams ||--o{ exam_attempts : attempted
+  exams ||--o{ exam_assignments : assigned
+  question_categories ||--o{ question_bank : categorizes
+  question_bank ||--o{ question_tags : tagged
+  question_bank ||--o{ question_options : options
+  assignments ||--o{ assignment_submissions : submitted
+  assignment_submissions ||--o{ assignment_evaluations : evaluated
+  assignments ||--o{ grade_books : recorded_in
+  grade_books ||--o{ student_report_cards : summarizes
+  student_report_cards ||--o{ performance_metrics : measures
+  student_report_cards ||--o{ disciplinary_records : records
+  live_classes ||--o{ live_class_participants : includes
+  live_classes ||--o{ class_recordings : archives
+  live_classes ||--o{ events : emits
+  student_profiles ||--o{ ai_recommendations : receives
+  student_profiles ||--o{ ai_predictions : scored_by
+  student_profiles ||--|| student_learning_styles : classified_as

@@ -1,0 +1,363 @@
+//// ======================================================
+//// CONTENT & MEDIA
+//// Module: 11-content-media
+//// Category: Content & Learning
+//// Tables: 13
+//// ======================================================
+
+Enum ContentType {
+  AR
+  VR
+  VIDEO
+  PDF
+  BOOK
+  THREE_D_MODEL
+  TWO_D_IMAGE
+  GAME
+  ANIMATION
+  PPT
+  DOCUMENT
+  QUIZ
+  SIMULATION
+  AUDIO
+  INTERACTIVE
+}
+
+Enum ContentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+Enum WorkflowStatus {
+  DRAFT
+  PENDING_REVIEW
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  ARCHIVED
+  SUSPENDED
+}
+
+Enum MediaCategory {
+  PROFILE_PHOTO
+  ASSIGNMENT
+  SUBMISSION
+  CERTIFICATE
+  REPORT
+  QUESTION_PAPER
+  ANSWER_SHEET
+  CONTENT
+  ANNOUNCEMENT
+  ID_CARD
+  LESSON_MATERIAL
+  OTHER
+}
+
+Table contents [headercolor: #E67E22] {
+  id String [pk]
+  creatorId String
+  title String [not null]
+  description String
+  thumbnail String
+  contentType ContentType [not null]
+  status ContentStatus [not null, default: 'DRAFT']
+  board Board
+  grade Int
+  subjectId String
+  chapterId String
+  topicId String
+  subtopicId String
+  subSubtopicId String
+  fileUrl String
+  fileSize Int
+  fileMimeType String
+  duration Int
+  difficultyLevel DifficultyLevel
+  language String [not null, default: 'en']
+  tags String[] [not null]
+  keywords String[] [not null]
+  learningOutcomes String[] [not null]
+  viewCount Int [not null, default: 0]
+  rating Decimal
+  ratingCount Int [not null, default: 0]
+  isFree Boolean [not null, default: false]
+  price Decimal
+  publishedAt DateTime
+  archivedAt DateTime
+  versionNumber String [not null, default: '1.0']
+  previousVersionId String
+  isLocked Boolean [not null, default: false]
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  creator creator_profiles
+  previousVersion contents
+  versions contents [not null]
+  topic topics
+  subtopic subtopics
+  subSubtopic sub_subtopics
+  arAssets ar_contents [not null]
+  vrAssets vr_contents [not null]
+  subscriptionAccess subscription_contents [not null]
+  learningProgress learning_progress [not null]
+  contentReviews content_reviews [not null]
+}
+
+Table content_versions [headercolor: #E67E22] {
+  id String [pk]
+  contentId String [not null]
+  versionNumber String [not null]
+  versionType String [not null]
+  title String [not null]
+  description String
+  thumbnail String
+  fileUrl String
+  fileSize Int
+  fileMimeType String
+  metadata Json [not null]
+  status WorkflowStatus [not null]
+  changedBy String [not null]
+  changeNotes String
+  isPublished Boolean [not null, default: false]
+  publishedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table content_drafts [headercolor: #E67E22] {
+  id String [pk]
+  contentId String
+  createdBy String [not null]
+  title String [not null]
+  description String
+  thumbnail String
+  contentType ContentType [not null]
+  fileUrl String
+  metadata Json
+  lastSavedAt DateTime [default: `now()`, not null]
+  isSubmitted Boolean [not null, default: false]
+  submittedAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table content_workflows [headercolor: #E67E22] {
+  id String [pk]
+  contentId String [not null]
+  status WorkflowStatus [not null]
+  submittedBy String [not null]
+  submittedAt DateTime [default: `now()`, not null]
+  assignedTo String
+  assignedAt DateTime
+  reviewedBy String
+  reviewedAt DateTime
+  approvedBy String
+  approvedAt DateTime
+  rejectedBy String
+  rejectedAt DateTime
+  rejectionReason String
+  publishedBy String
+  publishedAt DateTime
+  comments Json
+  currentStep String
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table books [headercolor: #E67E22] {
+  id String [pk]
+  publisherId String [not null]
+  title String [not null]
+  isbn String [unique]
+  edition String
+  board Board
+  grade Int
+  subject String
+  coverImage String
+  description String
+  totalPages Int
+  publishedDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  publisher publisher_profiles [not null]
+  diagrams diagrams [not null]
+}
+
+Table diagrams [headercolor: #E67E22] {
+  id String [pk]
+  bookId String [not null]
+  title String
+  imageUrl String [not null]
+  pageNumber Int
+  chapterName String
+  resolution String
+  fileSize Int
+  metadata Json
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  book books [not null]
+  arMarker ar_markers
+}
+
+Table media [headercolor: #E67E22] {
+  id String [pk]
+  fileName String [not null]
+  originalName String [not null]
+  fileUrl String [not null]
+  thumbnailUrl String
+  mediaType MediaType [not null]
+  category MediaCategory [not null]
+  mimeType String [not null]
+  fileSize Int [not null]
+  folderId String
+  uploadedBy String [not null]
+  isPublic Boolean [not null, default: false]
+  width Int
+  height Int
+  duration Int
+  version Int [not null, default: 1]
+  previousVersionId String
+  tags String[] [not null]
+  downloadCount Int [not null, default: 0]
+  viewCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  deletedAt DateTime
+  folder media_folders
+  previousVersion media
+  versions media [not null]
+  permissions media_permissions [not null]
+}
+
+Table media_folders [headercolor: #E67E22] {
+  id String [pk]
+  name String [not null]
+  parentId String
+  ownerId String [not null]
+  ownerType String [not null]
+  isPublic Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  parent media_folders
+  children media_folders [not null]
+  media media [not null]
+}
+
+Table media_permissions [headercolor: #E67E22] {
+  id String [pk]
+  mediaId String [not null]
+  userId String
+  roleId String
+  organizationId String
+  canView Boolean [not null, default: true]
+  canDownload Boolean [not null, default: false]
+  canEdit Boolean [not null, default: false]
+  canDelete Boolean [not null, default: false]
+  canShare Boolean [not null, default: false]
+  expiresAt DateTime
+  grantedBy String [not null]
+  grantedAt DateTime [default: `now()`, not null]
+  media media [not null]
+}
+
+Table content_reviews [headercolor: #E67E22] {
+  id String [pk]
+  contentId String [not null]
+  userId String [not null]
+  rating Int [not null]
+  comment String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  content contents [not null]
+
+  indexes {
+    (contentId, userId) [unique]
+  }
+}
+
+Table content_collections [headercolor: #E67E22] {
+  id String [pk]
+  name String [not null]
+  description String
+  createdBy String [not null]
+  contentIds String[] [not null]
+  isPublic Boolean [not null, default: false]
+  viewCount Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table content_moderation [headercolor: #E67E22] {
+  id String [pk]
+  contentId String [not null]
+  moderatedBy String [not null]
+  decision String [not null]
+  reason String
+  feedback String
+  moderatedAt DateTime [default: `now()`, not null]
+}
+
+Table trending_content [headercolor: #E67E22] {
+  id String [pk]
+  contentId String [not null]
+  timeWindow String [not null]
+  viewCount Int [not null, default: 0]
+  uniqueViews Int [not null, default: 0]
+  engagementScore Decimal [not null]
+  calculatedAt DateTime [default: `now()`, not null]
+
+  indexes {
+    (contentId, timeWindow) [unique]
+  }
+}
+
+//// ======================================================
+//// RELATIONSHIPS (Internal to this module)
+//// ======================================================
+
+Ref: contents.previousVersionId - contents.id
+Ref: content_reviews.contentId > contents.id [delete: Cascade]
+Ref: diagrams.bookId > books.id [delete: Cascade]
+Ref: media_folders.parentId - media_folders.id
+Ref: media.folderId > media_folders.id
+Ref: media.previousVersionId - media.id
+Ref: media_permissions.mediaId > media.id [delete: Cascade]
+
+//// ======================================================
+//// CROSS-MODULE REFERENCES (10)
+//// These reference tables in other modules
+//// ======================================================
+
+// Ref: contents.creatorId > creator_profiles.id (cross-module)
+// Ref: contents.topicId > topics.id (cross-module)
+// Ref: contents.subtopicId > subtopics.id (cross-module)
+// Ref: contents.subSubtopicId > sub_subtopics.id (cross-module)
+// Ref: books.publisherId > publisher_profiles.id [delete: Cascade] (cross-module)
+// Ref: ar_markers.diagramId - diagrams.id (cross-module)
+// Ref: ar_contents.contentId > contents.id [delete: Cascade] (cross-module)
+// Ref: vr_contents.contentId > contents.id [delete: Cascade] (cross-module)
+// Ref: subscription_contents.contentId > contents.id [delete: Cascade] (cross-module)
+// Ref: learning_progress.contentId > contents.id [delete: Cascade] (cross-module)
+
+//// ======================================================
+//// MODULE SUMMARY
+//// ======================================================
+//// Tables: 13
+//// Internal Relationships: 7
+//// Cross-Module References: 10
+//// Color: #E67E22
+//// Category: Content & Learning
+////
+//// VISUALIZATION TIPS:
+//// 1. Import this file into https://dbdiagram.io
+//// 2. Tables are color-coded by category
+//// 3. Only internal relationships are shown (clean diagram)
+//// 4. Cross-module refs are documented but not rendered
+//// 5. Combine multiple modules for broader ER views

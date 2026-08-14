@@ -1,0 +1,147 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/08-student-teacher.dbml
+  %% Tables: 11
+  %% Internal relationships: 4
+  %% Table: student_profiles
+  student_profiles {
+    String id PK
+    String userId UK
+    String schoolId
+    String rollNumber
+    String admissionNumber UK
+    DateTime admissionDate
+    String bloodGroup
+    Json emergencyContact
+    String previousSchool
+    Boolean transportOpted
+    Boolean hostelOpted
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: teacher_profiles
+  teacher_profiles {
+    String id PK
+    String userId UK
+    String schoolId
+    String employeeId UK
+    String designation
+    String qualification
+    Int experience
+    DateTime joiningDate
+    DateTime leavingDate
+    Decimal salary
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: parent_profiles
+  parent_profiles {
+    String id PK
+    String userId UK
+    String occupation
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: publisher_profiles
+  publisher_profiles {
+    String id PK
+    String userId UK
+    String companyName
+    String registrationNumber UK
+    String taxId
+    String website
+    String description
+    Boolean isVerified
+    DateTime verifiedAt
+    Boolean termsAccepted
+    DateTime termsAcceptedAt
+    Json bankDetails
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: creator_profiles
+  creator_profiles {
+    String id PK
+    String userId UK
+    String displayName
+    String bio
+    Boolean isVerified
+    DateTime verifiedAt
+    Boolean termsAccepted
+    DateTime termsAcceptedAt
+    Json bankDetails
+    Decimal totalEarnings
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: student_enrollments
+  student_enrollments {
+    String id PK
+    String studentId
+    String sectionId
+    String academicYearId
+    DateTime enrollmentDate
+    String status
+    String rollNumber
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: class_subjects
+  class_subjects {
+    String id PK
+    String classId
+    String subjectId
+    String teacherId
+    Boolean isActive
+  }
+  %% Table: section_teachers
+  section_teachers {
+    String id PK
+    String sectionId
+    String teacherId
+    String subjectId
+    Boolean isPrimary
+    DateTime assignedAt
+    String assignedBy
+  }
+  %% Table: section_subjects
+  section_subjects {
+    String id PK
+    String sectionId
+    String subjectId
+    String teacherId
+    Int periodsPerWeek
+    Boolean isActive
+  }
+  %% Table: parent_students
+  parent_students {
+    String id PK
+    String parentId
+    String studentId
+    String relationship
+    Boolean isPrimary
+    DateTime createdAt
+  }
+  %% Table: student_groups
+  student_groups {
+    String id PK
+    String schoolId
+    String groupName
+    String groupType
+    String color
+    String motto
+    String emblem
+    String captainId
+    String viceCaptainId
+    Int points
+    Boolean isActive
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  teacher_profiles ||--o{ class_subjects : teacherId
+  parent_profiles ||--o{ parent_students : parentId Cascade
+  student_profiles ||--o{ parent_students : studentId Cascade
+  student_profiles ||--o{ student_enrollments : studentId Cascade

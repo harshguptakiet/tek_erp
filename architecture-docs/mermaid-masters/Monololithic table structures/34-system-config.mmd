@@ -1,0 +1,134 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/34-system-config.dbml
+  %% Tables: 9
+  %% Internal relationships: 2
+  %% Table: platform_settings
+  platform_settings {
+    String id PK
+    String settingKey UK
+    String settingValue
+    String valueType
+    String category
+    String description
+    Boolean isPublic
+    Boolean isEncrypted
+    String updatedBy
+    DateTime updatedAt
+  }
+  %% Table: organization_settings
+  organization_settings {
+    String id PK
+    String organizationId
+    String settingKey
+    String settingValue
+    String valueType
+    String category
+    Boolean overridesPlatform
+    String updatedBy
+    DateTime updatedAt
+  }
+  %% Table: school_settings
+  school_settings {
+    String id PK
+    String schoolId
+    String settingKey
+    String settingValue
+    String valueType
+    String category
+    String updatedBy
+    DateTime updatedAt
+  }
+  %% Table: user_settings
+  user_settings {
+    String id PK
+    String userId
+    String settingKey
+    String settingValue
+    String valueType
+    String category
+    DateTime updatedAt
+  }
+  %% Table: feature_flags
+  feature_flags {
+    String id PK
+    String flagName UK
+    String description
+    Boolean isEnabled
+    Decimal rolloutPercent
+    Json conditions
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: feature_rollouts
+  feature_rollouts {
+    String id PK
+    String featureFlagId
+    String rolloutStage
+    String targetAudience
+    Decimal rolloutPercent
+    DateTime startDate
+    DateTime endDate
+    String status
+    Json metrics
+    String createdBy
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: experiments
+  experiments {
+    String id PK
+    String name UK
+    String description
+    String hypothesis
+    String experimentType
+    Json variants
+    Json targetAudience
+    Int sampleSize
+    Json trafficAllocation
+    DateTime startDate
+    DateTime endDate
+    String status
+    String winningVariant
+    Json results
+    String createdBy
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: ab_tests
+  ab_tests {
+    String id PK
+    String experimentId
+    String userId
+    String variant
+    DateTime assignedAt
+    Boolean converted
+    DateTime convertedAt
+    Json metrics
+  }
+  %% Table: system_config
+  system_config {
+    String id PK
+    String organizationId UK
+    String logo
+    String banner
+    String favicon
+    String primaryColor
+    String secondaryColor
+    String accentColor
+    String companyName
+    String tagline
+    String customDomain
+    Json features
+    Json smtpConfig
+    Json smsConfig
+    Json paymentGatewayConfig
+    Json analyticsConfig
+    Boolean maintenanceMode
+    DateTime createdAt
+    DateTime updatedAt
+  }
+
+  %% Relationships
+  feature_flags ||--o{ feature_rollouts : featureFlagId Cascade
+  experiments ||--o{ ab_tests : experimentId Cascade

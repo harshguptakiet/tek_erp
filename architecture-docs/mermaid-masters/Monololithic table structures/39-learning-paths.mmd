@@ -1,0 +1,49 @@
+%%{init: {"theme":"dark","themeVariables":{"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#0f172a","primaryColor":"#1e293b","secondaryColor":"#111827","tertiaryColor":"#0b1020","primaryBorderColor":"#8b5cf6","secondaryBorderColor":"#38bdf8","tertiaryBorderColor":"#14b8a6","lineColor":"#8b5cf6","textColor":"#e2e8f0","fontSize":"16px"}}}%%
+erDiagram
+  %% Source: dbml-modules/39-learning-paths.dbml
+  %% Tables: 3
+  %% Internal relationships: 0
+  %% Table: learning_paths
+  learning_paths {
+    String id PK
+    String name
+    String description
+    Board board
+    Int grade
+    String subjectId
+    Json steps
+    Int estimatedDuration
+    DifficultyLevel difficulty
+    Int enrollmentCount
+    Decimal completionRate
+    Boolean isPublic
+    String createdBy
+    DateTime createdAt
+    DateTime updatedAt
+  }
+  %% Table: learning_path_enrollments
+  learning_path_enrollments {
+    String id PK
+    String pathId
+    String studentId
+    Int currentStep
+    Decimal progressPercent
+    DateTime enrolledAt
+    DateTime completedAt
+  }
+  %% Table: learning_progress
+  learning_progress {
+    String id PK
+    String studentId
+    String contentId
+    DateTime startedAt
+    DateTime completedAt
+    DateTime lastAccessedAt
+    Int timeSpent
+    Decimal progressPercent
+    Int interactionCount
+    String masteryLevel
+    Json metadata
+  }
+
+  %% No internal relationships in this module
