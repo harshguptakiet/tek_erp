@@ -10,8 +10,9 @@ import {
   Logger,
   Delete,
   Param,
+  Res,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { authThrottle } from './config/auth-throttle.config';
 import { AuthService } from './auth.service';
@@ -453,8 +454,15 @@ export class AuthController {
   @Public()
   @UseGuards(GoogleOAuthGuard)
   @Get('google/callback')
-  async googleAuthRedirect(@Req() req): Promise<AuthResponseDto> {
-    return this.authService.oauthLogin(req.user);
+  async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    const authResponse = await this.authService.oauthLogin(req.user);
+    
+    // Redirect to frontend with token and user data
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const token = authResponse.accessToken;
+    const userData = encodeURIComponent(JSON.stringify(authResponse.user));
+    
+    return res.redirect(`${frontendUrl}/auth/oauth/success?token=${token}&user=${userData}`);
   }
 
   @Public()
@@ -465,8 +473,15 @@ export class AuthController {
   @Public()
   @UseGuards(MicrosoftOAuthGuard)
   @Get('microsoft/callback')
-  async microsoftAuthRedirect(@Req() req): Promise<AuthResponseDto> {
-    return this.authService.oauthLogin(req.user);
+  async microsoftAuthRedirect(@Req() req, @Res() res: Response) {
+    const authResponse = await this.authService.oauthLogin(req.user);
+    
+    // Redirect to frontend with token and user data
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const token = authResponse.accessToken;
+    const userData = encodeURIComponent(JSON.stringify(authResponse.user));
+    
+    return res.redirect(`${frontendUrl}/auth/oauth/success?token=${token}&user=${userData}`);
   }
 
   // ==================== SESSION SECURITY & ROTATION (FR-AUTH-033) ====================
