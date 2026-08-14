@@ -360,13 +360,8 @@ export class AuthService {
 
   /**
    * Get or generate CSRF token for user's active session
-   * TODO: Enable after migration runs on production and Prisma client regenerates
    */
   async getCsrfToken(userId: string): Promise<{ csrfToken: string }> {
-    // Temporarily disabled until Prisma migration completes on production
-    throw new BadRequestException('CSRF token endpoint temporarily unavailable during security upgrade');
-    
-    /* ENABLE AFTER MIGRATION:
     // Get user's most recent active session
     const session = await this.prisma.userSession.findFirst({
       where: {
@@ -400,7 +395,6 @@ export class AuthService {
     });
 
     return { csrfToken };
-    */
   }
 
   /**
