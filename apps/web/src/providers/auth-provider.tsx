@@ -6,19 +6,42 @@ import { useAuthStore } from '../stores/auth.store';
 import { authService } from '../services/auth.service';
 
 const PUBLIC_ROUTES = [
+  '/',
   '/auth/login',
   '/auth/register',
+  '/auth/register-phone',
   '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/verify-email-sent',
+  '/auth/2fa',
+  '/auth/2fa-verify',
+  '/auth/2fa/recovery',
+  '/auth/oauth/callback',
+  '/auth/oauth/success',
   '/test/api',
 ];
+
+// Routes that start with these prefixes are public
+const PUBLIC_ROUTE_PREFIXES = ['/auth/', '/test/'];
+
+function isPublicRoute(pathname: string): boolean {
+  // Check exact matches
+  if (PUBLIC_ROUTES.includes(pathname)) {
+    return true;
+  }
+  
+  // Check prefixes
+  return PUBLIC_ROUTE_PREFIXES.some(prefix => pathname.startsWith(prefix));
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { setUser, setLoading, setAccessToken, logout } = useAuthStore();
+  const { setUser, setLoading, setAccessToken, logout, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    // Check authentication status on mount only
+    // Check authentication status on mount
     const checkAuth = async () => {
       try {
         setLoading(true);
@@ -29,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!storedToken) {
           // No token, not authenticated
           setUser(null);
-          if (!PUBLIC_ROUTES.includes(pathname)) {
+          if (!isPublicRoute(pathname)) {
             router.push('/auth/login');
           }
           return;
@@ -55,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('accessToken');
 
         // Redirect to login if not on public route
-        if (!PUBLIC_ROUTES.includes(pathname)) {
+        if (!isPublicRoute(pathname)) {
           router.push('/auth/login');
         }
       } finally {
@@ -80,5 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run once on mount
 
+  // Handle route changes - redirect if not authenticated and trying to access protected route
+  useEffect(() => {
+    if (!isAuthenticated && !isPublicRoute(pathname)) {
+      router.push('/auth/login');
+    }
+  }, [pathname, isAuthenticated, router]);
+
   return <>{children}</>;
 }
+

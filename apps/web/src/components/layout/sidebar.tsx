@@ -6,17 +6,17 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth.store';
 import { Can } from '@/components/auth/can';
-import { PERMISSIONS } from '@/config/permissions';
+import { PERMISSIONS, type Permission } from '@/config/permissions';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ReactNode;
-  permission?: string;
+  permission?: Permission;
   badge?: string | number;
 }
 
@@ -165,7 +165,13 @@ const navigation: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
 
   return (
     <div className="flex flex-col w-64 bg-gray-900 h-screen">
@@ -252,7 +258,7 @@ export function Sidebar() {
         </Link>
         
         <button
-          onClick={() => useAuthStore.getState().logout()}
+          onClick={handleLogout}
           className="w-full group flex items-center px-3 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-gray-800 hover:text-white transition-colors"
         >
           <svg className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
