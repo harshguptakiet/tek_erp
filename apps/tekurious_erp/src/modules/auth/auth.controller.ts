@@ -71,6 +71,17 @@ export class AuthController {
   }
 
   /**
+   * Get CSRF token for the current session
+   * GET /api/v1/auth/csrf-token
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('csrf-token')
+  async getCsrfToken(@CurrentUser() user: any): Promise<{ csrfToken: string }> {
+    this.logger.log(`GET /auth/csrf-token - User ID: ${user.id}`);
+    return this.authService.getCsrfToken(user.id);
+  }
+
+  /**
    * Get current user profile
    * GET /api/v1/auth/me
    */
@@ -115,11 +126,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@CurrentUser('id') userId: string): Promise<{ message: string }> {
+  async logout(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<{ message: string }> {
     this.logger.log(`POST /auth/logout - User ID: ${userId}`);
     
-    // In a JWT-based system, logout is primarily client-side
-    // But we can record the logout event
+    // Extract token from Authorization header
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (token) {
+      await this.authService.logout(userId, token);
+    }
     
     return { message: 'Logged out successfully' };
   }

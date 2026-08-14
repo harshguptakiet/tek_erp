@@ -283,6 +283,56 @@ export class AuthService {
   }
 
   /**
+   * Logout user and blacklist token
+   */
+  async logout(userId: string, token: string): Promise<void> {
+    this.logger.log(`Logout for user: ${userId}`);
+
+    // Blacklist the current access token
+    await this.securityService.blacklistToken(token, userId, 'LOGOUT');
+
+    // Emit logout event
+    await this.eventBus.publish('user.logged_out', {
+      userId,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`User logged out successfully: ${userId}`);
+  }
+
+  /**
+   * Logout from all devices
+   */
+  async logoutAllDevices(userId: string): Promise<{ message: string; count: number }> {
+    this.logger.log(`Logout all devices for user: ${userId}`);
+
+    // Get session count before revoking
+    const sessions = await this.prisma.userSession.findMany({
+      where: {
+        userId,
+        isActive: true,
+      },
+    });
+
+    // Blacklist all user tokens
+    await this.securityService.blacklistAllUserTokens(userId, 'ADMIN_REVOKE');
+
+    // Emit event
+    await this.eventBus.publish('user.logged_out_all_devices', {
+      userId,
+      deviceCount: sessions.length,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Logged out from ${sessions.length} devices for user: ${userId}`);
+
+    return {
+      message: 'Logged out from all devices successfully',
+      count: sessions.length,
+    };
+  }
+
+  /**
    * Get current user profile
    */
   async getCurrentUser(userId: string): Promise<AuthResponseDto> {
@@ -306,6 +356,51 @@ export class AuthService {
     }
 
     return this.generateTokens(user);
+  }
+
+  /**
+   * Get or generate CSRF token for user's active session
+   * TODO: Enable after migration runs on production and Prisma client regenerates
+   */
+  async getCsrfToken(userId: string): Promise<{ csrfToken: string }> {
+    // Temporarily disabled until Prisma migration completes on production
+    throw new BadRequestException('CSRF token endpoint temporarily unavailable during security upgrade');
+    
+    /* ENABLE AFTER MIGRATION:
+    // Get user's most recent active session
+    const session = await this.prisma.userSession.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { lastActivity: 'desc' },
+      select: {
+        id: true,
+        csrfToken: true,
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('No active session found');
+    }
+
+    // If session already has CSRF token, return it
+    if (session.csrfToken) {
+      return { csrfToken: session.csrfToken };
+    }
+
+    // Generate new CSRF token
+    const csrfToken = this.securityService.generateCSRFToken();
+
+    // Save to session
+    await this.prisma.userSession.update({
+      where: { id: session.id },
+      data: { csrfToken },
+    });
+
+    return { csrfToken };
+    */
   }
 
   /**
@@ -593,18 +688,84 @@ export class AuthService {
     
     const updateData: any = {
       failedLoginAttempts: failedAttempts,
+      lastFailedLogin: new Date(),
     };
 
-    // Lock account after 5 failed attempts (15 minutes)
-    if (failedAttempts >= 5) {
-      updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-      this.logger.warn(`Account locked for user ${user.id} due to failed attempts`);
+    // Progressive lockout:
+    // 5 attempts = 15 minutes
+    // 10 attempts = 24 hours  
+    // 20 attempts in a week = permanent (admin unlock required)
+    
+    if (failedAttempts >= 20) {
+      // Permanent lock
+      updateData.lockedUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year (effectively permanent)
+      updateData.permanentLockReason = 'EXCESSIVE_FAILED_ATTEMPTS';
       
-      // Emit event
+      this.logger.error(`Account permanently locked for user ${user.id} (${failedAttempts} failed attempts)`);
+      
+      // Log critical security event
+      await this.securityService.logSecurityEvent(
+        user.id,
+        'ACCOUNT_PERMANENTLY_LOCKED',
+        'CRITICAL',
+        {
+          failedAttempts,
+          reason: 'Excessive failed login attempts',
+        },
+      );
+      
+      await this.eventBus.publish('account.permanently_locked', {
+        userId: user.id,
+        email: user.email,
+        failedAttempts,
+        timestamp: new Date(),
+      });
+    } else if (failedAttempts >= 10) {
+      // 24-hour lock
+      updateData.lockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      this.logger.warn(`Account locked for 24 hours for user ${user.id} (${failedAttempts} failed attempts)`);
+      
+      await this.securityService.logSecurityEvent(
+        user.id,
+        'ACCOUNT_LOCKED_24H',
+        'HIGH',
+        {
+          failedAttempts,
+          lockedUntil: updateData.lockedUntil,
+        },
+      );
+      
       await this.eventBus.publish('account.locked', {
         userId: user.id,
         email: user.email,
         reason: 'FAILED_LOGIN_ATTEMPTS',
+        duration: '24_HOURS',
+        failedAttempts,
+        timestamp: new Date(),
+      });
+    } else if (failedAttempts >= 5) {
+      // 15-minute lock
+      updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      this.logger.warn(`Account locked for 15 minutes for user ${user.id} (${failedAttempts} failed attempts)`);
+      
+      await this.securityService.logSecurityEvent(
+        user.id,
+        'ACCOUNT_LOCKED_15M',
+        'MEDIUM',
+        {
+          failedAttempts,
+          lockedUntil: updateData.lockedUntil,
+        },
+      );
+      
+      await this.eventBus.publish('account.locked', {
+        userId: user.id,
+        email: user.email,
+        reason: 'FAILED_LOGIN_ATTEMPTS',
+        duration: '15_MINUTES',
+        failedAttempts,
         timestamp: new Date(),
       });
     }
@@ -1050,16 +1211,17 @@ export class AuthService {
 
   async getAllSessions(userId: string) {
     const sessions = await this.prisma.userSession.findMany({
-      where: { userId, revokedAt: null, expiresAt: { gte: new Date() } },
-      orderBy: { lastActivityAt: 'desc' },
+      where: { userId, isActive: true, expiresAt: { gte: new Date() } },
+      orderBy: { lastActivity: 'desc' },
       select: {
         id: true,
         deviceName: true,
         deviceType: true,
         ipAddress: true,
+        location: true,
         userAgent: true,
         createdAt: true,
-        lastActivityAt: true,
+        lastActivity: true,
         expiresAt: true,
       },
     });
@@ -1069,16 +1231,25 @@ export class AuthService {
 
   async revokeSession(userId: string, sessionId: string) {
     const session = await this.prisma.userSession.findFirst({
-      where: { id: sessionId, userId },
+      where: { id: sessionId, userId, isActive: true },
     });
 
     if (!session) {
-      throw new BadRequestException('Session not found');
+      throw new BadRequestException('Session not found or already revoked');
     }
 
+    // Blacklist the session token if exists
+    if (session.token) {
+      await this.securityService.blacklistToken(session.token, userId, 'ADMIN_REVOKE');
+    }
+
+    // Mark session as revoked
     await this.prisma.userSession.update({
       where: { id: sessionId },
-      data: { revokedAt: new Date() },
+      data: { 
+        isActive: false,
+        revokedAt: new Date(),
+      },
     });
 
     this.eventBus.publish('auth.session_revoked', {
@@ -1092,14 +1263,31 @@ export class AuthService {
   }
 
   async revokeAllSessions(userId: string, exceptSessionId?: string) {
-    const where: any = { userId, revokedAt: null };
+    const where: any = { userId, isActive: true };
     if (exceptSessionId) {
       where.id = { not: exceptSessionId };
     }
 
+    // Get sessions to blacklist their tokens
+    const sessions = await this.prisma.userSession.findMany({
+      where,
+      select: { id: true, token: true },
+    });
+
+    // Blacklist all session tokens
+    for (const session of sessions) {
+      if (session.token) {
+        await this.securityService.blacklistToken(session.token, userId, 'ADMIN_REVOKE');
+      }
+    }
+
+    // Mark all sessions as revoked
     const result = await this.prisma.userSession.updateMany({
       where,
-      data: { revokedAt: new Date() },
+      data: { 
+        isActive: false,
+        revokedAt: new Date(),
+      },
     });
 
     this.eventBus.publish('auth.all_sessions_revoked', {
@@ -1109,7 +1297,7 @@ export class AuthService {
     });
 
     this.logger.log(`${result.count} sessions revoked for user: ${userId}`);
-    return { success: true, count: result.count, message: 'All sessions revoked successfully' };
+    return { success: true, count: result.count, message: 'All other sessions revoked successfully' };
   }
 
   // ─────────────────────────────────────────────────────────────────────────

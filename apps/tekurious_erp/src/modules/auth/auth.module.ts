@@ -8,7 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MicrosoftStrategy } from './strategies/microsoft.strategy';
-import { JwtAuthGuard, RolesGuard } from './guards';
+import { JwtAuthGuard, RolesGuard, CsrfGuard } from './guards';
 import { OtpService } from './services/otp.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SessionService } from './services/session.service';
@@ -37,11 +37,12 @@ import { SecurityService } from './services/security.service';
     MicrosoftStrategy,
     JwtAuthGuard,
     RolesGuard,
+    CsrfGuard,
     OtpService,
     TwoFactorService,
     SessionService,
     SecurityService,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, SecurityService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, CsrfGuard, SecurityService],
 })
 export class AuthModule {}
