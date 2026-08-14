@@ -16,7 +16,7 @@ Start Command: npx next start -p $PORT
 ### Backend Service Settings
 ```
 Root Directory: (leave empty)
-Build Command: npm install && npx prisma generate && npm run build
+Build Command: npm install --production=false && npx prisma generate && npm run build
 Start Command: node dist/apps/tekurious_erp/main.js
 ```
 
@@ -77,7 +77,7 @@ Region: Same as database
 Branch: master (or main)
 Root Directory: .
 Runtime: Node
-Build Command: npm install && npx prisma generate && npm run build
+Build Command: npm install --production=false && npx prisma generate && npm run build
 Start Command: node dist/apps/tekurious_erp/main.js
 Plan: Starter ($7/month) or Free
 ```
@@ -308,11 +308,12 @@ Start Command: npx next start -p $PORT
 ```
 Build tools like TypeScript and Tailwind PostCSS are needed during the build phase.
 
-**Issue:** `Prisma generate fails`
+**Issue:** `nx: not found` or `Prisma generate fails`
 ```bash
-# Solution: Add to Build Command
-npm install && npx prisma generate && npm run build
+# Solution: Install with devDependencies for build tools
+Build Command: npm install --production=false && npx prisma generate && npm run build
 ```
+Nx and other build tools are in devDependencies and needed during build.
 
 **Issue:** `Module not found`
 ```bash
