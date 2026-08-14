@@ -2489,4 +2489,22 @@ export class UsersService {
     this.eventBus.publish('support.ticket.responded', { ticketId, responderId: adminId });
     return updated;
   }
+
+  // TEMPORARY METHODS FOR SETUP
+  async findUserByPhone(phone: string) {
+    return this.prisma.user.findFirst({
+      where: { phone },
+    });
+  }
+
+  async promoteToSuperAdmin(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: 'PLATFORM_ADMIN',
+        status: 'ACTIVE',
+        emailVerified: true,
+      },
+    });
+  }
 }

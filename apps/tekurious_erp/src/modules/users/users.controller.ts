@@ -955,4 +955,37 @@ export class UsersController {
   ) {
     return this.usersService.respondToTicket(req.user.userId, id, responseText);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEMPORARY: Promote User to PLATFORM_ADMIN (Remove after setup)
+  // ═══════════════════════════════════════════════════════════════════════════
+  @Post('temp/promote-superadmin')
+  @ApiOperation({ summary: 'TEMPORARY: Promote user to PLATFORM_ADMIN by phone' })
+  async tempPromoteToSuperAdmin(@Body() dto: { phone: string; secretKey: string }) {
+    // Simple security: require a secret key
+    if (dto.secretKey !== 'TEMP_ADMIN_SETUP_2024') {
+      return { success: false, message: 'Invalid secret key' };
+    }
+
+    const user = await this.usersService.findUserByPhone(dto.phone);
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+
+    // Use the existing changeUserRole method
+    await this.usersService.promoteToSuperAdmin(user.id);
+
+    return {
+      success: true,
+      message: 'User promoted to PLATFORM_ADMIN successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: 'PLATFORM_ADMIN',
+      },
+    };
+  }
 }
