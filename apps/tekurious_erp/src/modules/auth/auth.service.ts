@@ -1262,15 +1262,16 @@ export class AuthService {
     });
 
     if (!user) {
+      // Create new OAuth user as ORG_OWNER with ACTIVE status
       user = await this.prisma.user.create({
         data: {
           email,
           firstName: firstName || 'OAuth',
           lastName: lastName || 'User',
-          role: 'STUDENT',
-          status: 'ACTIVE',
+          role: 'ORG_OWNER', // OAuth users default to ORG_OWNER
+          status: 'ACTIVE', // OAuth users are auto-activated
           authProvider: provider,
-          emailVerified: true,
+          emailVerified: true, // OAuth email is pre-verified
         },
         include: {
           userRolesNew: {
@@ -1285,8 +1286,11 @@ export class AuthService {
         },
       });
 
+      this.logger.log(`🔥 NEW OAUTH USER CREATED: ${user.email}, STATUS: ${user.status}, ROLE: ${user.role}`);
+
+      // Assign default ORG_OWNER role
       const defaultRole = await this.prisma.role.findFirst({
-        where: { name: 'STUDENT' }
+        where: { name: 'ORG_OWNER' }
       });
       if (defaultRole) {
         await this.prisma.userRole.create({
