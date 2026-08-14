@@ -38,12 +38,13 @@ export class AuthService {
     const isDev = this.configService.get('NODE_ENV') !== 'production';
 
     // Create user with profile and authentication
-    // In development, auto-activate users for easier testing
-    const userStatus = process.env.NODE_ENV === 'production' 
-      ? 'PENDING_VERIFICATION' 
-      : 'ACTIVE';
+    // ORG_OWNER users are auto-verified (organization owners don't need email verification)
+    // In development, auto-activate all users for easier testing
+    const isOrgOwner = dto.role === 'ORG_OWNER' || !dto.role; // Default to ORG_OWNER if no role specified
+    const isDevelopment = process.env.NODE_ENV !== 'production';
     
-    const emailVerified = process.env.NODE_ENV !== 'production';
+    const userStatus = (isDevelopment || isOrgOwner) ? 'ACTIVE' : 'PENDING_VERIFICATION';
+    const emailVerified = isDevelopment || isOrgOwner;
 
     const user = await this.prisma.user.create({
       data: {
