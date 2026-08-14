@@ -9,7 +9,7 @@ Complete guide to deploy Tekurious ERP (Next.js Frontend + NestJS Backend + Post
 ### Frontend Service Settings
 ```
 Root Directory: apps/web
-Build Command: npm install && npx next build
+Build Command: npm install --production=false && npx next build
 Start Command: npx next start -p $PORT
 ```
 
@@ -183,14 +183,15 @@ Region: Same as backend
 Branch: master (or main)
 Root Directory: apps/web
 Runtime: Node
-Build Command: npm install && npx next build
+Build Command: npm install --production=false && npx next build
 Start Command: npx next start -p $PORT
 Plan: Starter ($7/month) or Free
 ```
 
 **Critical for Monorepo:**
 - Set **Root Directory to `apps/web`** (Next.js app with its own package.json)
-- Build command: `npm install && npx next build`
+- Build command: `npm install --production=false && npx next build`
+  - `--production=false` ensures devDependencies are installed (needed for TypeScript during build)
 - Start command: `npx next start -p $PORT`
 
 ### 4.2 Add Environment Variables
@@ -298,15 +299,14 @@ Now every push to master will trigger automatic deployment!
 
 ### Build Fails
 
-**Issue:** `Cannot find module '@tailwindcss/postcss'`
+**Issue:** `Cannot find module '@tailwindcss/postcss'` (only 129 packages installed)
 ```bash
-# Solution: Ensure apps/web has its own package.json with all dependencies
-# This is now fixed - apps/web/package.json includes all required packages
-
+# Solution: Install with --production=false to include devDependencies
 Root Directory: apps/web
-Build Command: npm install && npx next build
+Build Command: npm install --production=false && npx next build
 Start Command: npx next start -p $PORT
 ```
+Build tools like TypeScript and Tailwind PostCSS are needed during the build phase.
 
 **Issue:** `Prisma generate fails`
 ```bash
