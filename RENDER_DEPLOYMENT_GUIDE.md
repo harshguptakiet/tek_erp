@@ -163,10 +163,10 @@ npx prisma db seed
 Name: tekurious-frontend
 Region: Same as backend
 Branch: master (or main)
-Root Directory: .
+Root Directory: apps/web
 Runtime: Node
-Build Command: cd apps/web && npm install && npx next build
-Start Command: cd apps/web && npx next start
+Build Command: npm install && npx next build
+Start Command: npx next start
 Plan: Starter ($7/month) or Free
 ```
 
@@ -179,6 +179,13 @@ NEXT_PUBLIC_API_URL=https://tekurious-backend.onrender.com/api/v1
 # Application
 NODE_ENV=production
 PORT=3000
+```
+
+**Important Note:** Since this is a monorepo, Render needs to install dependencies from the root. Add this build command instead:
+
+```bash
+# Better build command for monorepo
+cd ../.. && npm install && cd apps/web && npx next build
 ```
 
 ### 4.3 Deploy
