@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Chrome, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { authService, LoginDto } from '@/services/auth.service';
 import { toast } from 'sonner';
@@ -204,6 +204,7 @@ export function LoginForm() {
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
+          onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google`}
           className="flex items-center justify-center gap-2 h-11 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm font-medium hover:bg-[hsl(var(--secondary))] transition-colors"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -216,6 +217,7 @@ export function LoginForm() {
         </button>
         <button
           type="button"
+          onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/microsoft`}
           className="flex items-center justify-center gap-2 h-11 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm font-medium hover:bg-[hsl(var(--secondary))] transition-colors"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
