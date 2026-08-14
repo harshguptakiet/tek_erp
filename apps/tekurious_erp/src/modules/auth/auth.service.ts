@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
+import { SecurityService } from './services/security.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto, LoginDto, ChangePasswordDto, AuthResponseDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto } from './dto';
 
@@ -15,6 +16,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private eventBus: EventBusService,
+    private securityService: SecurityService,
   ) {}
 
   /**
@@ -238,6 +240,9 @@ export class AuthService {
       },
     });
 
+    // SECURITY: Blacklist all user's tokens (force re-login on all devices)
+    await this.securityService.blacklistAllUserTokens(userId, 'PASSWORD_CHANGE');
+
     // Emit password changed event
     await this.eventBus.publish('user.password_changed', {
       userId: user.id,
@@ -247,7 +252,7 @@ export class AuthService {
 
     this.logger.log(`Password changed successfully for user: ${userId}`);
 
-    return { message: 'Password changed successfully' };
+    return { message: 'Password changed successfully. You have been logged out from all devices.' };
   }
 
   /**

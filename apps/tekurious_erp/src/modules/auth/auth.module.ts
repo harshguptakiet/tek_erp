@@ -12,6 +12,7 @@ import { JwtAuthGuard, RolesGuard } from './guards';
 import { OtpService } from './services/otp.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SessionService } from './services/session.service';
+import { SecurityService } from './services/security.service';
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { SessionService } from './services/session.service';
     OtpService,
     TwoFactorService,
     SessionService,
+    SecurityService,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, SecurityService],
 })
 export class AuthModule {}
