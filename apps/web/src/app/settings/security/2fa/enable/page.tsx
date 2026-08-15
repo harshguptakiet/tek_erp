@@ -205,11 +205,11 @@ export default function Enable2FAPage() {
             {/* QR Code */}
             <div className="flex justify-center p-6 bg-white rounded-lg">
               <div className="relative h-64 w-64">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={qrData.qrCode}
                   alt="2FA QR Code"
-                  fill
-                  className="object-contain"
+                  className="w-full h-full object-contain"
                 />
               </div>
             </div>

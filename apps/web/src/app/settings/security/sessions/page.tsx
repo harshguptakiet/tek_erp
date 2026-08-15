@@ -14,20 +14,26 @@ import { Button } from '@/components/ui/button';
 
 interface Session {
   id: string;
-  deviceInfo: {
-    browser: string;
-    os: string;
-    device: string;
-    deviceType: 'desktop' | 'mobile' | 'tablet';
+  deviceInfo?: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    deviceType?: 'desktop' | 'mobile' | 'tablet';
   };
-  ipAddress: string;
+  deviceName?: string;
+  deviceType?: string;
+  browser?: string;
+  os?: string;
+  ipAddress?: string;
   location?: {
     city?: string;
     country?: string;
   };
-  loginTime: string;
-  lastActivity: string;
-  isCurrent: boolean;
+  loginTime?: string;
+  createdAt?: string;
+  lastActivity?: string;
+  lastActivityAt?: string;
+  isCurrent?: boolean;
 }
 
 export default function SessionsPage() {
@@ -38,8 +44,17 @@ export default function SessionsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['sessions'],
     queryFn: async () => {
-      const response = await authService.getSessions();
-      return response.sessions || [];
+      try {
+        const response = await authService.getSessions();
+        // Handle both array response and object with sessions property
+        if (Array.isArray(response)) {
+          return response;
+        }
+        return response.sessions || [];
+      } catch (err) {
+        console.error('Failed to fetch sessions:', err);
+        return [];
+      }
     },
   });
 
@@ -87,7 +102,8 @@ export default function SessionsPage() {
     }
   };
 
-  const getDeviceIcon = (deviceType: string) => {
+  const getDeviceIcon = (session: Session) => {
+    const deviceType = session.deviceInfo?.deviceType || session.deviceType || 'desktop';
     switch (deviceType) {
       case 'mobile':
         return <Smartphone className="h-5 w-5" />;
@@ -144,7 +160,7 @@ export default function SessionsPage() {
     );
   }
 
-  const sessions: Session[] = data || [];
+  const sessions: Session[] = Array.isArray(data) ? data : [];
   const activeSessions = sessions.length;
 
   return (
@@ -203,14 +219,14 @@ export default function SessionsPage() {
                       : 'bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))]'
                   }`}
                 >
-                  {getDeviceIcon(session.deviceInfo.deviceType)}
+                  {getDeviceIcon(session)}
                 </div>
 
                 {/* Session Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">
-                      {session.deviceInfo.browser} on {session.deviceInfo.os}
+                      {session.deviceInfo?.browser || session.browser || 'Unknown Browser'} on {session.deviceInfo?.os || session.os || 'Unknown OS'}
                     </h3>
                     {session.isCurrent && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-blue-600 text-white font-medium">
@@ -221,26 +237,30 @@ export default function SessionsPage() {
 
                   <div className="mt-2 space-y-1 text-sm text-[hsl(var(--muted-foreground))]">
                     {/* Location */}
-                    {session.location && (
+                    {session.location && (session.location.city || session.location.country) && (
                       <div className="flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5" />
                         <span>
-                          {session.location.city}, {session.location.country}
+                          {[session.location.city, session.location.country].filter(Boolean).join(', ')}
                         </span>
-                        <span className="text-xs">• {session.ipAddress}</span>
+                        {session.ipAddress && <span className="text-xs">• {session.ipAddress}</span>}
                       </div>
                     )}
 
                     {/* Login Time */}
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>Logged in {formatDate(session.loginTime)}</span>
-                    </div>
+                    {(session.loginTime || session.createdAt) && (
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Logged in {formatDate(session.loginTime || session.createdAt!)}</span>
+                      </div>
+                    )}
 
                     {/* Last Activity */}
-                    <div className="text-xs">
-                      Last active: {getTimeAgo(session.lastActivity)}
-                    </div>
+                    {(session.lastActivity || session.lastActivityAt) && (
+                      <div className="text-xs">
+                        Last active: {getTimeAgo(session.lastActivity || session.lastActivityAt!)}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
