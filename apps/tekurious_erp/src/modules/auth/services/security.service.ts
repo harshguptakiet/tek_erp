@@ -409,4 +409,47 @@ export class SecurityService {
       this.logger.warn(`Failed to update session activity: ${error.message}`);
     }
   }
+
+  /**
+   * Enforce session limit per user (FR-AUTH-015)
+   * Max 10 active sessions - auto-revoke oldest if limit exceeded
+   * @param userId - User ID to check
+   * @param maxSessions - Maximum allowed sessions (default: 10)
+   */
+  async enforceSessionLimit(userId: string, maxSessions: number = 10): Promise<void> {
+    try {
+      const activeSessions = await this.prisma.userSession.findMany({
+        where: {
+          userId,
+          isActive: true,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { lastActivityAt: 'asc' }, // Oldest activity first
+        select: { id: true, token: true },
+      });
+
+      if (activeSessions.length >= maxSessions) {
+        const sessionsToRevoke = activeSessions.slice(0, activeSessions.length - maxSessions + 1);
+
+        for (const session of sessionsToRevoke) {
+          await this.prisma.userSession.update({
+            where: { id: session.id },
+            data: { isActive: false, revokedAt: new Date() },
+          });
+
+          // Blacklist the token
+          if (session.token) {
+            await this.blacklistToken(session.token, userId, 'ADMIN_REVOKE');
+          }
+
+          this.logger.log(
+            `Revoked session ${session.id} for user ${userId} (session limit: ${maxSessions})`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to enforce session limit: ${error.message}`);
+      // Don't throw - session limit enforcement shouldn't break login
+    }
+  }
 }

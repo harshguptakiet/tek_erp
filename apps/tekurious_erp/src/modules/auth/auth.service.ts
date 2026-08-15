@@ -6,6 +6,7 @@ import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { IpRateLimitService } from './services/ip-rate-limit.service';
+import { DeviceDetectionService } from './services/device-detection.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
@@ -25,6 +26,7 @@ export class AuthService {
     private securityService: SecurityService,
     private refreshTokenService: RefreshTokenService,
     private ipRateLimitService: IpRateLimitService,
+    private deviceDetectionService: DeviceDetectionService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
     private suspiciousActivityService: SuspiciousActivityService,
@@ -1424,7 +1426,7 @@ export class AuthService {
   // FR-AUTH-015: Session Management
   // ─────────────────────────────────────────────────────────────────────────
 
-  async getAllSessions(userId: string) {
+  async getAllSessions(userId: string, currentSessionId?: string) {
     const sessions = await this.prisma.userSession.findMany({
       where: { userId, isActive: true, expiresAt: { gte: new Date() } },
       orderBy: { lastActivity: 'desc' },
@@ -1437,11 +1439,61 @@ export class AuthService {
         userAgent: true,
         createdAt: true,
         lastActivity: true,
+        lastActivityAt: true,
         expiresAt: true,
       },
     });
 
-    return sessions;
+    // Parse device info and add geolocation
+    const enrichedSessions = await Promise.all(
+      sessions.map(async (session) => {
+        // Parse user agent if deviceName is not set
+        let deviceInfo: any = {};
+        if (!session.deviceName && session.userAgent) {
+          const parsed = this.deviceDetectionService.parseUserAgent(session.userAgent);
+          deviceInfo = {
+            deviceName: parsed.device,
+            deviceType: parsed.deviceType,
+            browser: parsed.browser,
+            browserVersion: parsed.browserVersion,
+            os: parsed.os,
+            osVersion: parsed.osVersion,
+          };
+        } else {
+          deviceInfo = {
+            deviceName: session.deviceName,
+            deviceType: session.deviceType,
+          };
+        }
+
+        // Get location if not already cached
+        let locationInfo: any = {};
+        if (session.location && typeof session.location === 'object') {
+          locationInfo = session.location;
+        } else if (session.ipAddress) {
+          // Fetch location (consider caching this)
+          const location = await this.deviceDetectionService.getLocationFromIp(session.ipAddress);
+          locationInfo = {
+            city: location.city,
+            region: location.region,
+            country: location.country,
+          };
+        }
+
+        return {
+          id: session.id,
+          ...deviceInfo,
+          ipAddress: session.ipAddress,
+          location: locationInfo,
+          createdAt: session.createdAt,
+          lastActivity: session.lastActivity || session.lastActivityAt,
+          expiresAt: session.expiresAt,
+          isCurrent: session.id === currentSessionId, // Mark current session
+        };
+      }),
+    );
+
+    return enrichedSessions;
   }
 
   async revokeSession(userId: string, sessionId: string) {

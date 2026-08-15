@@ -350,9 +350,12 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('sessions')
-  async getAllSessions(@CurrentUser('id') userId: string) {
+  async getAllSessions(
+    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
+  ) {
     this.logger.log(`GET /auth/sessions - User: ${userId}`);
-    return this.authService.getAllSessions(userId);
+    return this.authService.getAllSessions(userId, user.sessionId);
   }
 
   /**

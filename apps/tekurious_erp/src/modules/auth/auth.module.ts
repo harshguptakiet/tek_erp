@@ -16,6 +16,7 @@ import { SecurityService } from './services/security.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { IpRateLimitService } from './services/ip-rate-limit.service';
+import { DeviceDetectionService } from './services/device-detection.service';
 import { EmailService } from './services/email.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { RolesService } from './services/roles.service';
@@ -52,6 +53,7 @@ import { RolesService } from './services/roles.service';
     TokenBlacklistService,
     RefreshTokenService,
     IpRateLimitService,
+    DeviceDetectionService,
     EmailService,
     SuspiciousActivityService,
     RolesService,
