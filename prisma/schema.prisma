@@ -69,6 +69,7 @@ model User {
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
   backupCodes      String[] // Hashed 2FA backup codes
+  trustedDevices   String[] // Trusted device fingerprints
 
   passwordExpiry     DateTime?
   lastPasswordChange DateTime?

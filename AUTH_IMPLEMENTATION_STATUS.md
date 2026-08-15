@@ -10,17 +10,17 @@
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| **Fully Implemented** | 42 | 59% |
-| **Partially Implemented** | 8 | 11% |
-| **Not Implemented** | 21 | 30% |
+| **Fully Implemented** | 45 | 63% |
+| **Partially Implemented** | 6 | 8% |
+| **Not Implemented** | 20 | 28% |
 | **Total Requirements** | 71 | 100% |
 
 ### Priority Breakdown
 
 | Priority | Total | Implemented | Partial | Missing | Status |
 |----------|-------|-------------|---------|---------|--------|
-| **P0 (Critical)** | 24 | 18 | 3 | 3 | 🟡 75% |
-| **P1 (High)** | 12 | 6 | 3 | 3 | 🟠 50% |
+| **P0 (Critical)** | 24 | 21 | 0 | 3 | � 88% |
+| **P1 (High)** | 12 | 8 | 2 | 2 | � 67% |
 | **P2 (Medium)** | 4 | 2 | 1 | 1 | 🟢 50% |
 
 ---
@@ -142,12 +142,37 @@
 
 ---
 
-### 7. ❌ FR-AUTH-002, FR-AUTH-024: Phone OTP Verification (P1)
-**Status**: ❌ NOT IMPLEMENTED
+### 7. ✅ FR-AUTH-002, FR-AUTH-024: Phone OTP Verification (P1)
+**Status**: ✅ FULLY IMPLEMENTED
 
-**What's Missing**:
-- ❌ SMS service integration (Twilio/AWS SNS)
-- ❌ OTP generation for phone verification
+**What's Done**:
+- ✅ SmsService with multiple providers (Twilio, AWS SNS, Console)
+- ✅ OTP generation for phone verification (6-digit, 10-min expiry)
+- ✅ Rate limiting (3 OTP per phone per hour)
+- ✅ Phone verification endpoints:
+  - ✅ `POST /auth/phone/send-otp` - Public endpoint (registration)
+  - ✅ `POST /auth/phone/verify-otp` - Verify OTP (authenticated)
+  - ✅ `POST /auth/phone/send-otp-auth` - Send OTP (authenticated)
+- ✅ E.164 phone format validation (+1234567890)
+- ✅ Integration with OtpService for SMS delivery
+- ✅ Event emission on phone verification
+- ✅ Update user.phoneVerified on success
+- ✅ Max 3 verification attempts per OTP
+
+**Configuration**:
+- Console provider (default, dev/testing)
+- Twilio provider (production, requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
+- AWS SNS provider (production, requires AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+- Set SMS_PROVIDER env var: 'console' | 'twilio' | 'aws'
+
+**Status**: ✅ COMPLETE
+
+---
+
+### 8. ❌ FR-AUTH-019: Password Expiry (P1)
+**Status**: ✅ FULLY IMPLEMENTED (commit 2aea82f)
+
+
 - ❌ OTP verification endpoint
 - ❌ Rate limiting (3 OTP per phone per hour)
 
