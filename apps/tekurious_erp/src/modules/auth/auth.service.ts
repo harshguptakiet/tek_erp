@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
 import { RefreshTokenService } from './services/refresh-token.service';
+import { IpRateLimitService } from './services/ip-rate-limit.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
@@ -23,6 +24,7 @@ export class AuthService {
     private eventBus: EventBusService,
     private securityService: SecurityService,
     private refreshTokenService: RefreshTokenService,
+    private ipRateLimitService: IpRateLimitService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
     private suspiciousActivityService: SuspiciousActivityService,
@@ -121,6 +123,18 @@ export class AuthService {
   async login(dto: LoginDto & { rememberMe?: boolean }): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
     this.logger.log(`Login attempt for email: ${dto.email}`);
 
+    // FR-AUTH-025: Check if IP is blocked
+    if (dto.ipAddress) {
+      const isIpBlocked = await this.ipRateLimitService.isIpBlocked(dto.ipAddress);
+      if (isIpBlocked) {
+        const timeRemaining = await this.ipRateLimitService.getBlockTimeRemaining(dto.ipAddress);
+        const minutes = Math.ceil(timeRemaining / 60);
+        throw new UnauthorizedException(
+          `Too many failed login attempts from this IP address. Please try again in ${minutes} minutes.`
+        );
+      }
+    }
+
     // Find user with authentication
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -140,6 +154,12 @@ export class AuthService {
     if (!user || !user.passwordHash) {
       // Record failed login attempt
       await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent);
+      
+      // FR-AUTH-025: Track IP-based failed attempts
+      if (dto.ipAddress) {
+        await this.ipRateLimitService.recordFailedAttempt(dto.ipAddress);
+      }
+      
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -164,6 +184,12 @@ export class AuthService {
       // Handle failed login
       await this.handleFailedLogin(user);
       await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent);
+      
+      // FR-AUTH-025: Track IP-based failed attempts
+      if (dto.ipAddress) {
+        await this.ipRateLimitService.recordFailedAttempt(dto.ipAddress);
+      }
+      
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -173,6 +199,11 @@ export class AuthService {
         where: { id: user.id },
         data: { failedLoginAttempts: 0, lockedUntil: null },
       });
+    }
+    
+    // FR-AUTH-025: Reset IP failed attempts on successful login
+    if (dto.ipAddress) {
+      await this.ipRateLimitService.resetFailedAttempts(dto.ipAddress);
     }
 
     // Record successful login
@@ -904,6 +935,18 @@ export class AuthService {
         failedAttempts,
         timestamp: new Date(),
       });
+      
+      // FR-AUTH-025: Send lockout email notification
+      try {
+        await this.emailService.sendAccountLockedEmail(
+          user.email!,
+          user.firstName,
+          '24 hours',
+          failedAttempts,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to send lockout email: ${error.message}`);
+      }
     } else if (failedAttempts >= 5) {
       // 15-minute lock
       updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -928,6 +971,18 @@ export class AuthService {
         failedAttempts,
         timestamp: new Date(),
       });
+      
+      // FR-AUTH-025: Send lockout email notification
+      try {
+        await this.emailService.sendAccountLockedEmail(
+          user.email!,
+          user.firstName,
+          '15 minutes',
+          failedAttempts,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to send lockout email: ${error.message}`);
+      }
     }
 
     await this.prisma.user.update({
@@ -2259,5 +2314,164 @@ export class AuthService {
     this.logger.log(`2FA backup codes regenerated for user: ${userId}`);
 
     return { backupCodes };
+  }
+
+  // ==================== FR-AUTH-025: ADMIN UNLOCK ACCOUNT ====================
+
+  /**
+   * Admin unlock user account
+   * Used to unlock accounts that are permanently locked or locked for 24 hours
+   * 
+   * @param adminId - ID of admin performing unlock
+   * @param userId - ID of user to unlock
+   * @returns Success message
+   */
+  async adminUnlockAccount(adminId: string, userId: string): Promise<{ message: string }> {
+    this.logger.log(`Admin unlock attempt by ${adminId} for user ${userId}`);
+
+    // Verify admin has permission (PLATFORM_ADMIN or ORG_ADMIN)
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { id: true, role: true, email: true },
+    });
+
+    if (!admin || (admin.role !== 'PLATFORM_ADMIN' && admin.role !== 'ORG_ADMIN')) {
+      throw new ForbiddenException('Only admins can unlock accounts');
+    }
+
+    // Get locked user
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { 
+        id: true, 
+        email: true, 
+        firstName: true,
+        lockedUntil: true, 
+        failedLoginAttempts: true,
+        permanentLockReason: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.lockedUntil || user.lockedUntil < new Date()) {
+      return { message: 'Account is not locked' };
+    }
+
+    // Unlock account
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        lockedUntil: null,
+        failedLoginAttempts: 0,
+        lastFailedLogin: null,
+        permanentLockReason: null,
+      },
+    });
+
+    // Log security event
+    await this.securityService.logSecurityEvent(
+      userId,
+      'ACCOUNT_UNLOCKED_BY_ADMIN',
+      'MEDIUM',
+      {
+        adminId,
+        adminEmail: admin.email,
+        previousLockReason: user.permanentLockReason || 'FAILED_LOGIN_ATTEMPTS',
+        failedAttempts: user.failedLoginAttempts,
+      },
+    );
+
+    // Send email notification to user
+    try {
+      await this.emailService.sendAccountUnlockedEmail(
+        user.email!,
+        user.firstName,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send account unlocked email: ${error.message}`);
+    }
+
+    // Emit event
+    await this.eventBus.publish('account.unlocked_by_admin', {
+      userId,
+      adminId,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Account unlocked by admin ${adminId} for user ${userId}`);
+
+    return { message: 'Account unlocked successfully' };
+  }
+
+  /**
+   * Admin unblock IP address
+   * Used to unblock IPs that have been blocked due to excessive failures
+   * 
+   * @param adminId - ID of admin performing unblock
+   * @param ipAddress - IP address to unblock
+   * @returns Success message
+   */
+  async adminUnblockIp(adminId: string, ipAddress: string): Promise<{ message: string }> {
+    this.logger.log(`Admin IP unblock attempt by ${adminId} for IP ${ipAddress}`);
+
+    // Verify admin has permission
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { id: true, role: true },
+    });
+
+    if (!admin || (admin.role !== 'PLATFORM_ADMIN' && admin.role !== 'ORG_ADMIN')) {
+      throw new ForbiddenException('Only admins can unblock IP addresses');
+    }
+
+    // Unblock IP
+    await this.ipRateLimitService.unblockIp(ipAddress);
+
+    this.logger.log(`IP ${ipAddress} unblocked by admin ${adminId}`);
+
+    return { message: `IP address ${ipAddress} unblocked successfully` };
+  }
+
+  /**
+   * Get locked accounts (admin view)
+   * 
+   * @returns List of locked accounts
+   */
+  async getLockedAccounts(): Promise<any[]> {
+    const lockedUsers = await this.prisma.user.findMany({
+      where: {
+        lockedUntil: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        lockedUntil: true,
+        failedLoginAttempts: true,
+        lastFailedLogin: true,
+        permanentLockReason: true,
+      },
+      orderBy: { lockedUntil: 'desc' },
+      take: 100,
+    });
+
+    return lockedUsers.map(user => ({
+      ...user,
+      isPermanentLock: user.permanentLockReason ? true : false,
+      timeRemaining: user.lockedUntil ? Math.max(0, user.lockedUntil.getTime() - Date.now()) / 1000 : 0,
+    }));
+  }
+
+  /**
+   * Get blocked IPs (admin view)
+   * 
+   * @returns List of blocked IP addresses
+   */
+  async getBlockedIps(): Promise<any[]> {
+    return this.ipRateLimitService.getBlockedIps();
   }
 }

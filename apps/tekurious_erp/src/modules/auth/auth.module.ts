@@ -15,6 +15,7 @@ import { SessionService } from './services/session.service';
 import { SecurityService } from './services/security.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
 import { RefreshTokenService } from './services/refresh-token.service';
+import { IpRateLimitService } from './services/ip-rate-limit.service';
 import { EmailService } from './services/email.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { RolesService } from './services/roles.service';
@@ -50,6 +51,7 @@ import { RolesService } from './services/roles.service';
     SecurityService,
     TokenBlacklistService,
     RefreshTokenService,
+    IpRateLimitService,
     EmailService,
     SuspiciousActivityService,
     RolesService,

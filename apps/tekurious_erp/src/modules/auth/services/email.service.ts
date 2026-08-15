@@ -417,4 +417,62 @@ export class EmailService {
       // Don't throw - this is just a notification
     }
   }
+
+  /**
+   * Send account unlocked notification (FR-AUTH-025)
+   */
+  async sendAccountUnlockedEmail(email: string, firstName: string): Promise<void> {
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
+    const loginLink = `${frontendUrl}/auth/login`;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Tekurious ERP" <${this.configService.get('EMAIL_FROM', 'noreply@tekurious.com')}>`,
+        to: email,
+        subject: 'Your Account Has Been Unlocked - Tekurious ERP',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .button { display: inline-block; padding: 12px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+              .info { background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; }
+              .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>✅ Account Unlocked</h1>
+              </div>
+              <div class="content">
+                <h2>Hi ${firstName},</h2>
+                <p>Good news! Your account has been unlocked by an administrator and you can now log in.</p>
+                <div class="info">
+                  <p><strong>What happened?</strong></p>
+                  <p>Your account was temporarily locked for security reasons. An administrator has reviewed and unlocked it.</p>
+                </div>
+                <p>You can now log in to your account:</p>
+                <a href="${loginLink}" class="button">Log In Now</a>
+                <p><strong>Security tip:</strong> Make sure to use a strong, unique password and enable two-factor authentication for added security.</p>
+              </div>
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Tekurious ERP. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+      });
+
+      this.logger.log(`Account unlocked notification sent to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send account unlocked email to ${email}:`, error);
+      // Don't throw - this is just a notification
+    }
+  }
 }

@@ -803,5 +803,66 @@ export class AuthController {
     this.logger.log(`GET /auth/roles/permissions`);
     return this.rolesService.getPermissionCategories();
   }
-}
 
+  // ==================== ADMIN: ACCOUNT UNLOCK (FR-AUTH-025) ====================
+
+  /**
+   * Admin unlock user account
+   * POST /api/v1/auth/admin/unlock-account
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('admin/unlock-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin unlock locked user account' })
+  @ApiBearerAuth()
+  async adminUnlockAccount(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { userId: string },
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/admin/unlock-account - Admin: ${adminId}, User: ${body.userId}`);
+    return this.authService.adminUnlockAccount(adminId, body.userId);
+  }
+
+  /**
+   * Admin unblock IP address
+   * POST /api/v1/auth/admin/unblock-ip
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('admin/unblock-ip')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin unblock IP address' })
+  @ApiBearerAuth()
+  async adminUnblockIp(
+    @CurrentUser('id') adminId: string,
+    @Body() body: { ipAddress: string },
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/admin/unblock-ip - Admin: ${adminId}, IP: ${body.ipAddress}`);
+    return this.authService.adminUnblockIp(adminId, body.ipAddress);
+  }
+
+  /**
+   * Get locked accounts (admin view)
+   * GET /api/v1/auth/admin/locked-accounts
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('admin/locked-accounts')
+  @ApiOperation({ summary: 'Get list of locked accounts' })
+  @ApiBearerAuth()
+  async getLockedAccounts(): Promise<any[]> {
+    this.logger.log('GET /auth/admin/locked-accounts');
+    return this.authService.getLockedAccounts();
+  }
+
+  /**
+   * Get blocked IPs (admin view)
+   * GET /api/v1/auth/admin/blocked-ips
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('admin/blocked-ips')
+  @ApiOperation({ summary: 'Get list of blocked IP addresses' })
+  @ApiBearerAuth()
+  async getBlockedIps(): Promise<any[]> {
+    this.logger.log('GET /auth/admin/blocked-ips');
+    return this.authService.getBlockedIps();
+  }
+}
