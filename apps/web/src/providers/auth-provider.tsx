@@ -61,8 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Set the token
         setAccessToken(storedToken);
 
-        // Verify token by calling /auth/me
-        const response = await authService.getMe();
+        // Verify token by calling /auth/me with timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth check timeout')), 5000)
+        );
+        
+        const response = await Promise.race([
+          authService.getMe(),
+          timeoutPromise
+        ]) as any;
         
         setUser(response.user);
         setAccessToken(response.accessToken);
@@ -71,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('accessToken', response.accessToken);
 
       } catch (error) {
-        // Token invalid or expired
+        // Token invalid, expired, or backend unreachable
         console.warn('Auth check failed:', error);
         setUser(null);
         setAccessToken(null);
