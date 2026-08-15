@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { setAccessToken } from '../lib/axios';
+import { setAccessToken, setRefreshToken } from '../lib/axios';
 
 // User type based on your backend JWT payload
 export interface User {
@@ -55,18 +55,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setTokens: (tokens) => {
     setAccessToken(tokens.accessToken);
-    // Save to localStorage for persistence
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', tokens.accessToken);
-    }
+    // Refresh token is managed as an HttpOnly cookie by the server (FR-AUTH-033)
+    // No client-side storage needed
   },
 
   logout: () => {
     setAccessToken(null);
-    // Remove from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-    }
+    setRefreshToken(null);
     set({
       user: null,
       isAuthenticated: false,
@@ -80,10 +75,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearAuth: () => {
     setAccessToken(null);
-    // Remove from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-    }
+    setRefreshToken(null);
     set({
       user: null,
       isAuthenticated: false,

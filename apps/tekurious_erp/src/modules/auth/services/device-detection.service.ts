@@ -4,7 +4,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import * as UAParser from 'ua-parser-js';
+import { UAParser } from 'ua-parser-js';
 import { Request } from 'express';
 
 export interface DeviceInfo {

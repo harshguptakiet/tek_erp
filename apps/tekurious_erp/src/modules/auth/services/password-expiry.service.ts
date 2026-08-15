@@ -32,10 +32,10 @@ export class PasswordExpiryService {
   }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { passwordChangedAt: true },
+      select: { lastPasswordChange: true },
     });
 
-    if (!user || !user.passwordChangedAt) {
+    if (!user || !user.lastPasswordChange) {
       // No password change history - consider it expired for security
       return {
         isExpired: true,
@@ -45,10 +45,10 @@ export class PasswordExpiryService {
       };
     }
 
-    const daysSinceChange = this.getDaysSince(user.passwordChangedAt);
+    const daysSinceChange = this.getDaysSince(user.lastPasswordChange);
     const daysRemaining = this.PASSWORD_EXPIRY_DAYS - daysSinceChange;
     const expiryDate = new Date(
-      user.passwordChangedAt.getTime() + this.PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+      user.lastPasswordChange.getTime() + this.PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     );
 
     // Check if in grace period (3 days after expiry)
@@ -70,9 +70,13 @@ export class PasswordExpiryService {
    * @param userId - User ID
    */
   async forcePasswordChange(userId: string): Promise<void> {
+    // Lock account to force password reset
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordExpired: true },
+      data: { 
+        lockedUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Lock for 1 year
+        permanentLockReason: 'PASSWORD_EXPIRED',
+      },
     });
     this.logger.log(`Forced password change for user ${userId}`);
   }
@@ -124,7 +128,7 @@ export class PasswordExpiryService {
         // Find users whose password will expire in X days
         const users = await this.prisma.user.findMany({
           where: {
-            passwordChangedAt: {
+            lastPasswordChange: {
               gte: new Date(targetDate.setHours(0, 0, 0, 0)),
               lte: new Date(targetDate.setHours(23, 59, 59, 999)),
             },
@@ -165,7 +169,7 @@ export class PasswordExpiryService {
 
       const result = await this.prisma.user.updateMany({
         where: {
-          passwordChangedAt: { lt: gracePeriodEnd },
+          lastPasswordChange: { lt: gracePeriodEnd },
           status: 'ACTIVE',
           lockedUntil: null, // Not already locked
         },

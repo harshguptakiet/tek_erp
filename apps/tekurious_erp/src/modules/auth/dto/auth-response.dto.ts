@@ -1,5 +1,6 @@
 export class AuthResponseDto {
   accessToken: string;
+  refreshToken?: string; // FR-AUTH-014: Refresh token for token rotation
   user: {
     id: string;
     email: string;

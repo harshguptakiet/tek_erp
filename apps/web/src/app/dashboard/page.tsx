@@ -12,11 +12,12 @@ import { PERMISSIONS } from '@/config/permissions';
 import { useHasRole } from '@/hooks/use-permissions';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsService } from '@/services/analytics.service';
+import { PasswordExpiryBanner } from '@/components/auth/password-expiry-banner';
 import {
   GraduationCap, Users, BookOpen, ClipboardCheck,
-  Calendar, CreditCard, TrendingUp, Activity, FileText,
-  PenTool, Video, ArrowUpRight, Loader2, BarChart3,
-  Bell, Clock,
+  CreditCard, TrendingUp, FileText,
+  PenTool, Video, ArrowUpRight, BarChart3,
+  Clock,
 } from 'lucide-react';
 
 /* ── stat card ─────────────────────────────────────────────── */
@@ -97,7 +98,6 @@ function QuickAction({ icon: Icon, label, href, gradient }: QuickActionProps) {
 /* ── main dashboard ──────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { user } = useAuthStore();
 
   const isTeacher = useHasRole('TEACHER');
@@ -109,16 +109,11 @@ export default function DashboardPage() {
     useHasRole('ORG_ADMIN');
 
   // Fetch dashboard stats
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => analyticsService.getDashboardOverview(),
     staleTime: 5 * 60 * 1000,
   });
-
-  const displayName =
-    user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.email || 'User';
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -128,30 +123,32 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
-      {/* ── Welcome header ── */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="page-title text-3xl">
-            {greeting()}, {user?.firstName || 'there'} 👋
-          </h1>
-          <p className="page-description mt-1">
-            Here&apos;s what&apos;s happening today
-          </p>
+    <>
+      <PasswordExpiryBanner />
+      <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
+        {/* ── Welcome header ── */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="page-title text-3xl">
+              {greeting()}, {user?.firstName || 'there'} 👋
+            </h1>
+            <p className="page-description mt-1">
+              Here&apos;s what&apos;s happening today
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <Clock className="h-4 w-4" />
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-          <Clock className="h-4 w-4" />
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </div>
-      </div>
 
-      {/* ── Stat cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ── Stat cards ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Can permission={PERMISSIONS.STUDENTS_VIEW}>
           <StatCard
             title="Total Students"
@@ -224,10 +221,10 @@ export default function DashboardPage() {
             href="/parent-portal"
           />
         )}
-      </div>
+        </div>
 
-      {/* ── Quick Actions ── */}
-      <Card className="card-premium">
+        {/* ── Quick Actions ── */}
+        <Card className="card-premium">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
         </CardHeader>
@@ -279,13 +276,13 @@ export default function DashboardPage() {
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
 
-      {/* ── Getting Started Guide ── */}
-      <div
-        className="rounded-2xl p-6 md:p-8 text-white relative overflow-hidden"
-        style={{ background: 'var(--gradient-primary)' }}
-      >
+        {/* ── Getting Started Guide ── */}
+        <div
+          className="rounded-2xl p-6 md:p-8 text-white relative overflow-hidden"
+          style={{ background: 'var(--gradient-primary)' }}
+        >
         <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/5" />
         <div className="absolute bottom-4 -left-8 w-32 h-32 rounded-full bg-white/5" />
 
@@ -360,7 +357,8 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

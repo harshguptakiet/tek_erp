@@ -31,7 +31,7 @@ export class SuspiciousActivityService {
     private prisma: PrismaService,
     private eventBus: EventBusService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Analyze login attempt for suspicious activity
@@ -136,8 +136,9 @@ export class SuspiciousActivityService {
         reasons,
         riskLevel,
       };
-    } catch (error) {
-      this.logger.error(`Error analyzing login activity: ${error.message}`);
+    } catch (error: any) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error analyzing login activity: ${errorMsg}`);
       // Return non-suspicious on error to avoid blocking legitimate logins
       return { isSuspicious: false, reasons: [], riskLevel: 'LOW' };
     }
@@ -295,8 +296,9 @@ export class SuspiciousActivityService {
       );
 
       this.logger.log(`Suspicious activity alert sent to ${context.email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send suspicious activity alert: ${error.message}`);
+    } catch (error: any) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to send suspicious activity alert: ${errorMsg}`);
     }
   }
 
@@ -304,8 +306,23 @@ export class SuspiciousActivityService {
    * Mark device as trusted (user confirms it's their device)
    */
   async markDeviceAsTrusted(userId: string, deviceFingerprint: string): Promise<void> {
-    // Store trusted device in database
-    // (Implementation depends on schema - could be separate TrustedDevices table)
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { trustedDevices: true },
+    });
+
+    if (user) {
+      const currentList = user.trustedDevices || [];
+      if (!currentList.includes(deviceFingerprint)) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            trustedDevices: [...currentList, deviceFingerprint],
+          },
+        });
+      }
+    }
+
     this.logger.log(`Device marked as trusted for user ${userId}: ${deviceFingerprint}`);
 
     await this.eventBus.publish('security.device_trusted', {

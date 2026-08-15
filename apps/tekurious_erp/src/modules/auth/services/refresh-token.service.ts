@@ -49,6 +49,24 @@ export class RefreshTokenService {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
+      // Enforce 10 active sessions limit per user (FR-AUTH-015)
+      const activeSessions = await this.prisma.userSession.findMany({
+        where: { userId, isActive: true },
+        orderBy: { lastActivity: 'asc' },
+      });
+
+      if (activeSessions.length >= 10) {
+        const excessCount = activeSessions.length - 9;
+        const sessionsToEvict = activeSessions.slice(0, excessCount);
+        for (const s of sessionsToEvict) {
+          await this.prisma.userSession.update({
+            where: { id: s.id },
+            data: { isActive: false, revokedAt: new Date() },
+          });
+        }
+        this.logger.log(`Evicted ${excessCount} oldest session(s) for user ${userId} to enforce 10-session limit`);
+      }
+
       // Create session with refresh token
       const session = await this.prisma.userSession.create({
         data: {

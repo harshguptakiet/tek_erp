@@ -170,9 +170,13 @@ export class AuthService {
     }
 
     // Check if account is locked
-    const isLocked = await this.isAccountLocked(user.id);
-    if (isLocked) {
-      throw new UnauthorizedException('Account is temporarily locked due to multiple failed login attempts. Please try again later.');
+    const lockStatus = await this.getAccountLockDetails(user.id);
+    if (lockStatus.isLocked) {
+      if (lockStatus.permanentReason) {
+        throw new UnauthorizedException('Account is permanently locked due to security policy. Please contact an administrator to unlock your account.');
+      }
+      const minutes = lockStatus.lockedUntil ? Math.ceil((lockStatus.lockedUntil.getTime() - Date.now()) / (60 * 1000)) : 15;
+      throw new UnauthorizedException(`Account is temporarily locked. Please try again in ${minutes} minute(s).`);
     }
 
     // Check if user is active
@@ -231,6 +235,14 @@ export class AuthService {
       }
     }
 
+    // FR-AUTH-019: Password Expiry Check
+    if (user.authProvider === 'LOCAL' && user.passwordHash) {
+      const expiryStatus = await this.passwordExpiryService.checkPasswordExpiry(user.id);
+      if (expiryStatus.isExpired && !expiryStatus.isInGracePeriod) {
+        throw new UnauthorizedException('Your password has expired and the grace period has ended. Please use Forgot Password or contact support to reset your password.');
+      }
+    }
+
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
       this.logger.log(`2FA required for user: ${user.id}`);
@@ -264,8 +276,13 @@ export class AuthService {
 
     this.logger.log(`User logged in successfully: ${user.id}`);
 
-    // Generate and return tokens with rememberMe flag
-    return this.generateTokens(user, dto.rememberMe);
+    // FR-AUTH-015: Parse device info from user agent
+    const deviceInfo = dto.userAgent 
+      ? await this.deviceDetectionService.parseUserAgent(dto.userAgent)
+      : undefined;
+
+    // Generate and return tokens with rememberMe flag + device info
+    return this.generateTokens(user, dto.rememberMe, deviceInfo, dto.ipAddress);
   }
 
   /**
@@ -397,39 +414,49 @@ export class AuthService {
 
   /**
    * Refresh access token
+   * FR-AUTH-014: Refresh token rotation - generate new tokens, invalidate old
    */
-  async refreshToken(userId: string): Promise<{ accessToken: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        userRolesNew: {
-          include: {
-            role: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
+  async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
+    this.logger.log('Refresh token rotation attempt');
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    try {
+      // FR-AUTH-014: Rotate refresh token (generates new tokens, detects theft)
+      const result = await this.refreshTokenService.rotateRefreshToken(refreshToken);
+
+      this.logger.log(`Tokens refreshed for user ${result.user.id}`);
+
+      return {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        rememberMe: false, // Will be determined from session
+        tokenExpiry: 604800, // 7 days default
+      };
+    } catch (error) {
+      this.logger.error(`Token refresh failed: ${error.message}`);
+      throw error;
     }
-
-    const tokens = this.generateTokens(user);
-    return { accessToken: tokens.accessToken };
   }
 
   /**
    * Logout user and blacklist token
+   * FR-AUTH-013: Blacklist token on logout
+   * FR-AUTH-014: Revoke refresh token
    */
-  async logout(userId: string, token: string): Promise<void> {
+  async logout(userId: string, token: string, refreshToken?: string): Promise<void> {
     this.logger.log(`Logout for user: ${userId}`);
 
-    // Blacklist the current access token
+    // FR-AUTH-013: Blacklist the current access token
     await this.securityService.blacklistToken(token, userId, 'LOGOUT');
+
+    // FR-AUTH-014: Revoke refresh token if provided
+    if (refreshToken) {
+      try {
+        await this.refreshTokenService.revokeRefreshToken(refreshToken);
+      } catch (error) {
+        this.logger.warn(`Failed to revoke refresh token: ${error.message}`);
+      }
+    }
 
     // Emit logout event
     await this.eventBus.publish('user.logged_out', {
@@ -442,6 +469,7 @@ export class AuthService {
 
   /**
    * Logout from all devices
+   * FR-AUTH-014: Revoke all refresh tokens
    */
   async logoutAllDevices(userId: string): Promise<{ message: string; count: number }> {
     this.logger.log(`Logout all devices for user: ${userId}`);
@@ -454,8 +482,11 @@ export class AuthService {
       },
     });
 
-    // Blacklist all user tokens
+    // FR-AUTH-013: Blacklist all user tokens
     await this.securityService.blacklistAllUserTokens(userId, 'ADMIN_REVOKE');
+
+    // FR-AUTH-014: Revoke all refresh tokens
+    const revokedCount = await this.refreshTokenService.revokeAllUserSessions(userId, 'USER_REQUESTED');
 
     // Emit event
     await this.eventBus.publish('user.logged_out_all_devices', {
@@ -464,11 +495,11 @@ export class AuthService {
       timestamp: new Date(),
     });
 
-    this.logger.log(`Logged out from ${sessions.length} devices for user: ${userId}`);
+    this.logger.log(`Logged out from ${revokedCount} devices for user: ${userId}`);
 
     return {
       message: 'Logged out from all devices successfully',
-      count: sessions.length,
+      count: revokedCount,
     };
   }
 
@@ -540,25 +571,46 @@ export class AuthService {
   /**
    * Generate JWT tokens
    * FR-AUTH-009: Remember Me extends token expiry to 30 days
+   * FR-AUTH-014: Integrated with RefreshTokenService for token rotation
    */
-  private generateTokens(user: any, rememberMe: boolean = false): AuthResponseDto {
+  private async generateTokens(
+    user: any, 
+    rememberMe: boolean = false,
+    deviceInfo?: any,
+    ipAddress?: string
+  ): Promise<AuthResponseDto> {
     const roles = user.userRolesNew?.map((ur: any) => ur.role.name) || [];
+
+    // FR-AUTH-014: Generate refresh token with rotation support
+    const { refreshToken, sessionId } = await this.refreshTokenService.generateRefreshToken(
+      user.id,
+      deviceInfo,
+      ipAddress,
+      rememberMe ? 30 : 7, // 30 days for remember me, 7 days standard
+    );
 
     const payload = {
       sub: user.id,
       email: user.email,
       tenantId: user.tenantId,
       roles,
+      sessionId, // Include sessionId for session timeout tracking
     };
 
     // Standard: 1 hour access token
     const accessToken = this.jwtService.sign(payload);
 
-    // Remember Me: Extended expiry (stored in response metadata for frontend cookie handling)
-    const tokenExpiry = rememberMe ? '30d' : '7d';
+    // Update session with access token for blacklist tracking
+    await this.prisma.userSession.update({
+      where: { id: sessionId },
+      data: { token: accessToken },
+    });
+
+    this.logger.log(`Tokens generated for user ${user.id}, session ${sessionId}, rememberMe: ${rememberMe}`);
 
     return {
       accessToken,
+      refreshToken, // FR-AUTH-014: Return refresh token to client
       user: {
         id: user.id,
         email: user.email,
@@ -801,7 +853,7 @@ export class AuthService {
       this.logger.log(`Email verified for user: ${user.id}`);
 
       // Auto-login user after verification
-      const tokens = this.generateTokens(user);
+      const tokens = await this.generateTokens(user);
 
       return {
         message: 'Email verified successfully',
@@ -854,27 +906,40 @@ export class AuthService {
   /**
    * Check if user account is locked due to failed attempts
    */
-  private async isAccountLocked(userId: string): Promise<boolean> {
+  /**
+   * Get account lock details
+   */
+  private async getAccountLockDetails(userId: string): Promise<{ isLocked: boolean; lockedUntil?: Date; permanentReason?: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { lockedUntil: true },
+      select: { lockedUntil: true, permanentLockReason: true },
     });
 
     if (!user || !user.lockedUntil) {
-      return false;
+      return { isLocked: false };
     }
 
-    // Check if lock has expired
     if (user.lockedUntil < new Date()) {
-      // Lock expired, clear it
       await this.prisma.user.update({
         where: { id: userId },
-        data: { lockedUntil: null, failedLoginAttempts: 0 },
+        data: { lockedUntil: null, failedLoginAttempts: 0, permanentLockReason: null },
       });
-      return false;
+      return { isLocked: false };
     }
 
-    return true;
+    return {
+      isLocked: true,
+      lockedUntil: user.lockedUntil,
+      permanentReason: user.permanentLockReason || undefined,
+    };
+  }
+
+  /**
+   * Check if user account is locked due to failed attempts
+   */
+  private async isAccountLocked(userId: string): Promise<boolean> {
+    const details = await this.getAccountLockDetails(userId);
+    return details.isLocked;
   }
 
   /**
@@ -984,7 +1049,7 @@ export class AuthService {
           user.email!,
           user.firstName,
           '15 minutes',
-          failedAttempts,
+          `${failedAttempts} failed login attempts`,
         );
       } catch (error) {
         this.logger.error(`Failed to send lockout email: ${error.message}`);
@@ -1336,7 +1401,7 @@ export class AuthService {
     this.logger.log(`Account recovery completed for user: ${user.id}`);
 
     // Auto-login user
-    const tokens = this.generateTokens(user);
+    const tokens = await this.generateTokens(user);
 
     return {
       message: 'Password reset successfully. You are now logged in.',
@@ -2660,9 +2725,57 @@ export class AuthService {
       await this.otpService.sendOtp(phone);
       
       return { message: 'OTP sent successfully. Valid for 10 minutes.' };
-    } catch (error) {
-      this.logger.error(`Failed to send public OTP: ${error.message}`);
+    } catch (error: any) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to send public OTP: ${errorMsg}`);
       throw error;
     }
   }
+
+  // ==================== TRUSTED DEVICES MANAGEMENT ====================
+
+  /**
+   * Get list of trusted devices for user
+   */
+  async getTrustedDevices(userId: string): Promise<{ devices: string[] }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { trustedDevices: true },
+    });
+    return { devices: user?.trustedDevices || [] };
+  }
+
+  /**
+   * Add current device to trusted devices
+   */
+  async addTrustedDevice(userId: string, userAgent?: string): Promise<{ message: string; devices: string[] }> {
+    const deviceId = userAgent
+      ? this.deviceDetectionService.getShortDeviceId(this.deviceDetectionService.parseUserAgent(userAgent))
+      : 'Current Device';
+    await this.suspiciousActivityService.markDeviceAsTrusted(userId, deviceId);
+    const updated = await this.getTrustedDevices(userId);
+    return { message: 'Device trusted successfully', devices: updated.devices };
+  }
+
+  /**
+   * Remove device from trusted devices
+   */
+  async removeTrustedDevice(userId: string, deviceId: string): Promise<{ message: string; devices: string[] }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { trustedDevices: true },
+    });
+
+    if (user && user.trustedDevices) {
+      const filtered = user.trustedDevices.filter((d) => d !== deviceId);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { trustedDevices: filtered },
+      });
+    }
+
+    const updated = await this.getTrustedDevices(userId);
+    return { message: 'Trusted device removed successfully', devices: updated.devices };
+  }
 }
+

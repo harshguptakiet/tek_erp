@@ -12,6 +12,7 @@ import {
   Param,
   Res,
   Put,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -66,6 +67,7 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto | { requiresTwoFactor: boolean; tempToken: string; message: string }> {
     this.logger.log(`POST /auth/login - Email: ${loginDto.email}`);
     
@@ -73,7 +75,17 @@ export class AuthController {
     loginDto.ipAddress = req.ip || req.socket.remoteAddress;
     loginDto.userAgent = req.headers['user-agent'];
 
-    return this.authService.login(loginDto);
+    const result = await this.authService.login(loginDto);
+    if ('refreshToken' in result && result.refreshToken) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: result.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+    }
+    return result;
   }
 
   /**
@@ -116,18 +128,40 @@ export class AuthController {
   /**
    * Refresh access token
    * POST /api/v1/auth/refresh
+   * FR-AUTH-014: Refresh token rotation
    */
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refreshToken(@CurrentUser('id') userId: string): Promise<{ accessToken: string }> {
-    this.logger.log(`POST /auth/refresh - User ID: ${userId}`);
-    return this.authService.refreshToken(userId);
+  async refreshToken(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body('refreshToken') bodyToken?: string,
+  ): Promise<AuthResponseDto> {
+    const refreshToken = bodyToken || req.cookies?.['refreshToken'];
+    this.logger.log(`POST /auth/refresh - Refresh token provided`);
+    
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    
+    const result = await this.authService.refreshToken(refreshToken);
+    if (result.refreshToken) {
+      res.cookie('refreshToken', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: result.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+    }
+    return result;
   }
 
   /**
    * Logout (client-side token removal)
    * POST /api/v1/auth/logout
+   * FR-AUTH-013 & FR-AUTH-014: Blacklist access token and revoke refresh token
    */
   @UseGuards(JwtAuthGuard)
   @Post('logout')
@@ -135,16 +169,19 @@ export class AuthController {
   async logout(
     @CurrentUser('id') userId: string,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body('refreshToken') bodyToken?: string,
   ): Promise<{ message: string }> {
     this.logger.log(`POST /auth/logout - User ID: ${userId}`);
     
-    // Extract token from Authorization header
+    const refreshToken = bodyToken || req.cookies?.['refreshToken'];
     const token = req.headers.authorization?.replace('Bearer ', '');
     
     if (token) {
-      await this.authService.logout(userId, token);
+      await this.authService.logout(userId, token, refreshToken);
     }
     
+    res.clearCookie('refreshToken', { path: '/' });
     return { message: 'Logged out successfully' };
   }
 
@@ -875,6 +912,7 @@ export class AuthController {
   /**
    * Admin unblock IP address
    * POST /api/v1/auth/admin/unblock-ip
+   * FR-AUTH-025: IP-based rate limiting with admin unblock
    */
   @UseGuards(JwtAuthGuard)
   @Post('admin/unblock-ip')
@@ -968,5 +1006,54 @@ export class AuthController {
   }> {
     this.logger.log(`GET /auth/password-expiry-status - User: ${userId}`);
     return this.authService.checkPasswordExpiry(userId);
+  }
+
+  // ==================== TRUSTED DEVICES ====================
+
+  /**
+   * Get trusted devices
+   * GET /api/v1/auth/trusted-devices
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('trusted-devices')
+  @ApiOperation({ summary: 'Get trusted devices' })
+  @ApiBearerAuth()
+  async getTrustedDevices(@CurrentUser('id') userId: string): Promise<{ devices: string[] }> {
+    this.logger.log(`GET /auth/trusted-devices - User: ${userId}`);
+    return this.authService.getTrustedDevices(userId);
+  }
+
+  /**
+   * Mark current device as trusted
+   * POST /api/v1/auth/trust-device
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('trust-device')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark current device as trusted' })
+  @ApiBearerAuth()
+  async trustDevice(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<{ message: string; devices: string[] }> {
+    const userAgent = req.headers['user-agent'];
+    this.logger.log(`POST /auth/trust-device - User: ${userId}`);
+    return this.authService.addTrustedDevice(userId, userAgent);
+  }
+
+  /**
+   * Delete trusted device
+   * DELETE /api/v1/auth/trusted-devices/:deviceId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('trusted-devices/:deviceId')
+  @ApiOperation({ summary: 'Remove trusted device' })
+  @ApiBearerAuth()
+  async removeTrustedDevice(
+    @CurrentUser('id') userId: string,
+    @Param('deviceId') deviceId: string,
+  ): Promise<{ message: string; devices: string[] }> {
+    this.logger.log(`DELETE /auth/trusted-devices/${deviceId} - User: ${userId}`);
+    return this.authService.removeTrustedDevice(userId, deviceId);
   }
 }

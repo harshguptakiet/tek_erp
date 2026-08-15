@@ -5,6 +5,7 @@ import { ThemeProvider } from '../providers/theme-provider';
 import { Toaster } from '../components/ui/toast';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppShell } from '../components/layout/app-shell';
+import { SessionTimeoutWarning } from '../components/auth/session-timeout-warning';
 
 export const metadata = {
   title: 'Tekurious ERP — Education Management Platform',
@@ -32,6 +33,7 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
+              <SessionTimeoutWarning />
               <AppShell>{children}</AppShell>
               <Toaster />
               <SonnerToaster

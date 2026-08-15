@@ -26,25 +26,59 @@ export function LoginForm() {
   const onSubmit = async (data: LoginDto) => {
     try {
       const response = await authService.login(data);
+
+      // Handle 2FA required
+      if ('requiresTwoFactor' in response && response.requiresTwoFactor) {
+        router.push(`/auth/2fa-verify?token=${(response as any).tempToken}`);
+        return;
+      }
+
+      const loginRes = response as any;
       setUser({
-        id: response.user.id,
-        email: response.user.email,
-        firstName: response.user.firstName,
-        lastName: response.user.lastName,
-        role: response.user.role,
-        permissions: response.user.permissions,
-        organizationId: response.user.organizationId,
-        schoolId: response.user.schoolId,
-        status: response.user.status,
+        id: loginRes.user.id,
+        email: loginRes.user.email,
+        firstName: loginRes.user.firstName,
+        lastName: loginRes.user.lastName,
+        role: loginRes.user.role,
+        permissions: loginRes.user.permissions,
+        organizationId: loginRes.user.organizationId,
+        schoolId: loginRes.user.schoolId,
+        status: loginRes.user.status,
       });
-      setTokens({ accessToken: response.accessToken });
+
+      // FR-AUTH-033: Only store access token in memory via setTokens
+      setTokens({ accessToken: loginRes.accessToken });
+
       toast.success('Welcome back!', {
-        description: `Signed in as ${response.user.firstName} ${response.user.lastName}`,
+        description: `Signed in as ${loginRes.user.firstName} ${loginRes.user.lastName}`,
       });
       router.push('/dashboard');
     } catch (error: any) {
+      const message: string = error?.message || error?.response?.data?.message || '';
+
+      // FR-AUTH-025: Account lockout - redirect to dedicated locked page
+      if (message.toLowerCase().includes('locked') || message.toLowerCase().includes('temporarily locked')) {
+        const minutesMatch = message.match(/(\d+)\s*minute/i);
+        const minutes = minutesMatch ? minutesMatch[1] : null;
+        const isPermanent = message.toLowerCase().includes('permanently');
+        const params = new URLSearchParams();
+        if (isPermanent) params.set('permanent', 'true');
+        if (minutes) params.set('minutes', minutes);
+        router.push(`/auth/account-locked?${params.toString()}`);
+        return;
+      }
+
+      // FR-AUTH-019: Password expired - redirect to change password
+      if (message.toLowerCase().includes('password has expired') || message.toLowerCase().includes('password expired')) {
+        toast.error('Password Expired', {
+          description: 'Your password has expired. Please set a new password to continue.',
+        });
+        router.push('/settings/security/password');
+        return;
+      }
+
       toast.error('Login failed', {
-        description: error?.message || 'Invalid email or password. Please try again.',
+        description: message || 'Invalid email or password. Please try again.',
       });
     }
   };

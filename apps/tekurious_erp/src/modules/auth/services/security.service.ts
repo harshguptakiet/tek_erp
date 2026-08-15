@@ -197,39 +197,6 @@ export class SecurityService {
 
   // ==================== SESSION TIMEOUT ====================
 
-  /**
-   * Check if session has timed out (30 min inactivity)
-   */
-  async checkSessionTimeout(sessionId: string): Promise<boolean> {
-    const session = await this.prisma.userSession.findUnique({
-      where: { id: sessionId },
-      select: { lastActivity: true, isActive: true },
-    });
-
-    if (!session || !session.isActive) {
-      return true; // Session doesn't exist or inactive = timed out
-    }
-
-    const inactiveMinutes = 30; // Configurable
-    const timeoutThreshold = new Date(Date.now() - inactiveMinutes * 60 * 1000);
-
-    return session.lastActivity < timeoutThreshold;
-  }
-
-  /**
-   * Update session activity timestamp
-   */
-  async updateSessionActivity(sessionId: string): Promise<void> {
-    try {
-      await this.prisma.userSession.update({
-        where: { id: sessionId },
-        data: { lastActivity: new Date() },
-      });
-    } catch (error) {
-      this.logger.error(`Failed to update session activity: ${error.message}`);
-    }
-  }
-
   // ==================== CSRF PROTECTION ====================
 
   /**
@@ -326,37 +293,6 @@ export class SecurityService {
       this.logger.log(`Cleaned up ${result.count} expired blacklisted tokens`);
     } catch (error) {
       this.logger.error(`Failed to cleanup blacklist: ${error.message}`);
-    }
-  }
-
-  /**
-   * Enforce session limit (max 10 concurrent sessions per user)
-   */
-  async enforceSessionLimit(userId: string): Promise<void> {
-    const maxSessions = 10;
-    
-    const sessions = await this.prisma.userSession.findMany({
-      where: {
-        userId,
-        isActive: true,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { lastActivity: 'asc' }, // Oldest first
-    });
-
-    if (sessions.length >= maxSessions) {
-      // Revoke oldest session
-      const oldestSession = sessions[0];
-      await this.prisma.userSession.update({
-        where: { id: oldestSession.id },
-        data: { isActive: false, revokedAt: new Date() },
-      });
-
-      if (oldestSession.token) {
-        await this.blacklistToken(oldestSession.token, userId, 'ADMIN_REVOKE');
-      }
-
-      this.logger.log(`Revoked oldest session for user ${userId} (session limit reached)`);
     }
   }
 

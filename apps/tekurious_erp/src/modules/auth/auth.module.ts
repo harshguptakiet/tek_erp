@@ -33,7 +33,7 @@ import { RolesService } from './services/roles.service';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '7d',
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '1h',
         } as any,
       }),
       inject: [ConfigService],
