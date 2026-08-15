@@ -40,6 +40,7 @@ export interface LoginResponse {
     organizationId?: string;
     schoolId?: string;
     status: string;
+    authProvider?: 'LOCAL' | 'GOOGLE' | 'MICROSOFT' | 'APPLE';
   };
   accessToken: string;
   refreshToken?: string; // FR-AUTH-014: Refresh token rotation

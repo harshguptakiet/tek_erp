@@ -21,6 +21,7 @@ export interface User {
   twoFactorEnabled?: boolean;
   lastLogin?: Date | string;
   isSuperAdmin?: boolean;
+  authProvider?: 'LOCAL' | 'GOOGLE' | 'MICROSOFT' | 'APPLE';
 }
 
 interface AuthState {
