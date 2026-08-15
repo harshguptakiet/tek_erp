@@ -865,4 +865,39 @@ export class AuthController {
     this.logger.log('GET /auth/admin/blocked-ips');
     return this.authService.getBlockedIps();
   }
+
+  // ==================== SESSION ACTIVITY PING (FR-AUTH-016) ====================
+
+  /**
+   * Keep session alive by updating activity timestamp
+   * POST /api/v1/auth/sessions/ping
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('sessions/ping')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Keep session alive (activity ping)' })
+  @ApiBearerAuth()
+  async pingSession(
+    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
+  ): Promise<{ success: boolean; remainingMs: number }> {
+    this.logger.log(`POST /auth/sessions/ping - User: ${userId}`);
+    return this.authService.pingSession(user.sessionId || user.id);
+  }
+
+  /**
+   * Get session timeout configuration
+   * GET /api/v1/auth/sessions/timeout-config
+   */
+  @Get('sessions/timeout-config')
+  @ApiOperation({ summary: 'Get session timeout configuration' })
+  async getTimeoutConfig(): Promise<{
+    timeoutMs: number;
+    warningThresholdMs: number;
+  }> {
+    return {
+      timeoutMs: 30 * 60 * 1000, // 30 minutes
+      warningThresholdMs: 5 * 60 * 1000, // 5 minutes warning
+    };
+  }
 }

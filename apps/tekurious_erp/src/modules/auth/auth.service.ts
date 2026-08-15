@@ -2474,4 +2474,37 @@ export class AuthService {
   async getBlockedIps(): Promise<any[]> {
     return this.ipRateLimitService.getBlockedIps();
   }
+
+  // ==================== SESSION ACTIVITY PING (FR-AUTH-016) ====================
+
+  /**
+   * Keep session alive by updating activity timestamp
+   * @param sessionId - Session ID to ping
+   * @returns Success status and remaining time
+   */
+  async pingSession(
+    sessionId: string,
+  ): Promise<{ success: boolean; remainingMs: number }> {
+    try {
+      // Update activity timestamp
+      await this.securityService.updateSessionActivity(sessionId);
+
+      // Calculate remaining time before timeout
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: sessionId },
+        select: { lastActivityAt: true },
+      });
+
+      const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      const inactiveMs = session
+        ? Date.now() - session.lastActivityAt.getTime()
+        : TIMEOUT_MS;
+      const remainingMs = Math.max(0, TIMEOUT_MS - inactiveMs);
+
+      return { success: true, remainingMs };
+    } catch (error) {
+      this.logger.error(`Failed to ping session: ${error.message}`);
+      return { success: false, remainingMs: 0 };
+    }
+  }
 }

@@ -359,4 +359,54 @@ export class SecurityService {
       this.logger.log(`Revoked oldest session for user ${userId} (session limit reached)`);
     }
   }
+
+  // ==================== SESSION TIMEOUT (FR-AUTH-016) ====================
+
+  /**
+   * Check if session has expired due to inactivity
+   * @param sessionId - Session ID to check
+   * @returns true if expired, false otherwise
+   */
+  async checkSessionTimeout(sessionId: string): Promise<boolean> {
+    try {
+      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: sessionId },
+        select: { lastActivityAt: true, expiresAt: true, isActive: true },
+      });
+
+      if (!session || !session.isActive) {
+        return true; // Session not found or inactive = expired
+      }
+
+      // Check absolute expiry
+      if (session.expiresAt && session.expiresAt < new Date()) {
+        return true;
+      }
+
+      // Check inactivity timeout
+      const inactiveMs = Date.now() - session.lastActivityAt.getTime();
+      return inactiveMs > INACTIVITY_TIMEOUT_MS;
+    } catch (error) {
+      this.logger.error(`Error checking session timeout: ${error.message}`);
+      return true; // Fail closed
+    }
+  }
+
+  /**
+   * Update session activity timestamp
+   * @param sessionId - Session ID to update
+   */
+  async updateSessionActivity(sessionId: string): Promise<void> {
+    try {
+      await this.prisma.userSession.update({
+        where: { id: sessionId },
+        data: { lastActivityAt: new Date() },
+      });
+    } catch (error) {
+      // Don't throw - activity update failure shouldn't block requests
+      this.logger.warn(`Failed to update session activity: ${error.message}`);
+    }
+  }
 }
