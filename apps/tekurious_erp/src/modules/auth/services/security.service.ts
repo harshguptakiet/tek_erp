@@ -335,7 +335,22 @@ export class SecurityService {
    * @param sessionId - Session ID to update
    */
   async updateSessionActivity(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      return; // No session ID to update
+    }
+    
     try {
+      // Check if session exists first
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: sessionId },
+        select: { id: true },
+      });
+
+      if (!session) {
+        this.logger.warn(`Session ${sessionId} not found - may have been revoked or expired`);
+        return;
+      }
+
       await this.prisma.userSession.update({
         where: { id: sessionId },
         data: { lastActivityAt: new Date() },
