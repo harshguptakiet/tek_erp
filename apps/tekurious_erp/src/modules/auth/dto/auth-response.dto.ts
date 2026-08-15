@@ -1,5 +1,6 @@
 export class AuthResponseDto {
   accessToken: string;
+  refreshToken?: string; // FR-AUTH-014: Refresh token for token rotation
   user: {
     id: string;
     email: string;
@@ -13,6 +14,9 @@ export class AuthResponseDto {
     schoolId?: string;
     status?: string;
   };
+  // FR-AUTH-009: Remember Me support
+  rememberMe?: boolean;
+  tokenExpiry?: number; // Token expiry in seconds
 }
 
 export class UserPayload {
@@ -21,4 +25,5 @@ export class UserPayload {
   email: string;
   tenantId?: string;
   roles: string[];
+  sessionId?: string; // Current session ID from JWT, used for ping/CSRF/session-management
 }

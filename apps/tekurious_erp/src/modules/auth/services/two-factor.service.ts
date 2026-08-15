@@ -1,32 +1,33 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TOTP } from 'otplib';
-import { generateSecret } from 'otplib';
+import { generateSecret as otplibGenerateSecret, generate as otplibGenerate, verify as otplibVerify } from 'otplib';
 import * as QRCode from 'qrcode';
 import * as crypto from 'crypto';
 
+/**
+ * otplib v13.4.1 note: the class-based `TOTP`/`HOTP` APIs require explicit
+ * crypto/base32 plugin injection (NobleCryptoPlugin/ScureBase32Plugin) or they
+ * throw `CryptoPluginMissingError`/`Base32PluginMissingError`. The top-level
+ * functional API (`generateSecret`, `generate`, `verify`) ships with sane
+ * defaults already wired in and works out of the box, so we use that instead.
+ */
 @Injectable()
 export class TwoFactorService {
-  private totp: TOTP;
+  private readonly PERIOD = 30; // 30-second time step
+  private readonly DIGITS = 6;
 
-  constructor(private configService: ConfigService) {
-    // Initialize TOTP with options
-    this.totp = new TOTP({
-      period: 30, // 30-second time step
-      digits: 6,
-    });
-  }
+  constructor(private configService: ConfigService) {}
 
   /**
    * Generate TOTP secret and QR code
    */
   async generateSecret(userEmail: string): Promise<{ secret: string; qrCodeUrl: string }> {
     // Generate secret (base32 encoded)
-    const secret = generateSecret();
+    const secret = otplibGenerateSecret();
 
     // Generate OTP auth URL
     const appName = this.configService.get('APP_NAME', 'Tekurious ERP');
-    const otpAuthUrl = `otpauth://totp/${encodeURIComponent(appName)}:${encodeURIComponent(userEmail)}?secret=${secret}&issuer=${encodeURIComponent(appName)}&period=30&digits=6`;
+    const otpAuthUrl = `otpauth://totp/${encodeURIComponent(appName)}:${encodeURIComponent(userEmail)}?secret=${secret}&issuer=${encodeURIComponent(appName)}&period=${this.PERIOD}&digits=${this.DIGITS}`;
 
     // Generate QR code
     const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl);
@@ -42,16 +43,28 @@ export class TwoFactorService {
    */
   async verifyToken(secret: string, token: string): Promise<boolean> {
     try {
-      const result = await this.totp.verify(token, {
+      const result = await otplibVerify({
+        token,
         secret,
-        period: 30,
-        digits: 6,
+        period: this.PERIOD,
+        digits: this.DIGITS,
         epochTolerance: 1, // Allow ±1 time step (30 seconds each)
       });
       return result.valid;
     } catch (error) {
       throw new BadRequestException('Invalid 2FA code');
     }
+  }
+
+  /**
+   * Generate current TOTP code (used only for tests/manual verification tooling)
+   */
+  async generateCurrentToken(secret: string): Promise<string> {
+    return otplibGenerate({
+      secret,
+      period: this.PERIOD,
+      digits: this.DIGITS,
+    });
   }
 
   /**

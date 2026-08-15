@@ -1,192 +1,163 @@
 /**
- * FR-AUTH-037: Password Strength Meter
- * Calculates password strength and provides feedback
+ * Password Strength Utility
+ * FR-AUTH-037: Password strength meter with real-time feedback
  */
 
 export interface PasswordStrengthResult {
-  score: number; // 0-4 (0=very weak, 4=very strong)
-  level: 'very-weak' | 'weak' | 'fair' | 'good' | 'strong';
+  score: number; // 0-4
+  strength: 'VERY_WEAK' | 'WEAK' | 'FAIR' | 'GOOD' | 'STRONG';
   feedback: string[];
   passesMinimum: boolean;
 }
 
-const COMMON_PASSWORDS = [
-  'password', '123456', '12345678', 'qwerty', 'abc123', 'monkey', '1234567',
-  'letmein', 'trustno1', 'dragon', 'baseball', 'iloveyou', 'master', 'sunshine',
-  'ashley', 'bailey', 'passw0rd', 'shadow', '123123', '654321', 'superman',
-  'qazwsx', 'michael', 'football', 'welcome', 'jesus', 'ninja', 'mustang'
-];
+export interface PasswordContext {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 export class PasswordStrengthUtil {
   /**
-   * Calculate password strength
+   * Calculate password strength with detailed feedback
    */
-  static calculateStrength(password: string, userInfo?: { email?: string; firstName?: string; lastName?: string }): PasswordStrengthResult {
+  static calculateStrength(password: string, context?: PasswordContext): PasswordStrengthResult {
     let score = 0;
     const feedback: string[] = [];
 
-    // Length check
-    if (password.length < 8) {
-      feedback.push('Password should be at least 8 characters long');
-    } else if (password.length >= 8 && password.length < 12) {
-      score += 1;
-    } else if (password.length >= 12 && password.length < 16) {
-      score += 2;
-    } else {
-      score += 3;
-    }
+    // Length scoring
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (password.length >= 16) score++;
 
-    // Character variety checks
+    // Character variety scoring
     const hasLowercase = /[a-z]/.test(password);
     const hasUppercase = /[A-Z]/.test(password);
-    const hasDigit = /\d/.test(password);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
-    const varietyCount = [hasLowercase, hasUppercase, hasDigit, hasSpecial].filter(Boolean).length;
+    const varietyCount = [hasLowercase, hasUppercase, hasNumbers, hasSpecialChars].filter(Boolean).length;
+    if (varietyCount >= 3) score++;
+    if (varietyCount === 4) score++;
 
-    if (!hasLowercase) feedback.push('Add lowercase letters');
-    if (!hasUppercase) feedback.push('Add uppercase letters');
-    if (!hasDigit) feedback.push('Add numbers');
-    if (!hasSpecial) feedback.push('Add special characters (!@#$%^&*)');
-
-    score += varietyCount;
-
-    // Common password check
-    const lowerPassword = password.toLowerCase();
-    if (COMMON_PASSWORDS.some(common => lowerPassword.includes(common))) {
-      feedback.push('Avoid common passwords');
+    // Penalty for common patterns
+    if (/^(?:12345|password|qwerty|abc123|letmein)/i.test(password)) {
       score = Math.max(0, score - 2);
+      feedback.push('Avoid common passwords like "password" or "12345"');
     }
 
-    // Pattern checks
+    // Penalty for sequential characters
+    if (/(?:abc|bcd|cde|123|234|345|678|789)/i.test(password)) {
+      score = Math.max(0, score - 1);
+      feedback.push('Avoid sequential characters like "123" or "abc"');
+    }
+
+    // Penalty for repeated characters
     if (/(.)\1{2,}/.test(password)) {
-      feedback.push('Avoid repeated characters');
       score = Math.max(0, score - 1);
+      feedback.push('Avoid repeating characters like "aaa" or "111"');
     }
 
-    if (/^[0-9]+$/.test(password)) {
-      feedback.push('Avoid using only numbers');
-      score = Math.max(0, score - 2);
-    }
-
-    if (/^[a-zA-Z]+$/.test(password)) {
-      feedback.push('Add numbers and special characters');
-      score = Math.max(0, score - 1);
-    }
-
-    // Sequential characters
-    if (this.hasSequentialChars(password)) {
-      feedback.push('Avoid sequential characters (abc, 123)');
-      score = Math.max(0, score - 1);
-    }
-
-    // User info check
-    if (userInfo) {
-      if (userInfo.email && lowerPassword.includes(userInfo.email.split('@')[0].toLowerCase())) {
-        feedback.push('Avoid using your email in the password');
-        score = Math.max(0, score - 2);
+    // Context-based checks (similarity to email/name)
+    if (context) {
+      if (context.email) {
+        const emailLocal = context.email.split('@')[0].toLowerCase();
+        if (password.toLowerCase().includes(emailLocal) && emailLocal.length > 3) {
+          score = Math.max(0, score - 1);
+          feedback.push('Password should not contain parts of your email');
+        }
       }
-      if (userInfo.firstName && lowerPassword.includes(userInfo.firstName.toLowerCase())) {
-        feedback.push('Avoid using your name in the password');
-        score = Math.max(0, score - 1);
+
+      if (context.firstName && context.firstName.length > 2) {
+        if (password.toLowerCase().includes(context.firstName.toLowerCase())) {
+          score = Math.max(0, score - 1);
+          feedback.push('Password should not contain your first name');
+        }
       }
-      if (userInfo.lastName && lowerPassword.includes(userInfo.lastName.toLowerCase())) {
-        feedback.push('Avoid using your name in the password');
-        score = Math.max(0, score - 1);
+
+      if (context.lastName && context.lastName.length > 2) {
+        if (password.toLowerCase().includes(context.lastName.toLowerCase())) {
+          score = Math.max(0, score - 1);
+          feedback.push('Password should not contain your last name');
+        }
       }
     }
 
     // Cap score at 4
     score = Math.min(4, Math.max(0, score));
 
-    // Determine level
-    let level: PasswordStrengthResult['level'];
-    if (score === 0) level = 'very-weak';
-    else if (score === 1) level = 'weak';
-    else if (score === 2) level = 'fair';
-    else if (score === 3) level = 'good';
-    else level = 'strong';
-
-    // Check if passes minimum requirements
-    const passesMinimum = 
-      password.length >= 8 &&
-      hasLowercase &&
-      hasUppercase &&
-      hasDigit &&
-      hasSpecial;
-
-    if (feedback.length === 0 && score >= 3) {
-      feedback.push('Strong password!');
+    // Determine strength level
+    let strength: PasswordStrengthResult['strength'];
+    if (score === 0) {
+      strength = 'VERY_WEAK';
+      feedback.unshift('Password is very weak');
+    } else if (score === 1) {
+      strength = 'WEAK';
+      feedback.unshift('Password is weak');
+    } else if (score === 2) {
+      strength = 'FAIR';
+      feedback.unshift('Password is fair');
+    } else if (score === 3) {
+      strength = 'GOOD';
+      feedback.unshift('Password is good');
+    } else {
+      strength = 'STRONG';
+      feedback.unshift('Password is strong');
     }
+
+    // Add constructive feedback for weak passwords
+    if (score < 3) {
+      if (password.length < 12) {
+        feedback.push('Use at least 12 characters for better security');
+      }
+      if (!hasUppercase) {
+        feedback.push('Add uppercase letters (A-Z)');
+      }
+      if (!hasLowercase) {
+        feedback.push('Add lowercase letters (a-z)');
+      }
+      if (!hasNumbers) {
+        feedback.push('Add numbers (0-9)');
+      }
+      if (!hasSpecialChars) {
+        feedback.push('Add special characters (!@#$%^&*)');
+      }
+    }
+
+    // Minimum acceptable is FAIR (score >= 2)
+    const passesMinimum = score >= 2;
 
     return {
       score,
-      level,
+      strength,
       feedback,
       passesMinimum,
     };
   }
 
   /**
-   * Check for sequential characters
+   * Get visual color for strength level
    */
-  private static hasSequentialChars(password: string): boolean {
-    const sequences = [
-      'abcdefghijklmnopqrstuvwxyz',
-      '0123456789',
-      'qwertyuiop',
-      'asdfghjkl',
-      'zxcvbnm'
-    ];
-
-    const lower = password.toLowerCase();
-    
-    for (const seq of sequences) {
-      for (let i = 0; i < seq.length - 2; i++) {
-        const substring = seq.substring(i, i + 3);
-        if (lower.includes(substring)) {
-          return true;
-        }
-        // Check reverse
-        const reverse = substring.split('').reverse().join('');
-        if (lower.includes(reverse)) {
-          return true;
-        }
-      }
+  static getStrengthColor(strength: PasswordStrengthResult['strength']): string {
+    switch (strength) {
+      case 'VERY_WEAK':
+        return '#dc2626'; // red-600
+      case 'WEAK':
+        return '#ea580c'; // orange-600
+      case 'FAIR':
+        return '#f59e0b'; // amber-500
+      case 'GOOD':
+        return '#22c55e'; // green-500
+      case 'STRONG':
+        return '#16a34a'; // green-600
+      default:
+        return '#9ca3af'; // gray-400
     }
-
-    return false;
   }
 
   /**
-   * Validate password meets minimum requirements
+   * Get progress percentage (0-100)
    */
-  static validatePassword(password: string): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (password.length < 8) {
-      errors.push('Password must be at least 8 characters long');
-    }
-
-    if (!/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter');
-    }
-
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter');
-    }
-
-    if (!/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Password must contain at least one special character');
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
+  static getStrengthPercentage(score: number): number {
+    return (score / 4) * 100;
   }
 }

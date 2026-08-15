@@ -41,8 +41,12 @@ export interface LoginResponse {
     schoolId?: string;
     tenantId?: string;
     status: string;
+    authProvider?: 'LOCAL' | 'GOOGLE' | 'MICROSOFT' | 'APPLE';
   };
   accessToken: string;
+  refreshToken?: string; // FR-AUTH-014: Refresh token rotation
+  rememberMe?: boolean;
+  tokenExpiry?: number;
 }
 
 // Auth Service
@@ -79,10 +83,12 @@ export const authService = {
   },
 
   /**
-   * Refresh access token (uses HttpOnly cookie)
+   * Refresh access token using refresh token (FR-AUTH-014: Token rotation)
    */
-  async refresh(): Promise<{ accessToken: string }> {
-    const response = await apiClient.post<{ accessToken: string }>('/auth/refresh');
+  async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const response = await apiClient.post<{ accessToken: string; refreshToken: string }>('/auth/refresh', { 
+      refreshToken 
+    });
     return response.data;
   },
 
@@ -193,8 +199,24 @@ export const authService = {
   /**
    * Mark current device as trusted
    */
-  async trustDevice(): Promise<{ message: string }> {
+  async trustDevice(): Promise<{ message: string; devices: string[] }> {
     const response = await apiClient.post('/auth/trust-device');
+    return response.data;
+  },
+
+  /**
+   * Get trusted devices
+   */
+  async getTrustedDevices(): Promise<{ devices: string[] }> {
+    const response = await apiClient.get('/auth/trusted-devices');
+    return response.data;
+  },
+
+  /**
+   * Remove trusted device
+   */
+  async removeTrustedDevice(deviceId: string): Promise<{ message: string; devices: string[] }> {
+    const response = await apiClient.delete(`/auth/trusted-devices/${encodeURIComponent(deviceId)}`);
     return response.data;
   },
 
@@ -222,18 +244,6 @@ export const authService = {
     const data = response.data;
     if (Array.isArray(data)) {
       return { sessions: data };
-    }
-    return data;
-  },
-
-  /**
-   * Get login history
-   */
-  async getLoginHistory(params?: { page?: number; limit?: number }): Promise<{ history: any[] }> {
-    const response = await apiClient.get('/auth/login-history', { params });
-    const data = response.data;
-    if (Array.isArray(data)) {
-      return { history: data };
     }
     return data;
   },
@@ -279,8 +289,8 @@ export const authService = {
   /**
    * Check password expiry status
    */
-  async checkPasswordExpiry(): Promise<{ isExpired: boolean; daysRemaining: number }> {
-    const response = await apiClient.get('/auth/password-expiry');
+  async checkPasswordExpiry(): Promise<{ isExpired: boolean; isInGracePeriod: boolean; daysRemaining: number; expiryDate?: Date }> {
+    const response = await apiClient.get('/auth/password-expiry-status');
     return response.data;
   },
 
@@ -289,6 +299,60 @@ export const authService = {
    */
   async checkLockStatus(email?: string): Promise<{ isLocked: boolean; lockedUntil?: string }> {
     const response = await apiClient.get('/auth/lock-status', { params: { email } });
+    return response.data;
+  },
+
+  /**
+   * Get backup codes status
+   */
+  async getBackupCodesStatus(): Promise<{
+    codes: string[];
+    used: string[];
+    remaining: number;
+    total: number;
+  }> {
+    const response = await apiClient.get('/auth/2fa/backup-codes/status');
+    return response.data;
+  },
+
+  /**
+   * Get login history with filtering
+   */
+  async getLoginHistory(params?: {
+    status?: string;
+    dateFilter?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    attempts: Array<{
+      id: string;
+      success: boolean;
+      timestamp: string;
+      ipAddress: string;
+      location?: string;
+      device: string;
+      browser: string;
+      os: string;
+      isSuspicious: boolean;
+      failureReason?: string;
+    }>;
+    stats: {
+      total: number;
+      successful: number;
+      failed: number;
+      suspicious: number;
+    };
+    total: number;
+  }> {
+    const response = await apiClient.get('/auth/login-history', { params });
+    return response.data;
+  },
+
+  /**
+   * Revoke all other sessions
+   */
+  async revokeAllSessions(): Promise<{ message: string }> {
+    const response = await apiClient.post('/auth/sessions/revoke-all');
     return response.data;
   },
 };

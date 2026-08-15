@@ -69,6 +69,10 @@ model User {
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
   backupCodes      String[] // Hashed 2FA backup codes
+  usedBackupCodes  String[] @default([]) // Track which backup codes have been used
+  twoFactorPendingSecret String? // Temporary storage for 2FA setup
+  twoFactorPendingBackupCodes String[] @default([]) // Temporary backup codes during setup
+  trustedDevices   String[] // Trusted device fingerprints
 
   passwordExpiry     DateTime?
   lastPasswordChange DateTime?
@@ -76,9 +80,11 @@ model User {
   emailVerified Boolean @default(false)
   phoneVerified Boolean @default(false)
 
-  lastLogin           DateTime?
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
+  lastLogin             DateTime?
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime?
+  lastFailedLogin       DateTime? // Track last failed login timestamp
+  permanentLockReason   String?   // Reason if permanently locked
 
   tenantId String? // For multi-tenancy
 
@@ -98,6 +104,9 @@ model User {
   parentProfile     ParentProfile?
   publisherProfile  PublisherProfile?
   creatorProfile    CreatorProfile?
+  tokenBlacklist    TokenBlacklist[]
+  securityEvents    SecurityEvent[]
+  passwordHistory   PasswordHistory[]
 
   auditLogs     AuditLog[]
   notifications Notification[]
@@ -107,6 +116,8 @@ model User {
   @@index([phone])
   @@index([tenantId])
   @@index([role, status])
+  @@index([lockedUntil])
+  @@index([lastLogin])
   @@map("users")
 }
 
@@ -115,6 +126,12 @@ model UserSession {
   userId       String
   token        String   @unique
   refreshToken String?  @unique
+  tokenHash    String?  // SHA-256 hash of refresh token for rotation tracking
+  previousTokenHash String? // Previous token hash to detect reuse
+  tokenVersion Int      @default(0) // Incremented on each rotation
+  rotatedAt    DateTime? // When token was last rotated
+  csrfToken    String?  // CSRF protection token
+  
   deviceInfo   String?  // Changed from Json to String for simplified device info
   deviceName   String?  // Device name (e.g., "iPhone 12", "Chrome on Windows")
   deviceType   String?  // Device type (e.g., "mobile", "desktop", "tablet")
@@ -136,6 +153,8 @@ model UserSession {
   @@index([expiresAt])
   @@index([userId, isActive])
   @@index([revokedAt])
+  @@index([lastActivity])
+  @@index([tokenHash])
   @@map("user_sessions")
 }
 
@@ -156,6 +175,60 @@ model OAuthAccount {
   @@index([userId])
   @@index([provider])
   @@map("oauth_accounts")
+}
+
+// Token Blacklist for revoked/logged-out tokens
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  token     String   @unique // The JWT access token (hash of it)
+  userId    String
+  reason    String   // 'LOGOUT', 'PASSWORD_CHANGE', 'ADMIN_REVOKE', 'SECURITY_BREACH'
+  expiresAt DateTime // When token naturally expires
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("token_blacklist")
+}
+
+// Security Events for suspicious activity tracking
+model SecurityEvent {
+  id         String   @id @default(uuid())
+  userId     String
+  eventType  String   // 'SUSPICIOUS_LOGIN', 'NEW_DEVICE', 'PASSWORD_CHANGE', 'LOCKOUT', etc.
+  severity   String   // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
+  details    Json?    // Additional event details
+  ipAddress  String?
+  deviceInfo String?
+  location   String?
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([severity])
+  @@map("security_events")
+}
+
+// Password History for preventing password reuse (last 5 passwords)
+model PasswordHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  passwordHash String   // Hashed password
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("password_history")
 }
 
 // Custom Role-Based Access Control (for B2B dynamic roles)
@@ -5942,6 +6015,7 @@ model TwoFactorBackupCode {
 model LoginAttempt {
   id String @id @default(uuid())
 
+  userId   String? // Link to user if login was successful or attempted for existing user
   email    String?
   phone    String?
   username String?
@@ -5951,15 +6025,22 @@ model LoginAttempt {
   ipAddress String?
   userAgent String?
   location  Json?
+  
+  device    String? // Parsed device type
+  browser   String? // Parsed browser name
+  os        String? // Parsed OS name
 
+  isSuspicious  Boolean @default(false) // Flag for suspicious activity
   failureReason String?
 
   timestamp DateTime @default(now())
 
+  @@index([userId])
   @@index([email])
   @@index([phone])
   @@index([success])
   @@index([timestamp])
+  @@index([isSuspicious])
   @@map("login_attempts")
 }
 

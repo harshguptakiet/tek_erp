@@ -12,6 +12,7 @@ import { PERMISSIONS } from '@/config/permissions';
 import { useHasRole } from '@/hooks/use-permissions';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsService } from '@/services/analytics.service';
+import { PasswordExpiryBanner } from '@/components/auth/password-expiry-banner';
 import {
   GraduationCap, Users, BookOpen, ClipboardCheck,
   CreditCard, TrendingUp, Activity, FileText,
@@ -97,7 +98,6 @@ function QuickAction({ icon: Icon, label, href, gradient }: QuickActionProps) {
 /* ── main dashboard ──────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { user } = useAuthStore();
 
   const isTeacher = useHasRole('TEACHER') || user?.role === 'TEACHER';
@@ -141,31 +141,33 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
-      {/* ── Welcome header ── */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="page-title text-3xl text-[hsl(var(--foreground))]">
-            {greeting()}, {user?.firstName || 'Learner'} 👋
-          </h1>
-          <p className="page-description mt-1 text-[hsl(var(--muted-foreground))]">
-            {isIndependentStudent
-              ? 'Welcome to your independent learning hub'
-              : "Here's what's happening today"}
-          </p>
+    <>
+      <PasswordExpiryBanner />
+      <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
+        {/* ── Welcome header ── */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="page-title text-3xl text-[hsl(var(--foreground))]">
+              {greeting()}, {user?.firstName || 'Learner'} 👋
+            </h1>
+            <p className="page-description mt-1 text-[hsl(var(--muted-foreground))]">
+              {isIndependentStudent
+                ? 'Welcome to your independent learning hub'
+                : "Here's what's happening today"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <Clock className="h-4 w-4" />
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-          <Clock className="h-4 w-4" />
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </div>
-      </div>
 
-      {/* ── Stat cards ── */}
+        {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {!isIndependentStudent && (
           <Can permission={PERMISSIONS.STUDENTS_VIEW}>
@@ -179,6 +181,20 @@ export default function DashboardPage() {
             />
           </Can>
         )}
+=======
+        {/* ── Stat cards ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Can permission={PERMISSIONS.STUDENTS_VIEW}>
+          <StatCard
+            title="Total Students"
+            value={stats?.totalStudents ?? '—'}
+            icon={GraduationCap}
+            color="blue"
+            trend={stats?.studentGrowth ? `+${stats.studentGrowth}% this month` : undefined}
+            href="/students"
+          />
+        </Can>
+>>>>>>> 0eb8fe82de2ac26116824c1b42858d441fe662fb
 
         {!isIndependentStudent && (
           <Can permission={PERMISSIONS.TEACHERS_VIEW}>
@@ -282,7 +298,7 @@ export default function DashboardPage() {
             href="/parent-portal"
           />
         )}
-      </div>
+        </div>
 
       {/* ── School Student Dashboard Section ── */}
       {isStudent && !isIndependentStudent && (
@@ -489,8 +505,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      )}
-
       {/* ── Quick Actions ── */}
       <Card className="card-premium">
         <CardHeader className="pb-3">
@@ -539,7 +553,7 @@ export default function DashboardPage() {
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
 
       {/* ── Getting Started / Learning Guide ── */}
       <div
@@ -636,7 +650,8 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

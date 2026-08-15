@@ -125,6 +125,9 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 const PUBLIC_PATHS = ['/auth', '/test/api'];
+// Exact-match public paths (not prefix-matched, to avoid accidentally
+// exposing every route that happens to start with '/').
+const PUBLIC_EXACT_PATHS = ['/'];
 
 /* ─── helpers ─────────────────────────────────────────────── */
 
@@ -193,8 +196,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
 
-  // Public pages — no shell
-  const isPublic = PUBLIC_PATHS.some((p) => pathname?.startsWith(p));
+  // Public pages — no shell. The root '/' is a pure redirect page
+  // (app/page.tsx) that decides between /dashboard and /auth/login based on
+  // auth state - it must be allowed to render (and thus mount its useEffect)
+  // even when there's no user yet, otherwise AppShell's "loading" branch
+  // below traps unauthenticated visitors on '/' in an infinite spinner and
+  // they never get redirected to login.
+  const isPublic =
+    PUBLIC_PATHS.some((p) => pathname?.startsWith(p)) ||
+    PUBLIC_EXACT_PATHS.includes(pathname ?? '');
   if (isPublic) return <>{children}</>;
 
   // Loading — user not yet resolved

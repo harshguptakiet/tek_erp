@@ -41,41 +41,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setLoading, setAccessToken, logout, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    // Check authentication status on mount
+    // Check authentication status on mount.
+    // FR-AUTH-033: Access tokens are NEVER persisted to localStorage - they
+    // live in memory only (see lib/axios.ts). On a fresh page load the
+    // in-memory token is gone, so we re-authenticate using the HttpOnly
+    // refresh-token cookie (sent automatically via withCredentials) instead
+    // of resurrecting a token from localStorage.
     const checkAuth = async () => {
       try {
         setLoading(true);
 
-        // Check if there's a token in localStorage (client-side persistence)
-        const storedToken = localStorage.getItem('accessToken');
-        
-        if (!storedToken) {
-          // No token, not authenticated
-          setUser(null);
-          if (!isPublicRoute(pathname)) {
-            router.push('/auth/login');
-          }
-          return;
-        }
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth check timeout')), 5000)
+        );
 
-        // Set the token
-        setAccessToken(storedToken);
+        // Attempt silent refresh via the HttpOnly refresh-token cookie.
+        const refreshResponse = await Promise.race([
+          authService.refresh(''), // refresh token is read from the cookie server-side
+          timeoutPromise,
+        ]) as any;
 
-        // Verify token by calling /auth/me
-        const response = await authService.getMe();
-        
-        setUser(response.user);
-        setAccessToken(response.accessToken);
-        
-        // Store new token if refreshed
-        localStorage.setItem('accessToken', response.accessToken);
+        setAccessToken(refreshResponse.accessToken);
 
+        // Now fetch the user profile using the freshly-issued access token
+        const meResponse = await Promise.race([
+          authService.getMe(),
+          timeoutPromise,
+        ]) as any;
+
+        setUser(meResponse.user);
       } catch (error) {
-        // Token invalid or expired
+        // No valid refresh cookie, expired, or backend unreachable
         console.warn('Auth check failed:', error);
         setUser(null);
         setAccessToken(null);
-        localStorage.removeItem('accessToken');
 
         // Redirect to login if not on public route
         if (!isPublicRoute(pathname)) {
@@ -91,7 +90,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for logout events
     const handleLogout = () => {
       logout();
-      localStorage.removeItem('accessToken');
       router.push('/auth/login');
     };
 

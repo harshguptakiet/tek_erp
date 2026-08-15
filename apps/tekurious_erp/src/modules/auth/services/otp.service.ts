@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SmsService } from './sms.service';
 import * as crypto from 'crypto';
 
 interface OtpRecord {
@@ -15,7 +16,10 @@ export class OtpService {
   private readonly maxAttempts = 3;
   private readonly otpValidityMinutes = 10;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private smsService: SmsService,
+  ) {
     // Cleanup expired OTPs every 5 minutes
     setInterval(() => this.cleanupExpiredOtps(), 5 * 60 * 1000);
   }
@@ -95,20 +99,17 @@ export class OtpService {
   }
 
   /**
-   * Send SMS via Twilio or similar service
+   * Send SMS via SMS service (Twilio, AWS SNS, or Console)
    */
   private async sendSms(phone: string, otp: string): Promise<void> {
-    // TODO: Integrate with actual SMS service (Twilio, AWS SNS, etc.)
-    // For now, just log to console
-    this.logger.log(`[SMS] To: ${phone} | Message: Your Tekurious verification code is: ${otp}. Valid for ${this.otpValidityMinutes} minutes.`);
+    const success = await this.smsService.sendOtp(phone, otp);
     
-    // Example Twilio integration (commented out):
-    // const twilioClient = twilio(this.configService.get('TWILIO_ACCOUNT_SID'), this.configService.get('TWILIO_AUTH_TOKEN'));
-    // await twilioClient.messages.create({
-    //   body: `Your Tekurious verification code is: ${otp}. Valid for ${this.otpValidityMinutes} minutes.`,
-    //   from: this.configService.get('TWILIO_PHONE_NUMBER'),
-    //   to: phone
-    // });
+    if (!success) {
+      this.logger.error(`Failed to send OTP via SMS to ${phone}`);
+      throw new BadRequestException('Failed to send OTP. Please try again.');
+    }
+    
+    this.logger.log(`OTP sent to ${phone} via SMS service (expires in ${this.otpValidityMinutes} min)`);
   }
 
   /**

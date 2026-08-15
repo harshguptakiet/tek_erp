@@ -2,38 +2,48 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { config } from '../config/env';
 import { errorMapper } from './error-mapper';
 
-// Token management
+// FR-AUTH-033: Access token stored in memory only (NOT localStorage)
+// Refresh token is stored as HttpOnly cookie by the server
 let accessToken: string | null = null;
 let refreshPromise: Promise<string> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  // FR-AUTH-033: Access tokens MUST NOT be stored in localStorage
+  // They are kept in memory only for XSS protection
+};
+
+// No-op: refresh token is managed server-side as HttpOnly cookie
+export const setRefreshToken = (_token: string | null) => {
+  // Refresh tokens are stored as HttpOnly cookies by the server.
+  // The client never stores them in JS-accessible storage.
 };
 
 export const getAccessToken = () => accessToken;
+export const getRefreshToken = () => null; // Managed by cookie
 
-// Axios instance
+// Axios instance — always send credentials so HttpOnly cookie is included
 export const apiClient = axios.create({
   baseURL: config.apiUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Important: Sends HttpOnly cookies
+  withCredentials: true, // Sends HttpOnly refresh token cookie automatically
 });
 
-// Request interceptor - attach access token
+// Request interceptor — attach access token from memory
 apiClient.interceptors.request.use(
-  (config) => {
-    if (accessToken && config.headers) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+  (reqConfig) => {
+    if (accessToken && reqConfig.headers) {
+      reqConfig.headers.Authorization = `Bearer ${accessToken}`;
     }
-    return config;
+    return reqConfig;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle 401 and refresh token
+// Response interceptor — silent token refresh on 401
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -41,16 +51,16 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
-                           originalRequest.url?.includes('/auth/register') ||
-                           originalRequest.url?.includes('/auth/refresh');
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register') ||
+      originalRequest.url?.includes('/auth/refresh');
 
-    // If 401 and not already retried and not an auth endpoint
+    // 401 on non-auth endpoint → try silent refresh via HttpOnly cookie
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       try {
-        // Use existing refresh promise or create new one
         if (!refreshPromise) {
           refreshPromise = refreshAccessToken();
         }
@@ -58,7 +68,6 @@ apiClient.interceptors.response.use(
         const newAccessToken = await refreshPromise;
         refreshPromise = null;
 
-        // Update token and retry request
         setAccessToken(newAccessToken);
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
@@ -66,11 +75,9 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - clear token and redirect to login
         setAccessToken(null);
         refreshPromise = null;
 
-        // Trigger logout (handled by auth store)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('auth:logout'));
           window.location.href = '/auth/login';
@@ -80,25 +87,32 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Map error to user-friendly format
     const appError = errorMapper(error);
     return Promise.reject(appError);
   }
 );
 
-// Refresh access token using HttpOnly refresh cookie
+// FR-AUTH-014: Refresh access token — sends HttpOnly cookie automatically via withCredentials
 async function refreshAccessToken(): Promise<string> {
   try {
+    // No body needed — refresh token is in the HttpOnly cookie
     const response = await axios.post(
       `${config.apiUrl}/auth/refresh`,
       {},
-      {
-        withCredentials: true, // Sends HttpOnly refresh cookie
-      }
+      { withCredentials: true }
     );
 
-    return response.data.accessToken;
-  } catch (error) {
+    const { accessToken: newAccessToken } = response.data;
+
+    if (!newAccessToken) {
+      throw new Error('No access token in refresh response');
+    }
+
+    setAccessToken(newAccessToken);
+    // New refresh token cookie is set by server automatically
+
+    return newAccessToken;
+  } catch {
     throw new Error('Failed to refresh token');
   }
 }

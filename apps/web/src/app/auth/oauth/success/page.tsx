@@ -36,6 +36,14 @@ function OAuthSuccessContent() {
       // Decode user data
       const user = JSON.parse(decodeURIComponent(userStr));
 
+      // Security: scrub the access token out of the URL/browser history
+      // immediately after reading it, so it isn't retained in browser
+      // history, address bar, or leaked via Referer headers on subsequent
+      // navigation. This doesn't fully solve token-in-URL exposure (server
+      // logs may still capture it) but meaningfully reduces the client-side
+      // exposure window.
+      window.history.replaceState({}, '', '/auth/oauth/success');
+
       // Store authentication data
       setTokens({ accessToken: token });
       setUser({
