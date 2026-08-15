@@ -465,10 +465,54 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async revokeAllSessions(
     @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
     @Body() body: { exceptSessionId?: string },
   ): Promise<{ success: boolean; count: number; message: string }> {
     this.logger.log(`POST /auth/sessions/revoke-all - User: ${userId}`);
-    return this.authService.revokeAllSessions(userId, body.exceptSessionId);
+    const sessionId = body.exceptSessionId || user.sessionId;
+    return this.authService.revokeAllSessions(userId, sessionId);
+  }
+
+  /**
+   * Get login history with filtering
+   * GET /api/v1/auth/login-history
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('login-history')
+  async getLoginHistory(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<{
+    attempts: Array<any>;
+    stats: {
+      total: number;
+      successful: number;
+      failed: number;
+      suspicious: number;
+    };
+    total: number;
+  }> {
+    this.logger.log(`GET /auth/login-history - User: ${userId}`);
+    const { status, dateFilter, page, limit } = req.query as any;
+    return this.authService.getLoginHistory(userId, {
+      status,
+      dateFilter,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+    });
+  }
+
+  /**
+   * Check password expiry status
+   * GET /api/v1/auth/password-expiry-status
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('password-expiry-status')
+  async getPasswordExpiryStatus(
+    @CurrentUser('id') userId: string,
+  ): Promise<{ isExpired: boolean; isInGracePeriod: boolean; daysRemaining: number; expiryDate?: Date }> {
+    this.logger.log(`GET /auth/password-expiry-status - User: ${userId}`);
+    return this.authService.checkPasswordExpiry(userId);
   }
 
   // ==================== FR-AUTH-033 to 040: ADVANCED SECURITY ====================
@@ -682,10 +726,10 @@ export class AuthController {
   @ApiBearerAuth()
   async verify2FASetup(
     @CurrentUser('id') userId: string,
-    @Body() dto: { code: string; secret: string; backupCodes: string[] },
-  ): Promise<{ message: string }> {
+    @Body() dto: { code: string },
+  ): Promise<{ message: string; backupCodes: string[] }> {
     this.logger.log(`POST /auth/2fa/verify-setup - User: ${userId}`);
-    return this.authService.verify2FASetup(userId, dto.code, dto.secret, dto.backupCodes);
+    return this.authService.verify2FASetup(userId, dto.code);
   }
 
   /**
@@ -738,20 +782,36 @@ export class AuthController {
   }
 
   /**
-   * Regenerate 2FA backup codes
-   * POST /api/v1/auth/2fa/regenerate-backup-codes
+   * Get 2FA backup codes
+   * GET /api/v1/auth/2fa/backup-codes
    */
   @UseGuards(JwtAuthGuard)
-  @Post('2fa/regenerate-backup-codes')
+  @Get('2fa/backup-codes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get 2FA backup codes' })
+  @ApiBearerAuth()
+  async get2FABackupCodes(
+    @CurrentUser('id') userId: string,
+  ): Promise<{ codes: Array<{ code: string; used: boolean }>; remaining: number }> {
+    this.logger.log(`GET /auth/2fa/backup-codes - User: ${userId}`);
+    return this.authService.get2FABackupCodes(userId);
+  }
+
+  /**
+   * Regenerate 2FA backup codes
+   * POST /api/v1/auth/2fa/backup-codes/regenerate
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/backup-codes/regenerate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Regenerate 2FA backup codes' })
   @ApiBearerAuth()
   async regenerate2FABackupCodes(
     @CurrentUser('id') userId: string,
-    @Body() dto: { password: string; code: string },
+    @Body() dto: { password?: string },
   ): Promise<{ backupCodes: string[] }> {
-    this.logger.log(`POST /auth/2fa/regenerate-backup-codes - User: ${userId}`);
-    return this.authService.regenerate2FABackupCodes(userId, dto.password, dto.code);
+    this.logger.log(`POST /auth/2fa/backup-codes/regenerate - User: ${userId}`);
+    return this.authService.regenerate2FABackupCodes(userId, dto.password || '', '');
   }
 
   // ==================== CUSTOM ROLES MANAGEMENT (FR-AUTH-021) ====================

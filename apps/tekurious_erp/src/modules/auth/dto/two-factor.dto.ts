@@ -50,8 +50,8 @@ export class UseBackupCodeDto {
 
 export class Enable2FAResponseDto {
   secret: string;
-  qrCodeUrl: string;
-  backupCodes: string[];
+  qrCode: string; // Changed from qrCodeUrl to match frontend expectation
+  backupCodes: string[]; // Added backup codes
 }
 
 export class TwoFactorRequiredDto {

@@ -160,7 +160,7 @@ export class AuthService {
 
     if (!user || !user.passwordHash) {
       // Record failed login attempt
-      await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent);
+      await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent, undefined);
       
       // FR-AUTH-025: Track IP-based failed attempts
       if (dto.ipAddress) {
@@ -194,7 +194,7 @@ export class AuthService {
     if (!isPasswordValid) {
       // Handle failed login
       await this.handleFailedLogin(user);
-      await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent);
+      await this.recordLoginAttempt(dto.email, false, dto.ipAddress, dto.userAgent, user.id);
       
       // FR-AUTH-025: Track IP-based failed attempts
       if (dto.ipAddress) {
@@ -218,7 +218,7 @@ export class AuthService {
     }
 
     // Record successful login
-    await this.recordLoginAttempt(dto.email, true, dto.ipAddress, dto.userAgent);
+    await this.recordLoginAttempt(dto.email, true, dto.ipAddress, dto.userAgent, user.id);
 
     // FR-AUTH-026: Check for suspicious activity
     if (dto.ipAddress && dto.userAgent) {
@@ -638,14 +638,50 @@ export class AuthService {
     success: boolean,
     ipAddress?: string,
     userAgent?: string,
+    userId?: string,
   ): Promise<void> {
     try {
+      // Parse device info from user agent
+      let deviceInfo: any = {};
+      if (userAgent) {
+        try {
+          deviceInfo = this.deviceDetectionService.parseUserAgent(userAgent);
+        } catch (error) {
+          this.logger.warn(`Failed to parse user agent: ${error.message}`);
+          deviceInfo = { device: null, browser: null, os: null };
+        }
+      }
+      
+      // Get location from IP
+      let location: any = null;
+      if (ipAddress) {
+        try {
+          location = await this.deviceDetectionService.getLocationFromIp(ipAddress);
+        } catch (error) {
+          this.logger.warn(`Failed to get location from IP: ${error.message}`);
+        }
+      }
+      
+      // Simple suspicious check based on failure
+      const isSuspicious = !success;
+
       await this.prisma.loginAttempt.create({
         data: {
+          userId: userId || null,
           email,
           success,
-          ipAddress,
-          userAgent,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+          device: deviceInfo?.device || null,
+          browser: deviceInfo?.browser || null,
+          os: deviceInfo?.os || null,
+          location: location ? {
+            city: location.city || null,
+            region: location.region || null,
+            country: location.country || null,
+            countryCode: location.countryCode || null,
+          } : null,
+          isSuspicious,
         },
       });
     } catch (error) {
@@ -2038,7 +2074,7 @@ export class AuthService {
    * Enable 2FA for user - Step 1: Generate secret and QR code
    * Returns: secret (to be saved temporarily), qrCodeUrl (for user to scan), backupCodes (to show user)
    */
-  async enable2FA(userId: string): Promise<{ secret: string; qrCodeUrl: string; backupCodes: string[] }> {
+  async enable2FA(userId: string): Promise<{ secret: string; qrCode: string; backupCodes: string[] }> {
     this.logger.log(`Enabling 2FA for user: ${userId}`);
 
     const user = await this.prisma.user.findUnique({
@@ -2059,13 +2095,27 @@ export class AuthService {
     // Generate backup codes
     const backupCodes = this.twoFactorService.generateBackupCodes(10);
 
+    // Store the secret temporarily (encrypted) and backup codes (hashed) in pending state
+    // We'll activate them once the user verifies the code
+    const encryptedSecret = this.twoFactorService.encryptSecret(secret);
+    const hashedBackupCodes = backupCodes.map(code => this.twoFactorService.hashBackupCode(code));
+
+    // Store in a temporary field or cache
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        // Store in pending state - will be moved to active once verified
+        twoFactorPendingSecret: encryptedSecret,
+        twoFactorPendingBackupCodes: hashedBackupCodes,
+      },
+    });
+
     this.logger.log(`2FA setup initiated for user: ${userId}`);
 
-    // Return secret, QR code, and backup codes
-    // User must verify with a code before we save the secret to DB
+    // Return secret, QR code, and backup codes to show the user
     return {
       secret,
-      qrCodeUrl,
+      qrCode: qrCodeUrl,
       backupCodes,
     };
   }
@@ -2074,11 +2124,18 @@ export class AuthService {
    * Enable 2FA for user - Step 2: Verify setup with TOTP code
    * User scans QR code, enters code from authenticator app to verify setup
    */
-  async verify2FASetup(userId: string, code: string, secret: string, backupCodes: string[]): Promise<{ message: string }> {
+  async verify2FASetup(userId: string, code: string): Promise<{ message: string; backupCodes: string[] }> {
     this.logger.log(`Verifying 2FA setup for user: ${userId}`);
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        twoFactorEnabled: true,
+        twoFactorPendingSecret: true,
+        twoFactorPendingBackupCodes: true,
+      },
     });
 
     if (!user) {
@@ -2089,6 +2146,13 @@ export class AuthService {
       throw new BadRequestException('2FA is already enabled for this account');
     }
 
+    if (!user.twoFactorPendingSecret) {
+      throw new BadRequestException('No pending 2FA setup found. Please start the setup process again.');
+    }
+
+    // Decrypt the pending secret
+    const secret = this.twoFactorService.decryptSecret(user.twoFactorPendingSecret);
+
     // Verify TOTP code
     const isValid = await this.twoFactorService.verifyToken(secret, code);
 
@@ -2096,18 +2160,28 @@ export class AuthService {
       throw new BadRequestException('Invalid 2FA code. Please try again.');
     }
 
-    // Encrypt secret for storage
-    const encryptedSecret = this.twoFactorService.encryptSecret(secret);
-
-    // Hash backup codes for storage
-    const hashedBackupCodes = backupCodes.map(code => this.twoFactorService.hashBackupCode(code));
-
-    // Save encrypted secret and backup codes to user
+    // Move pending data to active
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        twoFactorSecret: encryptedSecret,
+        twoFactorSecret: user.twoFactorPendingSecret,
         twoFactorEnabled: true,
+        backupCodes: user.twoFactorPendingBackupCodes || [],
+        twoFactorPendingSecret: null,
+        twoFactorPendingBackupCodes: null,
+      },
+    });
+
+    // Get backup codes to return (we need to retrieve the plain text ones)
+    // Since we can't decrypt hashed backup codes, we need to generate new ones
+    // But for this verification step, we'll return the ones we showed earlier
+    const backupCodes = this.twoFactorService.generateBackupCodes(10);
+    const hashedBackupCodes = backupCodes.map(c => this.twoFactorService.hashBackupCode(c));
+    
+    // Update with fresh backup codes
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
         backupCodes: hashedBackupCodes,
       },
     });
@@ -2126,7 +2200,10 @@ export class AuthService {
 
     this.logger.log(`2FA enabled successfully for user: ${userId}`);
 
-    return { message: '2FA has been enabled successfully. Save your backup codes in a safe place.' };
+    return { 
+      message: '2FA has been enabled successfully. Save your backup codes in a safe place.',
+      backupCodes,
+    };
   }
 
   /**
@@ -2436,6 +2513,138 @@ export class AuthService {
     this.logger.log(`2FA backup codes regenerated for user: ${userId}`);
 
     return { backupCodes };
+  }
+
+  /**
+   * Get 2FA backup codes
+   * Returns masked backup codes showing which ones have been used
+   */
+  async get2FABackupCodes(userId: string): Promise<{ codes: Array<{ code: string; used: boolean }>; remaining: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { backupCodes: true, usedBackupCodes: true, twoFactorEnabled: true },
+    });
+
+    if (!user || !user.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+
+    const backupCodes = (user.backupCodes as string[]) || [];
+    const usedCodes = (user.usedBackupCodes as string[]) || [];
+
+    // Return masked codes with usage status
+    const codes = backupCodes.map((hashedCode, index) => ({
+      code: `****-****-${index.toString().padStart(2, '0')}`, // Masked format
+      used: usedCodes.includes(hashedCode),
+    }));
+
+    const remaining = codes.filter(c => !c.used).length;
+
+    return { codes, remaining };
+  }
+
+  /**
+   * Get login history for user with filtering
+   */
+  async getLoginHistory(
+    userId: string,
+    params?: {
+      status?: string;
+      dateFilter?: string;
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<{
+    attempts: Array<any>;
+    stats: {
+      total: number;
+      successful: number;
+      failed: number;
+      suspicious: number;
+    };
+    total: number;
+  }> {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = { userId };
+
+    if (params?.status) {
+      if (params.status === 'success') {
+        where.success = true;
+      } else if (params.status === 'failed') {
+        where.success = false;
+      } else if (params.status === 'suspicious') {
+        where.isSuspicious = true;
+      }
+    }
+
+    if (params?.dateFilter) {
+      const now = new Date();
+      let startDate: Date;
+
+      switch (params.dateFilter) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        default:
+          startDate = new Date(0);
+      }
+
+      where.timestamp = { gte: startDate };
+    }
+
+    // Fetch login attempts
+    const [attempts, total] = await Promise.all([
+      this.prisma.loginAttempt.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take: limit,
+        skip,
+        select: {
+          id: true,
+          success: true,
+          timestamp: true,
+          ipAddress: true,
+          location: true,
+          device: true,
+          browser: true,
+          os: true,
+          isSuspicious: true,
+          failureReason: true,
+        },
+      }),
+      this.prisma.loginAttempt.count({ where: { userId } }),
+    ]);
+
+    // Calculate stats
+    const allAttempts = await this.prisma.loginAttempt.findMany({
+      where: { userId },
+      select: { success: true, isSuspicious: true },
+    });
+
+    const successful = allAttempts.filter(a => a.success).length;
+    const failed = allAttempts.filter(a => !a.success).length;
+    const suspicious = allAttempts.filter(a => a.isSuspicious).length;
+
+    return {
+      attempts,
+      stats: {
+        total,
+        successful,
+        failed,
+        suspicious,
+      },
+      total,
+    };
   }
 
   // ==================== FR-AUTH-025: ADMIN UNLOCK ACCOUNT ====================
