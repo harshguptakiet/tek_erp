@@ -12,13 +12,7 @@ const nextConfig = {
     minimumCacheTTL: 60,
   },
   
-  // Reduce bundle size
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
-    },
-  },
-  
+
   // Faster refresh
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],

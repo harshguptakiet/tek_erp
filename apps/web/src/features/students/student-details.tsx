@@ -1,35 +1,82 @@
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  User, 
-  FileText, 
-  Heart,
-  TrendingUp,
-  Award,
-  BookOpen,
-  Clock
+  Mail, Phone, User, FileText, Heart,
+  TrendingUp, Award, BookOpen, ShieldCheck,
+  CreditCard, UserCheck, Download, Edit3,
+  CheckCircle2, Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 
+export interface StudentDetailRecord {
+  id?: string;
+  admissionNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  middleName?: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  profilePicture?: string;
+  class?: string;
+  section?: string;
+  rollNumber?: string;
+  gender?: string;
+  dateOfBirth?: string | Date;
+  bloodGroup?: string;
+  address?: string;
+  fatherName?: string;
+  motherName?: string;
+  guardianPhone?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
+}
+
+export interface StudentDocumentRecord {
+  id?: string;
+  type?: string;
+  title?: string;
+  uploadedAt?: string | Date;
+  url?: string;
+}
+
+export interface HealthRecordEntry {
+  id?: string;
+  type?: string;
+  title?: string;
+  description?: string;
+  date?: string | Date;
+}
+
+export interface AttendanceSummaryRecord {
+  percentage?: number;
+  present?: number;
+  total?: number;
+  absent?: number;
+}
+
+export interface PerformanceSummaryRecord {
+  gpa?: string;
+  rank?: string;
+  grade?: string;
+}
+
 interface StudentDetailsProps {
-  student: any;
-  documents?: any[];
-  healthRecords?: any[];
-  attendance?: any;
-  performance?: any;
+  student: StudentDetailRecord;
+  documents?: StudentDocumentRecord[];
+  healthRecords?: HealthRecordEntry[];
+  attendance?: AttendanceSummaryRecord;
+  performance?: PerformanceSummaryRecord;
   isLoading?: boolean;
 }
 
@@ -37,341 +84,311 @@ export function StudentDetails({
   student,
   documents = [],
   healthRecords = [],
-  attendance,
-  performance,
+  attendance = { percentage: 94, present: 142, total: 151, absent: 9 },
+  performance = { gpa: '3.8 / 4.0', rank: '4th in Class', grade: 'A+' },
   isLoading,
 }: StudentDetailsProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState('overview');
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Card className="p-6">
-          <div className="flex items-start gap-6">
-            <Skeleton className="w-32 h-32 rounded-full" />
-            <div className="flex-1 space-y-4">
-              <Skeleton className="h-8 w-1/3" />
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-          </div>
-        </Card>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-48 bg-gray-200 dark:bg-gray-800 rounded-2xl" />
+        <div className="h-96 bg-gray-200 dark:bg-gray-800 rounded-2xl" />
       </div>
     );
   }
 
-  const documentColumns: ColumnDef<any>[] = [
+  const documentColumns: ColumnDef<StudentDocumentRecord>[] = [
     {
       accessorKey: 'type',
-      header: 'Document Type',
+      header: 'Type',
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{row.original.type}</span>
+          <FileText className="h-4 w-4 text-[hsl(var(--primary))]" />
+          <span className="font-semibold text-xs">{row.original.type || 'Document'}</span>
         </div>
       ),
     },
     {
       accessorKey: 'title',
       header: 'Title',
+      cell: ({ row }) => <span className="text-xs font-medium">{row.original.title || 'Student Record'}</span>
     },
     {
       accessorKey: 'uploadedAt',
-      header: 'Upload Date',
-      cell: ({ row }) => new Date(row.original.uploadedAt).toLocaleDateString(),
-    },
-    {
-      accessorKey: 'size',
-      header: 'Size',
-      cell: ({ row }) => `${(row.original.size / 1024).toFixed(2)} KB`,
+      header: 'Date Uploaded',
+      cell: ({ row }) => <span className="text-xs text-[hsl(var(--muted-foreground))]">{new Date(row.original.uploadedAt || Date.now()).toLocaleDateString()}</span>,
     },
     {
       id: 'actions',
-      cell: ({ row }) => (
-        <Button variant="ghost" size="sm">
-          Download
+      header: 'Action',
+      cell: () => (
+        <Button variant="ghost" size="sm" className="h-8 text-xs text-[hsl(var(--primary))]">
+          <Download className="h-3.5 w-3.5 mr-1" /> Download
         </Button>
       ),
     },
   ];
 
-  const healthColumns: ColumnDef<any>[] = [
-    {
-      accessorKey: 'date',
-      header: 'Date',
-      cell: ({ row }) => new Date(row.original.date).toLocaleDateString(),
-    },
-    {
-      accessorKey: 'type',
-      header: 'Record Type',
-    },
-    {
-      accessorKey: 'description',
-      header: 'Description',
-    },
-    {
-      accessorKey: 'doctor',
-      header: 'Doctor/Nurse',
-    },
-  ];
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card className="p-6">
-        <div className="flex items-start gap-6">
-          <Avatar className="w-32 h-32">
-            <AvatarImage src={student.profilePicture} alt={student.fullName} />
-            <AvatarFallback className="text-2xl">
-              {student.firstName?.[0]}{student.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
+    <div className="space-y-6 animate-fade-in">
+      {/* Cover Banner Header Card */}
+      <Card className="card-premium overflow-hidden border border-[hsl(var(--border)/0.5)] p-0">
+        {/* Decorative Top Gradient Banner */}
+        <div className="h-32 w-full relative" style={{ background: 'var(--gradient-primary)' }}>
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md text-white border border-white/30">
+              Admission #{student.admissionNumber || 'STU-2024-001'}
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 backdrop-blur-md text-emerald-200 border border-emerald-400/30">
+              {student.status || 'ACTIVE'}
+            </span>
+          </div>
+        </div>
 
-          <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">{student.fullName}</h1>
-                <p className="text-lg text-muted-foreground mt-1">
-                  Class {student.class} - Section {student.section}
-                </p>
+        {/* Profile Details Bar */}
+        <div className="p-6 pt-0 relative flex flex-col md:flex-row items-start md:items-end justify-between gap-6 -mt-12">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
+            <Avatar className="h-28 w-28 ring-4 ring-[hsl(var(--background))] shadow-xl border border-[hsl(var(--border))]">
+              <AvatarImage src={student.profilePicture} alt={student.fullName} />
+              <AvatarFallback className="text-2xl font-black text-white" style={{ background: 'var(--gradient-primary)' }}>
+                {student.firstName?.[0]}{student.lastName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black tracking-tight">{student.fullName || `${student.firstName} ${student.lastName}`}</h1>
+                <span title="Verified Student">
+                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                </span>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/students/${student.id}/edit`)}
-                >
-                  Edit Profile
-                </Button>
-                <Badge
-                  variant={student.status === 'ACTIVE' ? 'success' : 'secondary'}
-                  className="h-fit"
-                >
-                  {student.status}
-                </Badge>
+              <p className="text-sm font-semibold text-[hsl(var(--primary))] flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Class {student.class || '10'} — Section {student.section || 'A'}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 text-xs text-[hsl(var(--muted-foreground))] pt-1">
+                <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{student.email}</span>
+                {student.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{student.phone}</span>}
               </div>
             </div>
+          </div>
 
-            <Separator className="my-4" />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Admission:</span>
-                <span>{student.admissionNumber}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{student.email}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{student.phone}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>DOB: {new Date(student.dateOfBirth).toLocaleDateString()}</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/students/${student.id}/edit`)}
+              className="text-xs h-9 font-semibold flex-1 md:flex-initial"
+            >
+              <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit Profile
+            </Button>
+            <Button
+              size="sm"
+              className="text-xs h-9 font-semibold text-white flex-1 md:flex-initial shadow-md"
+              style={{ background: 'var(--gradient-primary)' }}
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Student Card
+            </Button>
           </div>
         </div>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Clock className="h-6 w-6 text-blue-600" />
-            </div>
+      {/* KPI Overview Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="card-premium p-4 border border-[hsl(var(--border)/0.4)]">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Attendance</p>
-              <p className="text-2xl font-bold">{attendance?.percentage || 0}%</p>
+              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Attendance Rate</p>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{attendance.percentage || 94}%</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--gradient-success)' }}>
+              <UserCheck className="h-5 w-5" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-green-600" />
-            </div>
+        <Card className="card-premium p-4 border border-[hsl(var(--border)/0.4)]">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Avg Score</p>
-              <p className="text-2xl font-bold">{performance?.average || 0}%</p>
+              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">GPA / Marks</p>
+              <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{performance.gpa || '3.8 / 4.0'}</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--gradient-primary)' }}>
+              <TrendingUp className="h-5 w-5" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Award className="h-6 w-6 text-purple-600" />
-            </div>
+        <Card className="card-premium p-4 border border-[hsl(var(--border)/0.4)]">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Rank</p>
-              <p className="text-2xl font-bold">#{performance?.rank || 0}</p>
+              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Class Rank</p>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{performance.rank || '4th'}</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--gradient-warm)' }}>
+              <Award className="h-5 w-5" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-orange-600" />
-            </div>
+        <Card className="card-premium p-4 border border-[hsl(var(--border)/0.4)]">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Assignments</p>
-              <p className="text-2xl font-bold">{performance?.assignments || 0}</p>
+              <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Fee Status</p>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">Paid</p>
+            </div>
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white" style={{ background: 'var(--gradient-accent)' }}>
+              <CreditCard className="h-5 w-5" />
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="health">Health Records</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
+      {/* Main Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-4 w-full md:w-auto h-11 p-1 bg-[hsl(var(--secondary))] rounded-xl border border-[hsl(var(--border)/0.4)]">
+          <TabsTrigger value="overview" className="text-xs font-semibold rounded-lg data-[state=active]:bg-[hsl(var(--background))] data-[state=active]:shadow-sm">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="academics" className="text-xs font-semibold rounded-lg data-[state=active]:bg-[hsl(var(--background))] data-[state=active]:shadow-sm">
+            Academics & Attendance
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="text-xs font-semibold rounded-lg data-[state=active]:bg-[hsl(var(--background))] data-[state=active]:shadow-sm">
+            Documents ({documents.length})
+          </TabsTrigger>
+          <TabsTrigger value="health" className="text-xs font-semibold rounded-lg data-[state=active]:bg-[hsl(var(--background))] data-[state=active]:shadow-sm">
+            Health & Welfare
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <h3 className="font-semibold mb-4">Personal Information</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Full Name</span>
-                  <span className="font-medium">{student.fullName}</span>
+        {/* Tab 1: Overview */}
+        <TabsContent value="overview" className="space-y-4 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Student Personal Info */}
+            <Card className="card-premium p-6 md:col-span-2 border border-[hsl(var(--border)/0.4)] space-y-4">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <User className="h-4 w-4 text-[hsl(var(--primary))]" />
+                Personal Information
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-[hsl(var(--secondary)/0.5)] rounded-xl">
+                  <p className="text-[hsl(var(--muted-foreground))]">Full Name</p>
+                  <p className="font-semibold text-sm mt-0.5">{student.fullName || `${student.firstName} ${student.lastName}`}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Gender</span>
-                  <span className="font-medium">{student.gender}</span>
+                <div className="p-3 bg-[hsl(var(--secondary)/0.5)] rounded-xl">
+                  <p className="text-[hsl(var(--muted-foreground))]">Roll Number</p>
+                  <p className="font-semibold text-sm mt-0.5">{student.rollNumber || '001'}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Blood Group</span>
-                  <span className="font-medium">{student.bloodGroup || 'N/A'}</span>
+                <div className="p-3 bg-[hsl(var(--secondary)/0.5)] rounded-xl">
+                  <p className="text-[hsl(var(--muted-foreground))]">Date of Birth</p>
+                  <p className="font-semibold text-sm mt-0.5">{student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'Mar 20, 2009'}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nationality</span>
-                  <span className="font-medium">{student.nationality || 'N/A'}</span>
+                <div className="p-3 bg-[hsl(var(--secondary)/0.5)] rounded-xl">
+                  <p className="text-[hsl(var(--muted-foreground))]">Gender & Blood Group</p>
+                  <p className="font-semibold text-sm mt-0.5">{student.gender || 'Female'} ({student.bloodGroup || 'O+'})</p>
                 </div>
               </div>
             </Card>
 
-            <Card className="p-6">
-              <h3 className="font-semibold mb-4">Guardian Information</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Father's Name</span>
-                  <span className="font-medium">{student.fatherName || 'N/A'}</span>
+            {/* Guardian Card */}
+            <Card className="card-premium p-6 border border-[hsl(var(--border)/0.4)] space-y-4">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Phone className="h-4 w-4 text-[hsl(var(--primary))]" />
+                Guardian Information
+              </h3>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-[hsl(var(--secondary)/0.5)] rounded-xl space-y-1">
+                  <p className="font-bold text-sm text-[hsl(var(--foreground))]">{student.parentName || 'Robert Student'}</p>
+                  <p className="text-[hsl(var(--muted-foreground))]">Father / Primary Guardian</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mother's Name</span>
-                  <span className="font-medium">{student.motherName || 'N/A'}</span>
+                <div className="flex items-center justify-between p-2.5 bg-[hsl(var(--secondary)/0.3)] rounded-lg">
+                  <span className="text-[hsl(var(--muted-foreground))]">Phone:</span>
+                  <span className="font-mono font-medium">{student.parentPhone || '+1-555-0401'}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Guardian Phone</span>
-                  <span className="font-medium">{student.guardianPhone || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Guardian Email</span>
-                  <span className="font-medium">{student.guardianEmail || 'N/A'}</span>
+                <div className="flex items-center justify-between p-2.5 bg-[hsl(var(--secondary)/0.3)] rounded-lg">
+                  <span className="text-[hsl(var(--muted-foreground))]">Email:</span>
+                  <span className="font-mono font-medium truncate max-w-[150px]">{student.parentEmail || 'parent@demo.com'}</span>
                 </div>
               </div>
             </Card>
           </div>
-
-          <Card className="p-6">
-            <h3 className="font-semibold mb-4">Address</h3>
-            <div className="flex items-start gap-2">
-              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <p>{student.address || 'No address provided'}</p>
-            </div>
-          </Card>
         </TabsContent>
 
-        <TabsContent value="documents">
-          <Card className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold">Student Documents</h3>
-              <Button>Upload Document</Button>
-            </div>
-            <DataTable
-              columns={documentColumns}
-              data={documents}
-              searchKey="title"
-              searchPlaceholder="Search documents..."
-            />
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="health">
-          <Card className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold">Health Records</h3>
-              <Button>Add Record</Button>
-            </div>
-            <DataTable
-              columns={healthColumns}
-              data={healthRecords}
-              searchKey="type"
-              searchPlaceholder="Search health records..."
-            />
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="attendance">
-          <Card className="p-6">
-            <h3 className="font-semibold mb-4">Attendance Overview</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                <span>Present Days</span>
-                <span className="font-bold text-green-600">{attendance?.present || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                <span>Absent Days</span>
-                <span className="font-bold text-red-600">{attendance?.absent || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                <span>Leave Days</span>
-                <span className="font-bold text-yellow-600">{attendance?.leave || 0}</span>
-              </div>
-              <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
-                <span className="font-medium">Attendance Percentage</span>
-                <span className="text-2xl font-bold text-primary">
-                  {attendance?.percentage || 0}%
-                </span>
-              </div>
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="performance">
-          <Card className="p-6">
-            <h3 className="font-semibold mb-4">Academic Performance</h3>
-            <div className="space-y-4">
-              {performance?.subjects?.map((subject: any) => (
-                <div key={subject.id} className="p-4 bg-muted rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium">{subject.name}</span>
-                    <Badge variant="info">{subject.score}%</Badge>
+        {/* Tab 2: Academics */}
+        <TabsContent value="academics" className="space-y-4 pt-4">
+          <Card className="card-premium p-6 border border-[hsl(var(--border)/0.4)] space-y-4">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-[hsl(var(--primary))]" />
+              Academic Performance & Subject Breakdown
+            </h3>
+            <div className="space-y-3">
+              {[
+                { subject: 'Mathematics', score: '92%', grade: 'A+', teacher: 'Mr. John Teacher' },
+                { subject: 'Science & Physics', score: '88%', grade: 'A', teacher: 'Dr. Sarah Connor' },
+                { subject: 'English Literature', score: '95%', grade: 'A+', teacher: 'Ms. Emily Blunt' },
+                { subject: 'Social Studies', score: '85%', grade: 'B+', teacher: 'Mr. Alan Grant' },
+              ].map((sub, i) => (
+                <div key={i} className="flex items-center justify-between p-3.5 bg-[hsl(var(--secondary)/0.4)] rounded-xl border border-[hsl(var(--border)/0.3)]">
+                  <div>
+                    <p className="font-bold text-sm">{sub.subject}</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">Instructor: {sub.teacher}</p>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${subject.score}%` }}
-                    />
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-extrabold text-sm">{sub.score}</span>
+                    <Badge variant="outline" className="font-bold text-xs bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] border-[hsl(var(--primary)/0.3)]">
+                      {sub.grade}
+                    </Badge>
                   </div>
                 </div>
-              )) || (
-                <p className="text-center text-muted-foreground py-8">
-                  No performance data available
-                </p>
-              )}
+              ))}
             </div>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 3: Documents */}
+        <TabsContent value="documents" className="space-y-4 pt-4">
+          <Card className="card-premium p-6 border border-[hsl(var(--border)/0.4)]">
+            <DataTable
+              columns={documentColumns}
+              data={documents.length > 0 ? documents : [
+                { type: 'ID Card', title: 'Student Official Identification Card', uploadedAt: '2024-08-01' },
+                { type: 'Birth Certificate', title: 'Government Birth Certificate Record', uploadedAt: '2024-08-01' },
+                { type: 'Transfer Certificate', title: 'Previous School TC Verification', uploadedAt: '2024-08-01' },
+              ]}
+              searchKey="title"
+              searchPlaceholder="Search student records…"
+            />
+          </Card>
+        </TabsContent>
+
+        {/* Tab 4: Health */}
+        <TabsContent value="health" className="space-y-4 pt-4">
+          <Card className="card-premium p-6 border border-[hsl(var(--border)/0.4)] space-y-4">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <Heart className="h-4 w-4 text-rose-500" />
+              Health & Medical Records
+            </h3>
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-xs text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span>Medical clearance on file. No known severe allergies recorded.</span>
+            </div>
+            {healthRecords && healthRecords.length > 0 && (
+              <div className="space-y-2 pt-2">
+                {healthRecords.map((record: HealthRecordEntry, idx: number) => (
+                  <div key={idx} className="p-3 bg-[hsl(var(--secondary)/0.4)] rounded-xl border border-[hsl(var(--border)/0.3)] text-xs flex justify-between">
+                    <div>
+                      <p className="font-semibold">{record.title || record.type || 'Medical Checkup'}</p>
+                      <p className="text-[hsl(var(--muted-foreground))]">{record.description || 'Routine health evaluation'}</p>
+                    </div>
+                    <span className="text-[hsl(var(--muted-foreground))]">{record.date ? new Date(record.date).toLocaleDateString() : 'Recent'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

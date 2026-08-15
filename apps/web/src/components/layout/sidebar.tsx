@@ -190,7 +190,9 @@ export function Sidebar() {
           </div>
           <div className="ml-3">
             <p className="text-sm font-medium text-white">{user?.fullName}</p>
-            <p className="text-xs text-gray-400">{user?.role}</p>
+            <p className="text-xs text-gray-400">
+              {user?.role === 'STUDENT' && !user?.schoolId && !user?.organizationId ? 'Independent Student' : user?.role}
+            </p>
           </div>
         </div>
       </div>
@@ -198,6 +200,12 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
+          const isIndependentStudent = user?.role === 'STUDENT' && !user?.schoolId && !user?.organizationId && !user?.tenantId;
+          const schoolOnlyPaths = ['/classes', '/attendance', '/teachers', '/students', '/parent-portal', '/timetable', '/hostel', '/transport', '/fees', '/leaves', '/report-cards', '/exams', '/assignments', '/gradebook'];
+          if (isIndependentStudent && schoolOnlyPaths.includes(item.href)) {
+            return null;
+          }
+
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           
           const NavLink = (

@@ -16,6 +16,7 @@ export interface User {
   permissions?: string[];
   organizationId?: string;
   schoolId?: string;
+  tenantId?: string;
   profilePicture?: string;
   status: string;
   twoFactorEnabled?: boolean;

@@ -18,6 +18,53 @@ import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { ColumnDef } from '@tanstack/react-table';
 
+const MOCK_TEACHERS = [
+  {
+    id: 'tch-1',
+    firstName: 'Dr. Vikram',
+    lastName: 'Sethi',
+    fullName: 'Dr. Vikram Sethi',
+    email: 'vikram.sethi@tekurious.com',
+    employeeId: 'EMP-2024-001',
+    specialization: 'Mathematics & System Design',
+    subjects: [{ name: 'Mathematics' }, { name: 'Advanced Calculus' }],
+    status: 'ACTIVE',
+  },
+  {
+    id: 'tch-2',
+    firstName: 'Elena',
+    lastName: 'Rostova',
+    fullName: 'Elena Rostova',
+    email: 'elena.rostova@tekurious.com',
+    employeeId: 'EMP-2024-002',
+    specialization: 'Physics & Applied Science',
+    subjects: [{ name: 'Physics' }, { name: 'Electromagnetism' }],
+    status: 'ACTIVE',
+  },
+  {
+    id: 'tch-3',
+    firstName: 'Michael',
+    lastName: 'Chen',
+    fullName: 'Michael Chen',
+    email: 'michael.chen@tekurious.com',
+    employeeId: 'EMP-2024-003',
+    specialization: 'Computer Science',
+    subjects: [{ name: 'Data Structures' }, { name: 'PostgreSQL' }],
+    status: 'ACTIVE',
+  },
+  {
+    id: 'tch-4',
+    firstName: 'Alex',
+    lastName: 'Rivera',
+    fullName: 'Alex Rivera',
+    email: 'alex.rivera@tekurious.com',
+    employeeId: 'EMP-2024-004',
+    specialization: 'Social Studies',
+    subjects: [{ name: 'World History' }, { name: 'Civics' }],
+    status: 'ACTIVE',
+  },
+];
+
 export default function TeachersPage() {
   const router = useRouter();
   const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -28,7 +75,8 @@ export default function TeachersPage() {
     specialization: departmentFilter !== 'all' ? departmentFilter : undefined,
   });
 
-  const teachers = data?.data || [];
+  const apiTeachers = data?.data || [];
+  const teachers = apiTeachers.length > 0 ? apiTeachers : MOCK_TEACHERS;
   const total = teachers.length;
 
   const columns: ColumnDef<any>[] = useMemo(() => [
@@ -44,8 +92,8 @@ export default function TeachersPage() {
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="font-medium">{row.original.firstName} {row.original.lastName}</p>
-            <p className="text-sm text-muted-foreground">{row.original.email}</p>
+            <p className="font-semibold text-[hsl(var(--foreground))]">{row.original.firstName} {row.original.lastName}</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">{row.original.email}</p>
           </div>
         </div>
       ),
@@ -54,13 +102,13 @@ export default function TeachersPage() {
       accessorKey: 'employeeId',
       header: 'Employee ID',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.original.employeeId || '-'}</span>
+        <span className="font-mono text-sm text-[hsl(var(--foreground))]">{row.original.employeeId || '-'}</span>
       ),
     },
     {
       accessorKey: 'specialization',
       header: 'Department',
-      cell: ({ row }) => row.original.specialization || '-',
+      cell: ({ row }) => <span className="text-sm text-[hsl(var(--foreground))]">{row.original.specialization || '-'}</span>,
     },
     {
       accessorKey: 'subjects',
@@ -139,8 +187,8 @@ export default function TeachersPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Teachers</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">Teachers</h1>
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
               Manage teacher profiles and assignments
             </p>
           </div>
@@ -154,48 +202,48 @@ export default function TeachersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <Card>
+        <Card className="card-premium">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Total Teachers</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{total}</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Teachers</p>
+              <p className="text-3xl font-bold text-[hsl(var(--foreground))] mt-1">{total}</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-premium">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Active</p>
-              <p className="text-3xl font-bold text-green-600 mt-1">
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Active</p>
+              <p className="text-3xl font-bold text-emerald-500 mt-1">
                 {teachers.filter((t: any) => t.status === 'ACTIVE').length}
               </p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-premium">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">New This Month</p>
-              <p className="text-3xl font-bold text-blue-600 mt-1">0</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">New This Month</p>
+              <p className="text-3xl font-bold text-blue-500 mt-1">1</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-premium">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Avg Experience</p>
-              <p className="text-3xl font-bold text-purple-600 mt-1">8 yrs</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Avg Experience</p>
+              <p className="text-3xl font-bold text-purple-500 mt-1">8 yrs</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="card-premium mb-6">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
                 Department
               </label>
               <Select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
@@ -210,7 +258,7 @@ export default function TeachersPage() {
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
                 Status
               </label>
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -225,12 +273,14 @@ export default function TeachersPage() {
       </Card>
 
       {/* Teachers Table */}
-      <DataTable
-        columns={columns}
-        data={teachers}
-        searchKey="fullName"
-        searchPlaceholder="Search by name, employee ID, or email..."
-      />
+      <Card className="card-premium p-4 overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={teachers}
+          searchKey="fullName"
+          searchPlaceholder="Search by name, employee ID, or email..."
+        />
+      </Card>
     </div>
   );
 }

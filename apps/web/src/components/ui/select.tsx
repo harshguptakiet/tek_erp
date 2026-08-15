@@ -13,27 +13,44 @@ import { cn } from '@/lib/utils';
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
+  onValueChange?: (value: string) => void;
 }
 
 const NativeSelect = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, error, children, ...props }, ref) => (
-    <div className="w-full">
-      <select
-        ref={ref}
-        className={cn(
-          'flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
-          'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          error && 'border-red-500 focus:ring-red-500',
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-    </div>
-  )
+  ({ className, error, children, onChange, onValueChange, value, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (onChange) onChange(e);
+      if (onValueChange) onValueChange(e.target.value);
+    };
+
+    const handleNoop = () => {
+      // Intentional noop fallback to suppress React read-only form field warnings when value is controlled externally
+    };
+
+    const safeOnChange = (onChange || onValueChange) ? handleChange : handleNoop;
+
+    return (
+      <div className="w-full">
+        <select
+          ref={ref}
+          value={value}
+          onChange={safeOnChange}
+          className={cn(
+            'flex h-10 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] px-3 py-2 text-sm transition-all',
+            'focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            '[&_option]:bg-[hsl(var(--card))] [&_option]:text-[hsl(var(--foreground))]',
+            error && 'border-red-500 focus:ring-red-500',
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </select>
+        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      </div>
+    );
+  }
 );
 NativeSelect.displayName = 'Select';
 
@@ -53,8 +70,8 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
-      'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+      'flex h-10 w-full items-center justify-between rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] px-3 py-2 text-sm transition-all',
+      'focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:border-transparent',
       'disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
@@ -62,7 +79,7 @@ const SelectTrigger = React.forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-50 text-[hsl(var(--muted-foreground))]" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -76,7 +93,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white text-gray-900 shadow-md',
+        'relative z-50 min-w-[8rem] overflow-hidden rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-md',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -108,8 +125,8 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none',
-      'focus:bg-gray-100 focus:text-gray-900',
+      'relative flex w-full cursor-default select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-sm outline-none transition-colors',
+      'focus:bg-[hsl(var(--muted))] focus:text-[hsl(var(--foreground))]',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
@@ -117,7 +134,7 @@ const SelectItem = React.forwardRef<
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check className="h-4 w-4 text-[hsl(var(--primary))]" />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

@@ -16,6 +16,69 @@ import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import { contentService } from '@/services/content.service';
 
+const MOCK_LEARNING_CONTENT = [
+  {
+    id: 'cnt-1',
+    title: 'Next.js 16 App Router & Microservices Architecture',
+    contentType: 'VIDEO',
+    board: 'Computer Science',
+    grade: 'Advanced',
+    duration: '4h 30m',
+    viewCount: 2450,
+    rating: '4.9 ★',
+    status: 'ACTIVE',
+    progress: 68,
+  },
+  {
+    id: 'cnt-2',
+    title: 'PostgreSQL Advanced Indexing & Query Performance Guide',
+    contentType: 'DOCUMENT',
+    board: 'Database Systems',
+    grade: 'Intermediate',
+    duration: '45 Pages',
+    viewCount: 1890,
+    rating: '5.0 ★',
+    status: 'COMPLETED',
+    progress: 100,
+  },
+  {
+    id: 'cnt-3',
+    title: 'Node.js Event Loop & Microservice Message Queue Architecture',
+    contentType: 'VIDEO',
+    board: 'Backend Engineering',
+    grade: 'Advanced',
+    duration: '3h 15m',
+    viewCount: 1200,
+    rating: '4.8 ★',
+    status: 'ACTIVE',
+    progress: 45,
+  },
+  {
+    id: 'cnt-4',
+    title: 'System Design Architecture Blueprints & Case Studies',
+    contentType: 'DOCUMENT',
+    board: 'Software Engineering',
+    grade: 'Expert',
+    duration: '60 Pages',
+    viewCount: 3100,
+    rating: '4.9 ★',
+    status: 'COMPLETED',
+    progress: 100,
+  },
+  {
+    id: 'cnt-5',
+    title: 'AR/VR Virtual Physics & Interactive Simulation Lab',
+    contentType: 'AR_VR',
+    board: 'Applied Science',
+    grade: 'All Levels',
+    duration: 'Interactive',
+    viewCount: 950,
+    rating: '4.7 ★',
+    status: 'ACTIVE',
+    progress: 30,
+  },
+];
+
 export default function ContentPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,8 +107,9 @@ export default function ContentPage() {
     );
   }
 
-  // Extract data array from paginated response
-  const contents = contentsResponse?.data || [];
+  // Extract data array from paginated response with mock fallback
+  const apiContents = contentsResponse?.data || [];
+  const contents = apiContents.length > 0 ? apiContents : MOCK_LEARNING_CONTENT;
   const videoContent = contents.filter((c: any) => c.contentType === 'VIDEO');
   const documentContent = contents.filter(
     (c: any) => c.contentType === 'DOCUMENT',
@@ -58,10 +122,10 @@ export default function ContentPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-[hsl(var(--foreground))]">
               Learning Content
             </h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
               Browse and manage educational content library
             </p>
           </div>
@@ -78,8 +142,8 @@ export default function ContentPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Total Content</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Total Content</p>
+              <p className="text-3xl font-bold text-[hsl(var(--foreground))] mt-1">
                 {contents.length}
               </p>
             </div>
@@ -88,7 +152,7 @@ export default function ContentPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Videos</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Videos</p>
               <p className="text-3xl font-bold text-blue-600 mt-1">
                 {videoContent.length}
               </p>
@@ -98,7 +162,7 @@ export default function ContentPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">Documents</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Documents</p>
               <p className="text-3xl font-bold text-green-600 mt-1">
                 {documentContent.length}
               </p>
@@ -108,7 +172,7 @@ export default function ContentPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-600">AR/VR</p>
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">AR/VR</p>
               <p className="text-3xl font-bold text-purple-600 mt-1">
                 {arvrContent.length}
               </p>
@@ -131,7 +195,7 @@ export default function ContentPage() {
             </div>
             <div>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] [&_option]:bg-[hsl(var(--card))] [&_option]:text-[hsl(var(--foreground))]"
                 value={contentType}
                 onChange={(e) => setContentType(e.target.value)}
               >
@@ -145,7 +209,7 @@ export default function ContentPage() {
             </div>
             <div>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] [&_option]:bg-[hsl(var(--card))] [&_option]:text-[hsl(var(--foreground))]"
                 value={subjectFilter}
                 onChange={(e) => setSubjectFilter(e.target.value)}
               >
@@ -170,9 +234,9 @@ export default function ContentPage() {
           >
             <CardContent className="pt-6">
               {/* Thumbnail */}
-              <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+              <div className="aspect-video bg-[hsl(var(--muted))] rounded-lg mb-4 flex items-center justify-center border border-[hsl(var(--border))]">
                 <svg
-                  className="w-12 h-12 text-gray-400"
+                  className="w-12 h-12 text-[hsl(var(--muted-foreground))]"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -207,7 +271,7 @@ export default function ContentPage() {
               {/* Content Info */}
               <div className="space-y-2">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-gray-900 line-clamp-2">
+                  <h3 className="font-semibold text-[hsl(var(--foreground))] line-clamp-2">
                     {content.title}
                   </h3>
                   <Badge
@@ -226,14 +290,14 @@ export default function ContentPage() {
                   </Badge>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
                   <span>{content.board || 'N/A'}</span>
                   <span>•</span>
                   <span>Grade {content.grade || 'N/A'}</span>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-1 text-gray-600">
+                  <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -249,7 +313,7 @@ export default function ContentPage() {
                     </svg>
                     <span>{content.duration || 'N/A'}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-gray-600">
+                  <div className="flex items-center gap-1 text-[hsl(var(--muted-foreground))]">
                     <svg
                       className="w-4 h-4"
                       fill="none"

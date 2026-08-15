@@ -86,9 +86,9 @@ export function ContentPlayer({ content, onComplete, onLike, onBookmark }: Conte
 
       case 'AUDIO':
         return (
-          <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg p-8">
+          <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-[hsl(var(--border))] rounded-lg p-8">
             <div className="text-center mb-6">
-              <div className="w-32 h-32 mx-auto bg-white rounded-full flex items-center justify-center mb-4">
+              <div className="w-32 h-32 mx-auto bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-full flex items-center justify-center mb-4">
                 <Volume2 className="h-16 w-16 text-purple-600" />
               </div>
               <h3 className="text-xl font-bold">{content.title}</h3>

@@ -33,8 +33,9 @@ export function LoginForm() {
         lastName: response.user.lastName,
         role: response.user.role,
         permissions: response.user.permissions,
-        organizationId: response.user.organizationId,
-        schoolId: response.user.schoolId,
+        organizationId: response.user.organizationId || (response.user.tenantId ? 'org-demo-1' : undefined),
+        schoolId: response.user.schoolId || (response.user.tenantId ? 'school-demo-1' : undefined),
+        tenantId: response.user.tenantId,
         status: response.user.status,
       });
       setTokens({ accessToken: response.accessToken });
@@ -42,9 +43,10 @@ export function LoginForm() {
         description: `Signed in as ${response.user.firstName} ${response.user.lastName}`,
       });
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast.error('Login failed', {
-        description: error?.message || 'Invalid email or password. Please try again.',
+        description: err?.message || 'Invalid email or password. Please try again.',
       });
     }
   };

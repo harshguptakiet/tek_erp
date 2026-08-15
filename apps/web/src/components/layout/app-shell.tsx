@@ -8,7 +8,6 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/providers/theme-provider';
-import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/can';
 import { PERMISSIONS } from '@/config/permissions';
 import {
@@ -29,12 +28,14 @@ interface NavItem {
   icon: React.ElementType;
   permission?: string;
   badge?: string;
+  schoolOnly?: boolean;
 }
 
 interface NavSection {
   title: string;
   items: NavItem[];
   adminOnly?: boolean;
+  schoolOnly?: boolean;
   roles?: string[];
 }
 
@@ -47,46 +48,51 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: 'People',
+    schoolOnly: true,
     items: [
-      { href: '/students', label: 'Students', icon: GraduationCap, permission: PERMISSIONS.STUDENTS_VIEW },
-      { href: '/teachers', label: 'Teachers', icon: Users, permission: PERMISSIONS.TEACHERS_VIEW },
-      { href: '/parents', label: 'Parents', icon: Users2, permission: PERMISSIONS.PARENTS_VIEW },
+      { href: '/students', label: 'Students', icon: GraduationCap, permission: PERMISSIONS.STUDENTS_VIEW, schoolOnly: true },
+      { href: '/teachers', label: 'Teachers', icon: Users, permission: PERMISSIONS.TEACHERS_VIEW, schoolOnly: true },
+      { href: '/parents', label: 'Parents', icon: Users2, permission: PERMISSIONS.PARENTS_VIEW, schoolOnly: true },
     ],
   },
   {
     title: 'Academics',
+    schoolOnly: true,
     items: [
-      { href: '/classes', label: 'Classes', icon: BookOpen, permission: PERMISSIONS.ACADEMIC_VIEW },
-      { href: '/subjects', label: 'Subjects', icon: FileText, permission: PERMISSIONS.ACADEMIC_VIEW },
-      { href: '/timetable', label: 'Timetable', icon: Clock },
-      { href: '/attendance', label: 'Attendance', icon: ClipboardCheck, permission: PERMISSIONS.ATTENDANCE_VIEW },
+      { href: '/classes', label: 'Classes', icon: BookOpen, permission: PERMISSIONS.ACADEMIC_VIEW, schoolOnly: true },
+      { href: '/subjects', label: 'Subjects', icon: FileText, permission: PERMISSIONS.ACADEMIC_VIEW, schoolOnly: true },
+      { href: '/timetable', label: 'Timetable', icon: Clock, schoolOnly: true },
+      { href: '/attendance', label: 'Attendance', icon: ClipboardCheck, permission: PERMISSIONS.ATTENDANCE_VIEW, schoolOnly: true },
     ],
   },
   {
     title: 'Learning',
     items: [
-      { href: '/exams', label: 'Exams', icon: PenTool, permission: PERMISSIONS.EXAMS_VIEW },
-      { href: '/assignments', label: 'Assignments', icon: FileText, permission: PERMISSIONS.ASSIGNMENTS_VIEW },
-      { href: '/gradebook', label: 'Gradebook', icon: BarChart3, permission: PERMISSIONS.EXAMS_VIEW },
-      { href: '/content', label: 'Content', icon: BookOpen, permission: PERMISSIONS.CONTENT_VIEW },
+      { href: '/content', label: 'My Content', icon: BookOpen, permission: PERMISSIONS.CONTENT_VIEW },
       { href: '/live-classes', label: 'Live Classes', icon: Video, permission: PERMISSIONS.LIVE_CLASSES_VIEW },
+      { href: '/certificates', label: 'Certificates', icon: Award },
+      { href: '/assignments', label: 'Assignments', icon: FileText, permission: PERMISSIONS.ASSIGNMENTS_VIEW, schoolOnly: true },
+      { href: '/exams', label: 'Exams', icon: PenTool, permission: PERMISSIONS.EXAMS_VIEW, schoolOnly: true },
+      { href: '/gradebook', label: 'Gradebook', icon: BarChart3, permission: PERMISSIONS.EXAMS_VIEW, schoolOnly: true },
     ],
   },
   {
     title: 'Finance',
+    schoolOnly: true,
     items: [
-      { href: '/fees', label: 'Fee Management', icon: CreditCard, permission: PERMISSIONS.FEES_VIEW },
-      { href: '/payroll', label: 'Payroll', icon: DollarSign, permission: PERMISSIONS.PAYROLL_VIEW },
+      { href: '/fees', label: 'Fee Management', icon: CreditCard, permission: PERMISSIONS.FEES_VIEW, schoolOnly: true },
+      { href: '/payroll', label: 'Payroll', icon: DollarSign, permission: PERMISSIONS.PAYROLL_VIEW, schoolOnly: true },
     ],
   },
   {
     title: 'Operations',
+    schoolOnly: true,
     items: [
-      { href: '/library', label: 'Library', icon: Library, permission: PERMISSIONS.LIBRARY_MANAGE },
-      { href: '/transport', label: 'Transport', icon: Bus, permission: PERMISSIONS.TRANSPORT_VIEW },
-      { href: '/hostel', label: 'Hostel', icon: Building2, permission: PERMISSIONS.HOSTEL_VIEW },
-      { href: '/inventory', label: 'Inventory', icon: Package, permission: PERMISSIONS.INVENTORY_VIEW },
-      { href: '/leaves', label: 'Leaves', icon: Palmtree },
+      { href: '/library', label: 'Library', icon: Library, permission: PERMISSIONS.LIBRARY_MANAGE, schoolOnly: true },
+      { href: '/transport', label: 'Transport', icon: Bus, permission: PERMISSIONS.TRANSPORT_VIEW, schoolOnly: true },
+      { href: '/hostel', label: 'Hostel', icon: Building2, permission: PERMISSIONS.HOSTEL_VIEW, schoolOnly: true },
+      { href: '/inventory', label: 'Inventory', icon: Package, permission: PERMISSIONS.INVENTORY_VIEW, schoolOnly: true },
+      { href: '/leaves', label: 'Leaves', icon: Palmtree, schoolOnly: true },
       { href: '/events', label: 'Events', icon: CalendarDays },
     ],
   },
@@ -101,7 +107,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Insights',
     items: [
       { href: '/analytics', label: 'Analytics', icon: BarChart3, permission: PERMISSIONS.ANALYTICS_VIEW },
-      { href: '/reports', label: 'Reports', icon: FileText, permission: PERMISSIONS.REPORTS_VIEW },
+      { href: '/reports', label: 'Reports', icon: FileText, permission: PERMISSIONS.REPORTS_VIEW, schoolOnly: true },
       { href: '/marketplace', label: 'Marketplace', icon: Store },
     ],
   },
@@ -218,12 +224,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     user.role === 'ORG_ADMIN' ||
     user.role === 'SCHOOL_ADMIN';
 
+  const isIndependentStudent =
+    user.role === 'STUDENT' && !user.schoolId && !user.organizationId && !user.tenantId;
+
   const displayName =
     user.firstName && user.lastName
       ? `${user.firstName} ${user.lastName}`
       : user.email || 'User';
 
-  const displayRole = user.role?.replace(/_/g, ' ') || 'User';
+  const displayRole = isIndependentStudent ? 'Independent Student' : (user.role?.replace(/_/g, ' ') || 'User');
 
   /* ── sidebar content ──────────────────────────────────── */
   const sidebarContent = (
@@ -264,8 +273,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
         {NAV_SECTIONS.map((section) => {
           if (section.adminOnly && !isAdmin) return null;
+          if (isIndependentStudent && section.schoolOnly) return null;
 
-          const visibleItems = section.items;
+          const visibleItems = isIndependentStudent
+            ? section.items.filter((item) => !item.schoolOnly)
+            : section.items;
 
           if (visibleItems.length === 0) return null;
 
@@ -315,7 +327,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 if (item.permission) {
                   return (
-                    <Can key={item.href} permission={item.permission}>
+                    <Can key={item.href} permission={item.permission as any}>
                       {linkContent}
                     </Can>
                   );

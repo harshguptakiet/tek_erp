@@ -3155,6 +3155,26 @@
         ]
       }
     },
+    "/api/v1/users/temp/promote-superadmin": {
+      "post": {
+        "operationId": "UsersController_tempPromoteToSuperAdmin",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "TEMPORARY: Promote user to PLATFORM_ADMIN by phone",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/api/v1/students": {
       "get": {
         "operationId": "StudentsController_getStudents",

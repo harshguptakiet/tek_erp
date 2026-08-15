@@ -39,6 +39,7 @@ export interface LoginResponse {
     permissions: string[];
     organizationId?: string;
     schoolId?: string;
+    tenantId?: string;
     status: string;
   };
   accessToken: string;
