@@ -20,6 +20,7 @@ import { IpRateLimitService } from './services/ip-rate-limit.service';
 import { DeviceDetectionService } from './services/device-detection.service';
 import { PasswordExpiryService } from './services/password-expiry.service';
 import { EmailService } from './services/email.service';
+import { SmsService } from './services/sms.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { RolesService } from './services/roles.service';
 
@@ -59,6 +60,7 @@ import { RolesService } from './services/roles.service';
     DeviceDetectionService,
     PasswordExpiryService,
     EmailService,
+    SmsService,
     SuspiciousActivityService,
     RolesService,
   ],

@@ -203,6 +203,52 @@ export class AuthController {
   }
 
   /**
+   * FR-AUTH-002, FR-AUTH-024: Send OTP to phone (Public - for registration)
+   * POST /api/v1/auth/phone/send-otp
+   * Rate limit: 3 OTP per phone per hour (enforced by OtpService)
+   */
+  @Public()
+  @Post('phone/send-otp')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(authThrottle.resendVerification) // Reuse 3 per hour throttle
+  async sendPhoneOtpPublic(@Body('phone') phone: string): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/phone/send-otp - Phone: ${phone}`);
+    return this.authService.sendPublicPhoneOtp(phone);
+  }
+
+  /**
+   * FR-AUTH-002, FR-AUTH-024: Verify phone OTP (Authenticated - verify user's phone)
+   * POST /api/v1/auth/phone/verify-otp
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('phone/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  async verifyPhoneOtp(
+    @CurrentUser() user: any,
+    @Body('phone') phone: string,
+    @Body('otp') otp: string,
+  ): Promise<{ message: string; phoneVerified: boolean }> {
+    this.logger.log(`POST /auth/phone/verify-otp - User: ${user.id}, Phone: ${phone}`);
+    return this.authService.verifyPhoneOtp(user.id, phone, otp);
+  }
+
+  /**
+   * FR-AUTH-024: Send OTP to user's own phone (Authenticated - for profile phone change)
+   * POST /api/v1/auth/phone/send-otp-auth
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('phone/send-otp-auth')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(authThrottle.resendVerification)
+  async sendPhoneOtpAuth(
+    @CurrentUser() user: any,
+    @Body('phone') phone: string,
+  ): Promise<{ message: string }> {
+    this.logger.log(`POST /auth/phone/send-otp-auth - User: ${user.id}, Phone: ${phone}`);
+    return this.authService.sendPhoneOtp(phone);
+  }
+
+  /**
    * Check password strength (FR-AUTH-037)
    * POST /api/v1/auth/check-password-strength
    */

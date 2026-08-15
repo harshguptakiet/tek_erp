@@ -10,6 +10,7 @@ import { DeviceDetectionService } from './services/device-detection.service';
 import { PasswordExpiryService } from './services/password-expiry.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
+import { OtpService } from './services/otp.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { PasswordValidator } from './utils/password-validator';
 import * as bcrypt from 'bcrypt';
@@ -31,6 +32,7 @@ export class AuthService {
     private passwordExpiryService: PasswordExpiryService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
+    private otpService: OtpService,
     private suspiciousActivityService: SuspiciousActivityService,
   ) {}
 
@@ -2576,5 +2578,91 @@ export class AuthService {
     expiryDate: Date;
   }> {
     return this.passwordExpiryService.checkPasswordExpiry(userId);
+  }
+
+  // ==================== PHONE OTP VERIFICATION (FR-AUTH-002, FR-AUTH-024) ====================
+
+  /**
+   * FR-AUTH-002, FR-AUTH-024: Send OTP to phone number
+   * Rate limited: 3 OTP per phone per hour via OtpService
+   */
+  async sendPhoneOtp(phone: string): Promise<{ message: string }> {
+    this.logger.log(`Sending OTP to phone: ${phone}`);
+
+    // Validate phone format (E.164: +1234567890)
+    if (!phone || !phone.startsWith('+') || phone.length < 10) {
+      throw new BadRequestException('Invalid phone number format. Please use E.164 format: +1234567890');
+    }
+
+    try {
+      // OtpService handles rate limiting (3 OTP per hour)
+      await this.otpService.sendOtp(phone);
+      
+      this.logger.log(`OTP sent successfully to ${phone}`);
+      
+      return { message: 'OTP sent successfully. Valid for 10 minutes.' };
+    } catch (error) {
+      this.logger.error(`Failed to send OTP: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * FR-AUTH-002, FR-AUTH-024: Verify phone OTP and mark phone as verified
+   */
+  async verifyPhoneOtp(userId: string, phone: string, otp: string): Promise<{ message: string; phoneVerified: boolean }> {
+    this.logger.log(`Verifying OTP for user ${userId}, phone: ${phone}`);
+
+    // Verify OTP through OtpService (handles expiry, max attempts)
+    const isValid = await this.otpService.verifyOtp(phone, otp);
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Update user record to mark phone as verified
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        phone: phone,
+        phoneVerified: true,
+      },
+    });
+
+    // Emit event
+    await this.eventBus.publish('phone.verified', {
+      userId,
+      phone,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Phone verified successfully for user: ${userId}`);
+
+    return {
+      message: 'Phone number verified successfully',
+      phoneVerified: true,
+    };
+  }
+
+  /**
+   * FR-AUTH-024: Send OTP to unverified phone for login/registration
+   * Public method for phone-based registration flow
+   */
+  async sendPublicPhoneOtp(phone: string): Promise<{ message: string }> {
+    this.logger.log(`Public OTP request for phone: ${phone}`);
+
+    // Validate phone format
+    if (!phone || !phone.startsWith('+') || phone.length < 10) {
+      throw new BadRequestException('Invalid phone number format. Please use E.164 format: +1234567890');
+    }
+
+    try {
+      await this.otpService.sendOtp(phone);
+      
+      return { message: 'OTP sent successfully. Valid for 10 minutes.' };
+    } catch (error) {
+      this.logger.error(`Failed to send public OTP: ${error.message}`);
+      throw error;
+    }
   }
 }
