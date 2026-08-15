@@ -74,33 +74,36 @@ export interface TwoFactorSetupResponse {
 
 export interface DeviceSession {
   id: string;
-  userId: string;
-  deviceName: string;
+  userId?: string;
+  deviceName?: string;
   deviceType?: string;
-  browser: string;
-  os: string;
-  ipAddress: string;
-  location?: string;
-  lastActive: Date;
-  lastActivity?: Date | string;
-  createdAt: Date;
-  isCurrent: boolean;
+  browser?: string;
+  os?: string;
+  ipAddress?: string;
+  // Backend (getAllSessions) returns location as an object, not a string
+  location?: string | { city?: string; region?: string; country?: string } | null;
+  lastActivity?: Date | string | null;
+  lastActivityAt?: Date | string | null;
+  createdAt?: Date | string;
+  isCurrent?: boolean;
 }
 
 export type LoginHistoryEntry = LoginHistory;
 
 export interface LoginHistory {
   id: string;
-  userId: string;
-  ipAddress: string;
-  location?: string;
-  device: string;
-  browser: string;
+  userId?: string;
+  ipAddress?: string;
+  // Backend (getLoginHistory) returns location as an object, not a string
+  location?: string | { city?: string; region?: string; country?: string; countryCode?: string } | null;
+  device?: string;
+  browser?: string;
   os?: string;
   method?: string;
   success: boolean;
-  timestamp: Date;
-  suspicious: boolean;
+  timestamp: Date | string;
+  suspicious?: boolean;
+  isSuspicious?: boolean;
   failureReason?: string;
 }
 

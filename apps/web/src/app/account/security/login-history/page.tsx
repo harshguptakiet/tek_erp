@@ -13,6 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { LoginHistoryEntry } from '@/types/auth.types';
 
+function formatLocation(location: LoginHistoryEntry['location']): string {
+  if (!location) return 'Unknown';
+  if (typeof location === 'string') return location;
+  const parts = [location.city, location.region, location.country].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : 'Unknown';
+}
+
 export default function LoginHistoryPage() {
   const router = useRouter();
   const { data: history, isLoading } = useLoginHistory();
@@ -172,7 +179,10 @@ export default function LoginHistoryPage() {
                       {entry.success ? 'Successful Login' : 'Failed Login Attempt'}
                     </h3>
                     <time className="text-sm text-gray-500">
-                      {format(new Date(entry.timestamp), 'PPp')}
+                      {(() => {
+                        const date = entry.timestamp ? new Date(entry.timestamp) : null;
+                        return date && !isNaN(date.getTime()) ? format(date, 'PPp') : 'Unknown';
+                      })()}
                     </time>
                   </div>
 
@@ -182,7 +192,7 @@ export default function LoginHistoryPage() {
                       <svg className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                       </svg>
-                      <span>Method: {entry.method}</span>
+                      <span>Method: {entry.method || 'Password'}</span>
                     </div>
 
                     {/* Device & Browser */}
@@ -199,7 +209,7 @@ export default function LoginHistoryPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <span>{entry.location || 'Unknown'} • {entry.ipAddress}</span>
+                      <span>{formatLocation(entry.location)} • {entry.ipAddress}</span>
                     </div>
 
                     {/* Failure Reason */}

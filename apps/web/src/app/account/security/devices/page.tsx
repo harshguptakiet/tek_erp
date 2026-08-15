@@ -16,6 +16,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from 'sonner';
 import type { DeviceSession } from '@/types/auth.types';
 
+function formatLocation(location: unknown): string {
+  if (!location) return 'Unknown location';
+  if (typeof location === 'string') return location;
+  if (typeof location === 'object') {
+    const loc = location as { city?: string; region?: string; country?: string };
+    const parts = [loc.city, loc.region, loc.country].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Unknown location';
+  }
+  return 'Unknown location';
+}
+
 export default function DeviceManagementPage() {
   const router = useRouter();
   const { data: sessionsData, isLoading } = useSessions();
@@ -24,6 +35,7 @@ export default function DeviceManagementPage() {
   
   const [sessionToRevoke, setSessionToRevoke] = useState<string | null>(null);
   const [showLogoutAllDialog, setShowLogoutAllDialog] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const sessions = sessionsData?.sessions || [];
   const currentSessionId = sessionsData?.currentSessionId;
@@ -62,16 +74,17 @@ export default function DeviceManagementPage() {
   };
 
   const handleLogoutAll = async () => {
+    if (!confirmPassword) {
+      toast.error('Please enter your password to confirm');
+      return;
+    }
     try {
-      await logoutAllMutation.mutateAsync({});
-      toast.success('All devices logged out successfully');
+      await logoutAllMutation.mutateAsync({ password: confirmPassword });
       setShowLogoutAllDialog(false);
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        router.push('/auth/login');
-      }, 1500);
+      setConfirmPassword('');
+      // Current session stays logged in - just refresh the sessions list
     } catch (error) {
-      toast.error('Failed to logout all devices');
+      // Error toast already shown by the mutation's onError
     }
   };
 
@@ -215,7 +228,7 @@ export default function DeviceManagementPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                             <span>
-                              {session.location || 'Unknown location'} • {session.ipAddress}
+                              {formatLocation(session.location)} • {session.ipAddress}
                             </span>
                           </div>
                         )}
@@ -226,7 +239,11 @@ export default function DeviceManagementPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <span>
-                            Last active: {format(new Date(session.lastActivity ?? session.lastActive), 'PPp')}
+                            Last active: {(() => {
+                              const raw = session.lastActivity ?? session.lastActivityAt;
+                              const date = raw ? new Date(raw) : null;
+                              return date && !isNaN(date.getTime()) ? format(date, 'PPp') : 'Unknown';
+                            })()}
                           </span>
                         </div>
 
@@ -236,7 +253,10 @@ export default function DeviceManagementPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                           <span>
-                            Logged in: {format(new Date(session.createdAt), 'PPp')}
+                            Logged in: {(() => {
+                              const date = session.createdAt ? new Date(session.createdAt) : null;
+                              return date && !isNaN(date.getTime()) ? format(date, 'PPp') : 'Unknown';
+                            })()}
                           </span>
                         </div>
                       </div>
@@ -305,13 +325,19 @@ export default function DeviceManagementPage() {
       </Dialog>
 
       {/* Logout All Dialog */}
-      <Dialog open={showLogoutAllDialog} onOpenChange={setShowLogoutAllDialog}>
+      <Dialog
+        open={showLogoutAllDialog}
+        onOpenChange={(open) => {
+          setShowLogoutAllDialog(open);
+          if (!open) setConfirmPassword('');
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Logout All Devices?</DialogTitle>
+            <DialogTitle>Logout All Other Devices?</DialogTitle>
             <DialogDescription>
-              This will log you out from all devices except this one. This action cannot
-              be undone. You'll need to log in again on each device.
+              This session will stay logged in. All other devices will be signed out.
+              Please confirm your password to continue.
             </DialogDescription>
           </DialogHeader>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 my-4">
@@ -327,19 +353,39 @@ export default function DeviceManagementPage() {
               </div>
             </div>
           </div>
+          <div className="mb-2">
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
+              Current Password
+            </label>
+            <input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleLogoutAll();
+              }}
+              autoFocus
+              placeholder="Enter your password"
+              className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowLogoutAllDialog(false)}
+              onClick={() => {
+                setShowLogoutAllDialog(false);
+                setConfirmPassword('');
+              }}
             >
               Cancel
             </Button>
             <Button
               onClick={handleLogoutAll}
-              disabled={logoutAllMutation.isPending}
+              disabled={logoutAllMutation.isPending || !confirmPassword}
               className="bg-red-600 hover:bg-red-700"
             >
-              {logoutAllMutation.isPending ? 'Logging out...' : 'Logout All Devices'}
+              {logoutAllMutation.isPending ? 'Logging out...' : 'Logout All Other Devices'}
             </Button>
           </DialogFooter>
         </DialogContent>

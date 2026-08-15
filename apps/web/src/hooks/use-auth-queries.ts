@@ -18,7 +18,10 @@ export function useLoginHistory(params?: { page?: number; limit?: number }) {
   return useQuery({
     queryKey: ['auth', 'login-history', params],
     queryFn: () => authService.getLoginHistory(params),
-    select: (data) => data.history ?? [],
+    // Backend returns { attempts, stats, total } - there is no `history`
+    // field. Reading `data.history` always returned [] regardless of actual
+    // login attempts, making this page permanently show "no history".
+    select: (data) => data.attempts ?? [],
     staleTime: 1000 * 60 * 5,
   });
 }

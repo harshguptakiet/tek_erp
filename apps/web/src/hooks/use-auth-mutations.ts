@@ -218,16 +218,17 @@ export function useLogout() {
 }
 
 export function useLogoutAllDevices() {
-  const { clearAuth } = useAuthStore();
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (params: { password?: string; twoFactorCode?: string } = {}) =>
-      authService.logoutAllDevices(params.password ?? '', params.twoFactorCode),
+    // FR-AUTH-028: requires the current password (and 2FA code if enabled).
+    // The current session stays logged in - only OTHER devices are revoked -
+    // so this must NOT call clearAuth()/log the caller out of their own session.
+    mutationFn: (params: { password: string; twoFactorCode?: string }) =>
+      authService.logoutAllDevices(params.password, params.twoFactorCode),
     onSuccess: () => {
-      clearAuth();
-      queryClient.clear();
-      toast.success('Logged out from all devices');
+      queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
+      toast.success('Logged out from all other devices');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to logout all devices');
