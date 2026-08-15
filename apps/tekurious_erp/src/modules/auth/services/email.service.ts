@@ -10,36 +10,70 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
+  private emailEnabled = false;
 
   constructor(private configService: ConfigService) {
-    // Initialize email transporter
-    const emailConfig = {
-      host: this.configService.get('EMAIL_HOST', 'smtp.gmail.com'),
-      port: this.configService.get('EMAIL_PORT', 587),
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: this.configService.get('EMAIL_USER'),
-        pass: this.configService.get('EMAIL_PASSWORD'),
-      },
-    };
+    // Check if email is configured
+    const emailUser = this.configService.get('EMAIL_USER');
+    const emailPassword = this.configService.get('EMAIL_PASSWORD');
+    const sendgridApiKey = this.configService.get('SENDGRID_API_KEY');
 
-    this.transporter = nodemailer.createTransport(emailConfig);
+    if (!emailUser && !sendgridApiKey) {
+      this.logger.warn('⚠️ Email service not configured - email notifications will be skipped');
+      this.logger.warn('Set EMAIL_USER/EMAIL_PASSWORD or SENDGRID_API_KEY to enable email notifications');
+      return;
+    }
 
-    // Verify connection configuration
-    this.transporter.verify((error, success) => {
-      if (error) {
-        this.logger.error('Email service initialization failed:', error);
-      } else {
-        this.logger.log('✅ Email service ready to send messages');
-      }
-    });
+    try {
+      // Initialize email transporter
+      const emailConfig = sendgridApiKey
+        ? {
+            host: 'smtp.sendgrid.net',
+            port: 587,
+            secure: false,
+            auth: {
+              user: 'apikey',
+              pass: sendgridApiKey,
+            },
+          }
+        : {
+            host: this.configService.get('EMAIL_HOST', 'smtp.gmail.com'),
+            port: this.configService.get('EMAIL_PORT', 587),
+            secure: false,
+            auth: {
+              user: emailUser,
+              pass: emailPassword,
+            },
+          };
+
+      this.transporter = nodemailer.createTransport(emailConfig);
+      this.emailEnabled = true;
+
+      // Verify connection configuration (non-blocking)
+      this.transporter.verify((error) => {
+        if (error) {
+          this.logger.warn('Email service verification failed - emails may not send:', error.message);
+          this.emailEnabled = false;
+        } else {
+          this.logger.log('✅ Email service ready to send messages');
+        }
+      });
+    } catch (error) {
+      this.logger.error('Failed to initialize email service:', error);
+      this.emailEnabled = false;
+    }
   }
 
   /**
    * Send email verification link
    */
   async sendVerificationEmail(email: string, token: string, firstName: string): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping verification email to ${email}`);
+      return;
+    }
+
     const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
     const verificationLink = `${frontendUrl}/auth/verify-email?token=${token}`;
 
@@ -96,6 +130,11 @@ export class EmailService {
    * Send password reset email
    */
   async sendPasswordResetEmail(email: string, token: string, firstName: string): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping password reset email to ${email}`);
+      return;
+    }
+
     const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
     const resetLink = `${frontendUrl}/auth/reset-password?token=${token}`;
 
@@ -159,6 +198,11 @@ export class EmailService {
    * Send password changed notification
    */
   async sendPasswordChangedEmail(email: string, firstName: string): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping password changed notification to ${email}`);
+      return;
+    }
+
     try {
       await this.transporter.sendMail({
         from: `"Tekurious ERP" <${this.configService.get('EMAIL_FROM', 'noreply@tekurious.com')}>`,
@@ -216,6 +260,11 @@ export class EmailService {
     duration: string,
     reason: string,
   ): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping account locked notification to ${email}`);
+      return;
+    }
+
     try {
       await this.transporter.sendMail({
         from: `"Tekurious ERP" <${this.configService.get('EMAIL_FROM', 'noreply@tekurious.com')}>`,
@@ -269,6 +318,11 @@ export class EmailService {
    * Send password expiry reminder (FR-AUTH-019)
    */
   async sendPasswordExpiryReminder(email: string, firstName: string, daysRemaining: number): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping password expiry reminder to ${email}`);
+      return;
+    }
+
     const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
     const changePasswordLink = `${frontendUrl}/settings/security`;
 
@@ -337,6 +391,11 @@ export class EmailService {
     ipAddress: string,
     loginTime: Date,
   ): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.debug(`Email not configured - skipping login notification to ${email}`);
+      return;
+    }
+
     const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
     const securitySettingsLink = `${frontendUrl}/settings/security`;
 
@@ -422,6 +481,11 @@ export class EmailService {
    * Send account unlocked notification (FR-AUTH-025)
    */
   async sendAccountUnlockedEmail(email: string, firstName: string): Promise<void> {
+    if (!this.emailEnabled || !this.transporter) {
+      this.logger.warn(`Email not configured - skipping account unlocked notification to ${email}`);
+      return;
+    }
+
     const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
     const loginLink = `${frontendUrl}/auth/login`;
 
