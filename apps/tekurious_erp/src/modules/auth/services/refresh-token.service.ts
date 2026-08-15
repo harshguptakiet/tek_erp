@@ -67,12 +67,13 @@ export class RefreshTokenService {
         this.logger.log(`Evicted ${excessCount} oldest session(s) for user ${userId} to enforce 10-session limit`);
       }
 
-      // Create session with refresh token
+      // Create session - store only the SHA-256 hash of the refresh token
+      // (FR-AUTH-033: refresh tokens must be hashed at rest, never plaintext).
+      // The plaintext token is returned to the caller once and never persisted.
       const session = await this.prisma.userSession.create({
         data: {
           userId,
           token: '', // Will be set when access token is issued
-          refreshToken, // Store plain token (will be removed in production)
           tokenHash, // Store hash for validation
           deviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null, // Convert to string
           ipAddress,
@@ -106,6 +107,8 @@ export class RefreshTokenService {
     accessToken: string;
     refreshToken: string;
     user: any;
+    rememberMe: boolean;
+    tokenExpiry: number;
   }> {
     try {
       const tokenHash = this.hashToken(refreshToken);
@@ -175,20 +178,30 @@ export class RefreshTokenService {
         sessionId: session.id,
       });
 
-      // Update session with new token and mark old token hash
+      // Determine remember-me duration from the ORIGINAL session lifetime
+      // (createdAt -> expiresAt), so a 30-day "remember me" session keeps
+      // renewing itself for another 30 days instead of being silently
+      // downgraded to 7 days on every refresh (previously hardcoded).
+      const originalDurationMs = session.expiresAt.getTime() - session.createdAt.getTime();
+      const REMEMBER_ME_THRESHOLD_MS = 10 * 24 * 60 * 60 * 1000; // >10 days implies remember-me (30-day) session
+      const rememberMe = originalDurationMs > REMEMBER_ME_THRESHOLD_MS;
+      const renewedDurationDays = rememberMe ? 30 : 7;
+      const newExpiresAt = new Date(Date.now() + renewedDurationDays * 24 * 60 * 60 * 1000);
+
+      // Update session with new token hash (never store plaintext refresh tokens)
       await this.prisma.userSession.update({
         where: { id: session.id },
         data: {
-          refreshToken: newRefreshToken,
           tokenHash: newTokenHash,
           previousTokenHash: tokenHash, // Store old hash for reuse detection
           tokenVersion: (session.tokenVersion || 1) + 1,
           rotatedAt: new Date(),
           lastActivity: new Date(),
+          expiresAt: newExpiresAt,
         },
       });
 
-      this.logger.log(`Refresh token rotated for user ${session.userId}, session ${session.id}`);
+      this.logger.log(`Refresh token rotated for user ${session.userId}, session ${session.id}, rememberMe: ${rememberMe}`);
 
       return {
         accessToken: newAccessToken,
@@ -203,6 +216,8 @@ export class RefreshTokenService {
           tenantId: session.user.tenantId,
           status: session.user.status,
         },
+        rememberMe,
+        tokenExpiry: rememberMe ? 2592000 : 604800, // seconds: 30 days or 7 days
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -251,13 +266,15 @@ export class RefreshTokenService {
   async revokeAllUserSessions(
     userId: string,
     reason: string = 'USER_REQUESTED',
+    exceptSessionId?: string,
   ): Promise<number> {
     try {
-      // Get all active sessions
+      // Get active sessions (excluding the current one if specified)
       const sessions = await this.prisma.userSession.findMany({
         where: {
           userId,
           isActive: true,
+          ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
         },
         select: {
           id: true,
@@ -265,7 +282,7 @@ export class RefreshTokenService {
         },
       });
 
-      // Blacklist all access tokens
+      // Blacklist access tokens for the targeted sessions only
       for (const session of sessions) {
         if (session.token) {
           try {
@@ -278,14 +295,20 @@ export class RefreshTokenService {
         }
       }
 
-      // Also blacklist all user tokens via user-level flag
-      await this.tokenBlacklistService.blacklistAllUserTokens(userId, reason, 7200);
+      // IMPORTANT: only blacklist ALL user tokens (including current) when
+      // no exceptSessionId is given (i.e. a true "kill everything" scenario
+      // like security breach). Otherwise this would also invalidate the
+      // caller's own active session.
+      if (!exceptSessionId) {
+        await this.tokenBlacklistService.blacklistAllUserTokens(userId, reason, 7200);
+      }
 
-      // Mark all sessions as inactive
+      // Mark targeted sessions as inactive
       const result = await this.prisma.userSession.updateMany({
         where: {
           userId,
           isActive: true,
+          ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
         },
         data: {
           isActive: false,
@@ -294,7 +317,7 @@ export class RefreshTokenService {
       });
 
       this.logger.warn(
-        `Revoked ${result.count} sessions for user ${userId}, reason: ${reason}`,
+        `Revoked ${result.count} sessions for user ${userId}, reason: ${reason}${exceptSessionId ? ` (except ${exceptSessionId})` : ''}`,
       );
 
       return result.count;

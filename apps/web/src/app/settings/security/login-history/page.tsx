@@ -52,7 +52,7 @@ interface LoginAttempt {
   success: boolean;
   timestamp: string;
   ipAddress: string;
-  location?: string;
+  location?: string | { city?: string; region?: string; country?: string; countryCode?: string } | null;
   device: string;
   browser: string;
   os: string;
@@ -92,6 +92,7 @@ export default function LoginHistoryPage() {
   const totalPages = Math.ceil((data?.total || 0) / pageSize);
 
   const getDeviceIcon = (device: string) => {
+    if (!device) return Monitor;
     if (device.includes('Mobile') || device.includes('Phone')) {
       return Smartphone;
     }
@@ -99,6 +100,13 @@ export default function LoginHistoryPage() {
       return Tablet;
     }
     return Monitor;
+  };
+
+  const formatLocation = (location: LoginAttempt['location']): string => {
+    if (!location) return 'Unknown';
+    if (typeof location === 'string') return location || 'Unknown';
+    const parts = [location.city, location.region, location.country].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Unknown';
   };
 
   const formatDate = (dateString: string) => {
@@ -328,7 +336,7 @@ export default function LoginHistoryPage() {
                             <div className="flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-[hsl(var(--muted-foreground))]" />
                               <span className="text-sm">
-                                {attempt.location || 'Unknown'}
+                                {formatLocation(attempt.location)}
                               </span>
                             </div>
                           </TableCell>

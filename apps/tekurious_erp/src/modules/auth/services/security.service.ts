@@ -91,26 +91,26 @@ export class SecurityService {
 
   /**
    * Blacklist all user's tokens (password change, security breach)
-   * FR-AUTH-018: Change password invalidates all sessions
+   * FR-AUTH-018: Change password invalidates all sessions EXCEPT the current one.
+   * Pass exceptSessionId to keep the session making the request alive.
    */
   async blacklistAllUserTokens(
     userId: string,
     reason: 'PASSWORD_CHANGE' | 'SECURITY_BREACH' | 'ADMIN_REVOKE',
+    exceptSessionId?: string,
   ): Promise<void> {
     try {
-      // Blacklist all tokens in Redis (fast, affects all tokens immediately)
-      await this.tokenBlacklistService.blacklistAllUserTokens(userId, reason, 7200); // 2 hours
-
-      // Get all active sessions
+      // Get sessions to blacklist (excluding current session if specified)
       const sessions = await this.prisma.userSession.findMany({
         where: {
           userId,
           isActive: true,
           expiresAt: { gt: new Date() },
+          ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
         },
       });
 
-      // Blacklist each session token individually (for audit)
+      // Blacklist each targeted session token individually (for audit)
       for (const session of sessions) {
         if (session.token) {
           const decoded = this.jwtService.decode(session.token) as any;
@@ -119,13 +119,22 @@ export class SecurityService {
         }
       }
 
-      // Mark all sessions as revoked in database
+      // Only nuke ALL user tokens (including current) when no exception given
+      if (!exceptSessionId) {
+        await this.tokenBlacklistService.blacklistAllUserTokens(userId, reason, 7200); // 2 hours
+      }
+
+      // Mark targeted sessions as revoked in database
       await this.prisma.userSession.updateMany({
-        where: { userId, isActive: true },
+        where: {
+          userId,
+          isActive: true,
+          ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
+        },
         data: { isActive: false, revokedAt: new Date() },
       });
 
-      this.logger.warn(`All tokens blacklisted for user ${userId}, reason: ${reason}`);
+      this.logger.warn(`Tokens blacklisted for user ${userId}, reason: ${reason}${exceptSessionId ? ` (except session ${exceptSessionId})` : ' (all sessions)'}`);
     } catch (error) {
       this.logger.error(`Failed to blacklist all user tokens: ${error.message}`);
       throw error;
@@ -177,11 +186,10 @@ export class SecurityService {
       roles: [],
     });
 
-    // Update session with new token
+    // Update session with new token hash (never store plaintext refresh tokens)
     await this.prisma.userSession.update({
       where: { id: sessionId },
       data: {
-        refreshToken: newRefreshToken,
         tokenHash: this.hashToken(newRefreshToken),
         previousTokenHash: oldTokenHash, // Store for detection
         tokenVersion: (session.tokenVersion || 0) + 1,

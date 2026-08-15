@@ -155,6 +155,11 @@ export class AuthService {
             },
           },
         },
+        organizations: {
+          where: { isActive: true },
+          select: { organizationId: true },
+          take: 1,
+        },
       },
     });
 
@@ -244,6 +249,22 @@ export class AuthService {
       }
     }
 
+    // FR-AUTH-039/040: IP Whitelist & Geo-Blocking enforcement (organization-scoped)
+    const orgId = user.organizations?.[0]?.organizationId;
+    if (orgId && dto.ipAddress) {
+      const isWhitelisted = await this.checkIPWhitelist(orgId, dto.ipAddress);
+      if (!isWhitelisted) {
+        this.logger.warn(`Login blocked - IP ${dto.ipAddress} not whitelisted for org ${orgId}`);
+        throw new UnauthorizedException('Login blocked: your network is not authorized for this organization. Contact your administrator.');
+      }
+
+      const isGeoBlocked = await this.checkGeoBlock(orgId, dto.ipAddress);
+      if (isGeoBlocked) {
+        this.logger.warn(`Login blocked - IP ${dto.ipAddress} geo-blocked for org ${orgId}`);
+        throw new UnauthorizedException('Login blocked: access from your current location is restricted for this organization.');
+      }
+    }
+
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
       this.logger.log(`2FA required for user: ${user.id}`);
@@ -311,8 +332,9 @@ export class AuthService {
 
   /**
    * Change password for authenticated user
+   * FR-AUTH-018: invalidates all OTHER sessions, current session stays active
    */
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ message: string }> {
+  async changePassword(userId: string, dto: ChangePasswordDto, currentSessionId?: string): Promise<{ message: string }> {
     this.logger.log(`Password change attempt for user: ${userId}`);
 
     const user = await this.prisma.user.findUnique({
@@ -391,8 +413,8 @@ export class AuthService {
       });
     }
 
-    // SECURITY: Blacklist all user's tokens (force re-login on all devices)
-    await this.securityService.blacklistAllUserTokens(userId, 'PASSWORD_CHANGE');
+    // SECURITY: Blacklist tokens on all OTHER devices (current session stays logged in)
+    await this.securityService.blacklistAllUserTokens(userId, 'PASSWORD_CHANGE', currentSessionId);
 
     // Send password changed notification email
     try {
@@ -410,7 +432,7 @@ export class AuthService {
 
     this.logger.log(`Password changed successfully for user: ${userId}`);
 
-    return { message: 'Password changed successfully. You have been logged out from all devices.' };
+    return { message: 'Password changed successfully. You have been logged out from all other devices.' };
   }
 
   /**
@@ -424,14 +446,14 @@ export class AuthService {
       // FR-AUTH-014: Rotate refresh token (generates new tokens, detects theft)
       const result = await this.refreshTokenService.rotateRefreshToken(refreshToken);
 
-      this.logger.log(`Tokens refreshed for user ${result.user.id}`);
+      this.logger.log(`Tokens refreshed for user ${result.user.id}, rememberMe: ${result.rememberMe}`);
 
       return {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         user: result.user,
-        rememberMe: false, // Will be determined from session
-        tokenExpiry: 604800, // 7 days default
+        rememberMe: result.rememberMe, // FR-AUTH-009: preserve original remember-me duration
+        tokenExpiry: result.tokenExpiry,
       };
     } catch (error) {
       this.logger.error(`Token refresh failed: ${error.message}`);
@@ -470,24 +492,62 @@ export class AuthService {
 
   /**
    * Logout from all devices
-   * FR-AUTH-014: Revoke all refresh tokens
+   * FR-AUTH-028: Requires re-authentication (password + 2FA if enabled).
+   * Current session is preserved; all OTHER sessions/tokens are revoked.
    */
-  async logoutAllDevices(userId: string): Promise<{ message: string; count: number }> {
+  async logoutAllDevices(
+    userId: string,
+    password: string,
+    twoFactorCode?: string,
+    exceptSessionId?: string,
+  ): Promise<{ message: string; count: number }> {
     this.logger.log(`Logout all devices for user: ${userId}`);
 
-    // Get session count before revoking
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash) {
+      throw new BadRequestException('Unable to verify identity for this account');
+    }
+
+    // Re-authentication required per FR-AUTH-028
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    if (user.twoFactorEnabled) {
+      if (!twoFactorCode) {
+        throw new BadRequestException('2FA code is required');
+      }
+      const secret = this.twoFactorService.decryptSecret(user.twoFactorSecret!);
+      const isValid = await this.twoFactorService.verifyToken(secret, twoFactorCode);
+      if (!isValid) {
+        throw new UnauthorizedException('Invalid 2FA code');
+      }
+    }
+
+    // Get session count before revoking (excluding current session)
     const sessions = await this.prisma.userSession.findMany({
       where: {
         userId,
         isActive: true,
+        ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}),
       },
+      select: { id: true, token: true },
     });
 
-    // FR-AUTH-013: Blacklist all user tokens
-    await this.securityService.blacklistAllUserTokens(userId, 'ADMIN_REVOKE');
+    // Blacklist tokens for all OTHER sessions only
+    for (const session of sessions) {
+      if (session.token) {
+        await this.securityService.blacklistToken(session.token, userId, 'ADMIN_REVOKE');
+      }
+    }
 
-    // FR-AUTH-014: Revoke all refresh tokens
-    const revokedCount = await this.refreshTokenService.revokeAllUserSessions(userId, 'USER_REQUESTED');
+    // Revoke refresh tokens/sessions except current
+    const revokedCount = await this.refreshTokenService.revokeAllUserSessions(
+      userId,
+      'USER_REQUESTED',
+      exceptSessionId,
+    );
 
     // Emit event
     await this.eventBus.publish('user.logged_out_all_devices', {
@@ -496,18 +556,24 @@ export class AuthService {
       timestamp: new Date(),
     });
 
-    this.logger.log(`Logged out from ${revokedCount} devices for user: ${userId}`);
+    this.logger.log(`Logged out from ${revokedCount} other devices for user: ${userId}`);
 
     return {
-      message: 'Logged out from all devices successfully',
+      message: 'Logged out from all other devices successfully',
       count: revokedCount,
     };
   }
 
   /**
    * Get current user profile
+   * CRITICAL: This must NOT call generateTokens() - doing so mints a brand new
+   * refresh token + UserSession on every single /auth/me call (page load, tab switch, etc),
+   * which rapidly exhausts the 10-session limit and causes legitimate active sessions
+   * (including the one currently in use) to be evicted, producing forced-logout loops.
+   * This endpoint should simply echo back the user's profile using the access token
+   * that already passed JwtAuthGuard validation to get here.
    */
-  async getCurrentUser(userId: string): Promise<AuthResponseDto> {
+  async getCurrentUser(userId: string, existingAccessToken?: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -527,7 +593,22 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.generateTokens(user);
+    const roles = user.userRolesNew?.map((ur: any) => ur.role.name) || [];
+
+    return {
+      accessToken: existingAccessToken || '',
+      user: {
+        id: user.id,
+        email: user.email || '',
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        role: user.role || roles[0] || 'USER',
+        roles,
+        permissions: roles,
+        tenantId: user.tenantId || undefined,
+        status: user.status || 'ACTIVE',
+      } as any,
+    };
   }
 
   /**
@@ -1917,7 +1998,7 @@ export class AuthService {
     return buffer.toString('base64');
   }
 
-  // FR-AUTH-040: checkGeoBlock
+  // FR-AUTH-040: checkGeoBlock - returns true if the IP's resolved country is blocked
   async checkGeoBlock(organizationId: string, ipAddress: string): Promise<boolean> {
     const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
     if (!org) return false;
@@ -1925,8 +2006,18 @@ export class AuthService {
     const settings = org.securitySettings as any;
     if (!settings?.geoBlockingEnabled) return false;
 
-    const blockedCountries = settings.blockedCountries as string[] || [];
-    return blockedCountries.includes('CN');
+    const blockedCountries = (settings.blockedCountries as string[]) || [];
+    if (blockedCountries.length === 0) return false;
+
+    try {
+      const location = await this.deviceDetectionService.getLocationFromIp(ipAddress);
+      const countryCode = location?.countryCode;
+      if (!countryCode) return false; // fail open if we can't resolve location
+      return blockedCountries.includes(countryCode);
+    } catch (error) {
+      this.logger.warn(`Geo-block lookup failed for IP ${ipAddress}: ${error.message}`);
+      return false; // fail open on lookup errors
+    }
   }
 
   // FR-AUTH-041-071: Magic Link features
@@ -2095,18 +2186,18 @@ export class AuthService {
     // Generate backup codes
     const backupCodes = this.twoFactorService.generateBackupCodes(10);
 
-    // Store the secret temporarily (encrypted) and backup codes (hashed) in pending state
-    // We'll activate them once the user verifies the code
+    // Store the secret (encrypted) in pending state. Backup codes are stored
+    // PLAINTEXT in the pending field (not the final `backupCodes` field, which
+    // always holds hashes) purely so verify2FASetup can hash+activate the SAME
+    // codes shown here, instead of throwing them away and minting a second,
+    // different set the user never saw at this step.
     const encryptedSecret = this.twoFactorService.encryptSecret(secret);
-    const hashedBackupCodes = backupCodes.map(code => this.twoFactorService.hashBackupCode(code));
 
-    // Store in a temporary field or cache
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        // Store in pending state - will be moved to active once verified
         twoFactorPendingSecret: encryptedSecret,
-        twoFactorPendingBackupCodes: hashedBackupCodes,
+        twoFactorPendingBackupCodes: backupCodes, // plaintext, pending only - never exposed via any GET endpoint
       },
     });
 
@@ -2160,29 +2251,19 @@ export class AuthService {
       throw new BadRequestException('Invalid 2FA code. Please try again.');
     }
 
-    // Move pending data to active
+    // The pending backup codes are the SAME plaintext codes shown to the user
+    // at the enable2FA (step 1) screen - hash them now and activate 2FA.
+    const backupCodes = user.twoFactorPendingBackupCodes || [];
+    const hashedBackupCodes = backupCodes.map(c => this.twoFactorService.hashBackupCode(c));
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         twoFactorSecret: user.twoFactorPendingSecret,
         twoFactorEnabled: true,
-        backupCodes: user.twoFactorPendingBackupCodes || [],
-        twoFactorPendingSecret: null,
-        twoFactorPendingBackupCodes: null,
-      },
-    });
-
-    // Get backup codes to return (we need to retrieve the plain text ones)
-    // Since we can't decrypt hashed backup codes, we need to generate new ones
-    // But for this verification step, we'll return the ones we showed earlier
-    const backupCodes = this.twoFactorService.generateBackupCodes(10);
-    const hashedBackupCodes = backupCodes.map(c => this.twoFactorService.hashBackupCode(c));
-    
-    // Update with fresh backup codes
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
         backupCodes: hashedBackupCodes,
+        twoFactorPendingSecret: null,
+        twoFactorPendingBackupCodes: [],
       },
     });
 
@@ -2814,8 +2895,12 @@ export class AuthService {
    * @returns Success status and remaining time
    */
   async pingSession(
-    sessionId: string,
+    sessionId?: string,
   ): Promise<{ success: boolean; remainingMs: number }> {
+    if (!sessionId) {
+      this.logger.warn('pingSession called without a sessionId (JWT missing sessionId claim)');
+      return { success: false, remainingMs: 30 * 60 * 1000 };
+    }
     try {
       // Update activity timestamp
       await this.securityService.updateSessionActivity(sessionId);

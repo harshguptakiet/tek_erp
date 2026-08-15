@@ -25,4 +25,5 @@ export class UserPayload {
   email: string;
   tenantId?: string;
   roles: string[];
+  sessionId?: string; // Current session ID from JWT, used for ping/CSRF/session-management
 }

@@ -22,6 +22,7 @@ export interface DeviceInfo {
 export interface LocationInfo {
   ip: string;
   country?: string;
+  countryCode?: string; // ISO 3166-1 alpha-2 (e.g. "CN", "US") - used for geo-blocking
   region?: string;
   city?: string;
   latitude?: number;
@@ -127,7 +128,7 @@ export class DeviceDetectionService {
 
       // Use ip-api.com free API (15 requests/minute limit)
       const response = await fetch(
-        `http://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,lat,lon,timezone`,
+        `http://ip-api.com/json/${ipAddress}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone`,
       );
 
       if (!response.ok) {
@@ -144,6 +145,7 @@ export class DeviceDetectionService {
       return {
         ip: ipAddress,
         country: data.country,
+        countryCode: data.countryCode,
         region: data.regionName,
         city: data.city,
         latitude: data.lat,

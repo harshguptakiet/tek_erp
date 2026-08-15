@@ -105,9 +105,10 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@CurrentUser() user: any): Promise<AuthResponseDto> {
+  async getProfile(@CurrentUser() user: any, @Req() req: Request): Promise<AuthResponseDto> {
     this.logger.log(`GET /auth/me - User ID: ${user.id}`);
-    return this.authService.getCurrentUser(user.id);
+    const existingToken = req.headers.authorization?.replace('Bearer ', '');
+    return this.authService.getCurrentUser(user.id, existingToken);
   }
 
   /**
@@ -119,10 +120,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
     this.logger.log(`POST /auth/change-password - User ID: ${userId}`);
-    return this.authService.changePassword(userId, changePasswordDto);
+    return this.authService.changePassword(userId, changePasswordDto, user.sessionId);
   }
 
   /**
@@ -471,6 +473,23 @@ export class AuthController {
     this.logger.log(`POST /auth/sessions/revoke-all - User: ${userId}`);
     const sessionId = body.exceptSessionId || user.sessionId;
     return this.authService.revokeAllSessions(userId, sessionId);
+  }
+
+  /**
+   * Logout from all devices (requires re-authentication)
+   * POST /api/v1/auth/logout-all
+   * FR-AUTH-028: Password + 2FA (if enabled) required; current session stays active.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  async logoutAllDevices(
+    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
+    @Body() body: { password: string; twoFactorCode?: string },
+  ): Promise<{ message: string; count: number }> {
+    this.logger.log(`POST /auth/logout-all - User: ${userId}`);
+    return this.authService.logoutAllDevices(userId, body.password, body.twoFactorCode, user.sessionId);
   }
 
   /**
@@ -1029,7 +1048,7 @@ export class AuthController {
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; remainingMs: number }> {
     this.logger.log(`POST /auth/sessions/ping - User: ${userId}`);
-    return this.authService.pingSession(user.sessionId || user.id);
+    return this.authService.pingSession(user.sessionId);
   }
 
   /**

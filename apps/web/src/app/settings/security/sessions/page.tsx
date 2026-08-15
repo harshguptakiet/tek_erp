@@ -9,8 +9,16 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/auth.service';
 import { toast } from 'sonner';
-import { Loader2, Monitor, Smartphone, Tablet, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Monitor, Smartphone, Tablet, MapPin, Clock, AlertCircle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface Session {
   id: string;
@@ -39,6 +47,8 @@ interface Session {
 export default function SessionsPage() {
   const queryClient = useQueryClient();
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [showLogoutAllDialog, setShowLogoutAllDialog] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Fetch sessions
   const { data, isLoading, error } = useQuery({
@@ -74,19 +84,20 @@ export default function SessionsPage() {
     },
   });
 
-  // Logout all devices mutation
+  // Logout all devices mutation - requires password re-authentication (FR-AUTH-028)
   const logoutAllMutation = useMutation({
-    mutationFn: async () => {
-      // This requires password confirmation in production
-      return authService.logoutAllDevices(''); // Empty password for now
+    mutationFn: async (password: string) => {
+      return authService.logoutAllDevices(password);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      toast.success('Logged out from all other devices');
+      toast.success(data?.message || 'Logged out from all other devices');
+      setShowLogoutAllDialog(false);
+      setConfirmPassword('');
     },
     onError: (error: any) => {
       toast.error('Failed to logout from all devices', {
-        description: error?.message || 'Please try again',
+        description: error?.response?.data?.message || error?.message || 'Please check your password and try again',
       });
     },
   });
@@ -97,9 +108,15 @@ export default function SessionsPage() {
   };
 
   const handleLogoutAll = () => {
-    if (confirm('Are you sure you want to logout from all other devices?')) {
-      logoutAllMutation.mutate();
+    setShowLogoutAllDialog(true);
+  };
+
+  const handleConfirmLogoutAll = () => {
+    if (!confirmPassword) {
+      toast.error('Please enter your password to confirm');
+      return;
     }
+    logoutAllMutation.mutate(confirmPassword);
   };
 
   const getDeviceIcon = (session: Session) => {
@@ -303,6 +320,62 @@ export default function SessionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Logout All Devices Confirmation Dialog */}
+      <Dialog open={showLogoutAllDialog} onOpenChange={setShowLogoutAllDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Logout all other devices?</DialogTitle>
+            <DialogDescription>
+              For your security, please confirm your password. This session will stay logged in;
+              all other devices will be signed out.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="block text-sm font-medium mb-2">Current Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-[hsl(var(--muted-foreground))]" />
+              <input
+                type="password"
+                autoFocus
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmLogoutAll();
+                }}
+                placeholder="Enter your password"
+                className="w-full h-11 pl-11 pr-4 rounded-xl border text-sm bg-[hsl(var(--background))] border-[hsl(var(--border))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLogoutAllDialog(false);
+                setConfirmPassword('');
+              }}
+              disabled={logoutAllMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmLogoutAll}
+              disabled={logoutAllMutation.isPending || !confirmPassword}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {logoutAllMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Logging out...
+                </>
+              ) : (
+                'Confirm Logout All'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

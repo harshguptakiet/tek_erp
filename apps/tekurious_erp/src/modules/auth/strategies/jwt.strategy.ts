@@ -75,6 +75,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       tenantId: user.tenantId,
       roles: payload.roles || [],
+      sessionId: payload.sessionId, // CRITICAL: must propagate sessionId for ping/CSRF/session ops to work
     };
   }
 }

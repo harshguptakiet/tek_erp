@@ -6,6 +6,10 @@ import { Laptop, Smartphone, Trash2, ArrowLeft, ShieldCheck, Plus, Loader2 } fro
 import { authService } from '@/services/auth.service';
 import { toast } from 'sonner';
 
+function safeList(list?: (string | null | undefined)[]): string[] {
+  return (list || []).filter((d): d is string => typeof d === 'string' && d.length > 0);
+}
+
 export default function TrustedDevicesPage() {
   const [devices, setDevices] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +19,10 @@ export default function TrustedDevicesPage() {
     try {
       setLoading(true);
       const res = await authService.getTrustedDevices();
-      setDevices(res.devices || []);
+      // Filter out any null/undefined/non-string entries defensively -
+      // a malformed DB row (trustedDevices null before a migration default
+      // kicked in) previously caused a client-side crash here.
+      setDevices(safeList(res.devices));
     } catch (err: any) {
       toast.error('Failed to load trusted devices');
     } finally {
@@ -31,7 +38,7 @@ export default function TrustedDevicesPage() {
     try {
       setActionLoading(true);
       const res = await authService.trustDevice();
-      setDevices(res.devices || []);
+      setDevices(safeList(res.devices));
       toast.success('Current device marked as trusted!');
     } catch (err: any) {
       toast.error('Failed to trust device');
@@ -44,7 +51,7 @@ export default function TrustedDevicesPage() {
     try {
       setActionLoading(true);
       const res = await authService.removeTrustedDevice(deviceId);
-      setDevices(res.devices || []);
+      setDevices(safeList(res.devices));
       toast.success('Trusted device removed');
     } catch (err: any) {
       toast.error('Failed to remove device');
@@ -121,7 +128,7 @@ export default function TrustedDevicesPage() {
               <div key={idx} className="p-4 px-6 flex items-center justify-between hover:bg-[hsl(var(--muted)/0.3)] transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-lg bg-[hsl(var(--muted)/0.5)] flex items-center justify-center text-[hsl(var(--foreground))]">
-                    {device.toLowerCase().includes('phone') || device.toLowerCase().includes('safari') ? (
+                    {(device || '').toLowerCase().includes('phone') || (device || '').toLowerCase().includes('safari') ? (
                       <Smartphone className="h-5 w-5" />
                     ) : (
                       <Laptop className="h-5 w-5" />
