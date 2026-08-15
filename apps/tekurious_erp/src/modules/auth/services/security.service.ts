@@ -7,6 +7,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { TokenBlacklistService } from './token-blacklist.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -17,12 +18,14 @@ export class SecurityService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private tokenBlacklistService: TokenBlacklistService,
   ) {}
 
-  // ==================== TOKEN BLACKLIST ====================
+  // ==================== TOKEN BLACKLIST (Redis-based) ====================
 
   /**
    * Add token to blacklist (logout, password change, security breach)
+   * FR-AUTH-013: JWT Token Blacklist
    */
   async blacklistToken(
     token: string,
@@ -32,9 +35,13 @@ export class SecurityService {
     try {
       // Decode token to get expiry
       const decoded = this.jwtService.decode(token) as any;
-      const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 3600000); // Default 1 hour
+      const ttlSeconds = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 3600;
 
-      // Store in database
+      // Blacklist in Redis (primary - fast lookup)
+      await this.tokenBlacklistService.blacklistToken(token, userId, reason, ttlSeconds);
+
+      // Also store in database for audit trail (optional)
+      const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 3600000);
       await this.prisma.tokenBlacklist.create({
         data: {
           token: this.hashToken(token), // Store hash for security
@@ -42,6 +49,9 @@ export class SecurityService {
           reason,
           expiresAt,
         },
+      }).catch(err => {
+        // Ignore database errors - Redis is primary
+        this.logger.warn(`Failed to store blacklist in DB: ${err.message}`);
       });
 
       this.logger.log(`Token blacklisted for user ${userId}, reason: ${reason}`);
@@ -53,20 +63,26 @@ export class SecurityService {
 
   /**
    * Check if token is blacklisted
+   * FR-AUTH-013: Token validation with blacklist check
    */
   async isTokenBlacklisted(token: string): Promise<boolean> {
     try {
-      const tokenHash = this.hashToken(token);
+      // Check Redis first (fast)
+      const isBlacklistedInRedis = await this.tokenBlacklistService.isTokenBlacklisted(token);
+      if (isBlacklistedInRedis) {
+        return true;
+      }
 
-      // Check database
-      const dbResult = await this.prisma.tokenBlacklist.findFirst({
-        where: {
-          token: tokenHash,
-          expiresAt: { gt: new Date() }, // Not expired
-        },
-      });
+      // Also check if all user tokens are blacklisted
+      const decoded = this.jwtService.decode(token) as any;
+      if (decoded?.sub) {
+        const allTokensBlacklisted = await this.tokenBlacklistService.areAllUserTokensBlacklisted(decoded.sub);
+        if (allTokensBlacklisted) {
+          return true;
+        }
+      }
 
-      return !!dbResult;
+      return false;
     } catch (error) {
       this.logger.error(`Error checking token blacklist: ${error.message}`);
       return false; // Fail open to prevent blocking valid users
@@ -75,34 +91,45 @@ export class SecurityService {
 
   /**
    * Blacklist all user's tokens (password change, security breach)
+   * FR-AUTH-018: Change password invalidates all sessions
    */
   async blacklistAllUserTokens(
     userId: string,
     reason: 'PASSWORD_CHANGE' | 'SECURITY_BREACH' | 'ADMIN_REVOKE',
   ): Promise<void> {
-    // Get all active sessions
-    const sessions = await this.prisma.userSession.findMany({
-      where: {
-        userId,
-        isActive: true,
-        expiresAt: { gt: new Date() },
-      },
-    });
+    try {
+      // Blacklist all tokens in Redis (fast, affects all tokens immediately)
+      await this.tokenBlacklistService.blacklistAllUserTokens(userId, reason, 7200); // 2 hours
 
-    // Blacklist each session token
-    for (const session of sessions) {
-      if (session.token) {
-        await this.blacklistToken(session.token, userId, reason);
+      // Get all active sessions
+      const sessions = await this.prisma.userSession.findMany({
+        where: {
+          userId,
+          isActive: true,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      // Blacklist each session token individually (for audit)
+      for (const session of sessions) {
+        if (session.token) {
+          const decoded = this.jwtService.decode(session.token) as any;
+          const ttlSeconds = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 3600;
+          await this.tokenBlacklistService.blacklistToken(session.token, userId, reason, ttlSeconds);
+        }
       }
+
+      // Mark all sessions as revoked in database
+      await this.prisma.userSession.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false, revokedAt: new Date() },
+      });
+
+      this.logger.warn(`All tokens blacklisted for user ${userId}, reason: ${reason}`);
+    } catch (error) {
+      this.logger.error(`Failed to blacklist all user tokens: ${error.message}`);
+      throw error;
     }
-
-    // Mark all sessions as revoked
-    await this.prisma.userSession.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false, revokedAt: new Date() },
-    });
-
-    this.logger.warn(`All tokens blacklisted for user ${userId}, reason: ${reason}`);
   }
 
   // ==================== REFRESH TOKEN ROTATION ====================

@@ -13,6 +13,8 @@ import { OtpService } from './services/otp.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SessionService } from './services/session.service';
 import { SecurityService } from './services/security.service';
+import { TokenBlacklistService } from './services/token-blacklist.service';
+import { RefreshTokenService } from './services/refresh-token.service';
 import { EmailService } from './services/email.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { RolesService } from './services/roles.service';
@@ -46,6 +48,8 @@ import { RolesService } from './services/roles.service';
     TwoFactorService,
     SessionService,
     SecurityService,
+    TokenBlacklistService,
+    RefreshTokenService,
     EmailService,
     SuspiciousActivityService,
     RolesService,

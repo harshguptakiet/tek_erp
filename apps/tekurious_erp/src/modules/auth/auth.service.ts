@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { EventBusService } from '../../events/event-bus.service';
 import { SecurityService } from './services/security.service';
+import { RefreshTokenService } from './services/refresh-token.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
@@ -21,6 +22,7 @@ export class AuthService {
     private configService: ConfigService,
     private eventBus: EventBusService,
     private securityService: SecurityService,
+    private refreshTokenService: RefreshTokenService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
     private suspiciousActivityService: SuspiciousActivityService,
