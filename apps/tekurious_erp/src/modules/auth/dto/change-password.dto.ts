@@ -9,7 +9,7 @@ export class ChangePasswordDto {
   @MinLength(8, { message: 'New password must be at least 8 characters long' })
   @MaxLength(128)
   @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/,
     { message: 'Password must contain uppercase, lowercase, number, and special character' }
   )
   newPassword: string;
@@ -28,7 +28,7 @@ export class ResetPasswordDto {
   @MinLength(8)
   @MaxLength(128)
   @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/,
     { message: 'Password must contain uppercase, lowercase, number, and special character' }
   )
   newPassword: string;

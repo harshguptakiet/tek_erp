@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { authService } from '@/services/auth.service';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Lock, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -35,9 +36,12 @@ const passwordRequirements: PasswordRequirement[] = [
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isOAuthUser, setIsOAuthUser] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const {
     register,
@@ -48,6 +52,25 @@ export default function ChangePasswordPage() {
   } = useForm<ChangePasswordForm>();
 
   const newPassword = watch('newPassword');
+
+  // Check if user is OAuth user
+  useEffect(() => {
+    const checkAuthProvider = async () => {
+      try {
+        if (user?.authProvider && user.authProvider !== 'LOCAL') {
+          setIsOAuthUser(true);
+        } else {
+          const response = await authService.getMe();
+          setIsOAuthUser(response.user.authProvider !== 'LOCAL');
+        }
+      } catch (error) {
+        console.error('Failed to check auth provider:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkAuthProvider();
+  }, [user]);
 
   const changePasswordMutation = useMutation({
     mutationFn: (data: ChangePasswordForm) =>
@@ -60,7 +83,6 @@ export default function ChangePasswordPage() {
         description: 'You have been logged out from all other devices for security.',
       });
       reset();
-      // Redirect to dashboard after 2 seconds
       setTimeout(() => {
         router.push('/dashboard');
       }, 2000);
@@ -79,6 +101,73 @@ export default function ChangePasswordPage() {
     }
     changePasswordMutation.mutate(data);
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <div className="rounded-lg border bg-[hsl(var(--card))] p-8 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--muted-foreground))]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isOAuthUser) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Change Password</h1>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+            Update your password to keep your account secure
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-6">
+          <div className="flex gap-3">
+            <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                Password Change Not Available
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                You signed in using Google or another social provider. Your password is managed by that provider.
+              </p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                To change your password, please visit your provider's account settings:
+              </p>
+              <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2 list-disc list-inside ml-2">
+                <li>
+                  <a
+                    href="https://myaccount.google.com/security"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-900 dark:hover:text-blue-100"
+                  >
+                    Google Account Security
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://account.microsoft.com/security"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-900 dark:hover:text-blue-100"
+                  >
+                    Microsoft Account Security
+                  </a>
+                </li>
+              </ul>
+              <div className="mt-4">
+                <Button variant="outline" onClick={() => router.push('/settings/security')}>
+                  Back to Security Settings
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
