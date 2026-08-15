@@ -78,6 +78,7 @@ export class AuthService {
         status: userStatus,
         authProvider: 'LOCAL',
         emailVerified: emailVerified,
+        lastPasswordChange: new Date(), // Set password change date on registration
       },
       include: {
         userRolesNew: {
