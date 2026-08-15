@@ -35,7 +35,6 @@ export function LoginForm() {
 
       const loginRes = response as any;
       setUser({
-      setUser({
         id: loginRes.user.id,
         email: loginRes.user.email,
         firstName: loginRes.user.firstName,
