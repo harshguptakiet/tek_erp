@@ -903,4 +903,24 @@ export class AuthController {
       warningThresholdMs: 5 * 60 * 1000, // 5 minutes warning
     };
   }
+
+  // ==================== PASSWORD EXPIRY (FR-AUTH-019) ====================
+
+  /**
+   * Check password expiry status
+   * GET /api/v1/auth/password-expiry-status
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('password-expiry-status')
+  @ApiOperation({ summary: 'Check password expiry status' })
+  @ApiBearerAuth()
+  async checkPasswordExpiry(@CurrentUser('id') userId: string): Promise<{
+    isExpired: boolean;
+    isInGracePeriod: boolean;
+    daysRemaining: number;
+    expiryDate: Date;
+  }> {
+    this.logger.log(`GET /auth/password-expiry-status - User: ${userId}`);
+    return this.authService.checkPasswordExpiry(userId);
+  }
 }

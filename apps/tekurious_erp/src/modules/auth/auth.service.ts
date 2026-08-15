@@ -7,6 +7,7 @@ import { SecurityService } from './services/security.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { IpRateLimitService } from './services/ip-rate-limit.service';
 import { DeviceDetectionService } from './services/device-detection.service';
+import { PasswordExpiryService } from './services/password-expiry.service';
 import { EmailService } from './services/email.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
@@ -27,6 +28,7 @@ export class AuthService {
     private refreshTokenService: RefreshTokenService,
     private ipRateLimitService: IpRateLimitService,
     private deviceDetectionService: DeviceDetectionService,
+    private passwordExpiryService: PasswordExpiryService,
     private emailService: EmailService,
     private twoFactorService: TwoFactorService,
     private suspiciousActivityService: SuspiciousActivityService,
@@ -2558,5 +2560,21 @@ export class AuthService {
       this.logger.error(`Failed to ping session: ${error.message}`);
       return { success: false, remainingMs: 0 };
     }
+  }
+
+  // ==================== PASSWORD EXPIRY (FR-AUTH-019) ====================
+
+  /**
+   * Check password expiry status
+   * @param userId - User ID
+   * @returns Password expiry information
+   */
+  async checkPasswordExpiry(userId: string): Promise<{
+    isExpired: boolean;
+    isInGracePeriod: boolean;
+    daysRemaining: number;
+    expiryDate: Date;
+  }> {
+    return this.passwordExpiryService.checkPasswordExpiry(userId);
   }
 }

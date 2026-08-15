@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -17,6 +18,7 @@ import { TokenBlacklistService } from './services/token-blacklist.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { IpRateLimitService } from './services/ip-rate-limit.service';
 import { DeviceDetectionService } from './services/device-detection.service';
+import { PasswordExpiryService } from './services/password-expiry.service';
 import { EmailService } from './services/email.service';
 import { SuspiciousActivityService } from './services/suspicious-activity.service';
 import { RolesService } from './services/roles.service';
@@ -24,6 +26,7 @@ import { RolesService } from './services/roles.service';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    ScheduleModule.forRoot(), // Enable cron jobs
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -54,6 +57,7 @@ import { RolesService } from './services/roles.service';
     RefreshTokenService,
     IpRateLimitService,
     DeviceDetectionService,
+    PasswordExpiryService,
     EmailService,
     SuspiciousActivityService,
     RolesService,
