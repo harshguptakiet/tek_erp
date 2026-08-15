@@ -243,7 +243,12 @@ export const authService = {
     const response = await apiClient.get('/auth/sessions');
     const data = response.data;
     if (Array.isArray(data)) {
-      return { sessions: data };
+      // Backend marks the caller's own session with isCurrent: true on each
+      // item, but doesn't send a separate currentSessionId field. Derive it
+      // here so pages that key off `currentSessionId` (rather than the
+      // per-item isCurrent flag) work correctly.
+      const current = data.find((s: any) => s.isCurrent);
+      return { sessions: data, currentSessionId: current?.id };
     }
     return data;
   },

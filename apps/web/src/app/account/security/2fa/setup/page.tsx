@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/form';
 import * as z from 'zod';
-import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth.store';
 import { authService } from '@/services/auth.service';
 import { Button } from '@/components/ui/button';
@@ -240,9 +239,15 @@ export default function Setup2FAPage() {
             <div className="flex flex-col items-center space-y-4">
               {/* QR Code */}
               <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-                <div
-                  dangerouslySetInnerHTML={{ __html: qrCodeData.qrCode }}
-                  className="w-64 h-64"
+                {/* qrCode is a data:image/png;base64,... URI, not HTML markup -
+                    it must be rendered as an <img> src, never via
+                    dangerouslySetInnerHTML (which just dumps the raw string
+                    as visible text). */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrCodeData.qrCode}
+                  alt="2FA QR Code"
+                  className="w-64 h-64 object-contain"
                 />
               </div>
 
